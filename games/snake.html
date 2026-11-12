@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>贪吃蛇 · RTSX</title>
+<style>
+  :root{
+    --bg:#F4F1EA; --ink:#191817; --ink-2:#5F5B53; --ink-3:#938E85;
+    --line:#E4E0D7; --brand:#D97757; --btn:#2A2724; --board:#EDE7DC;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased;
+    display:flex;align-items:center;justify-content:center;
+    min-height:100vh;min-height:100dvh;
+    padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom));
+    overflow:auto;
+    touch-action:manipulation;
+  }
+  .app{width:min(420px,94vw,64dvh);display:flex;flex-direction:column;gap:12px;}
+  .top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+  .lead{display:flex;align-items:center;gap:10px;}
+  .back{border:0;background:none;font:inherit;font-size:12px;color:var(--ink-3);cursor:pointer;padding:4px 0;}
+  .back:hover{color:var(--ink-2);}
+  .snd{
+    border:1px solid var(--line);background:#fff;border-radius:8px;
+    padding:3px 7px;font:inherit;font-size:10px;letter-spacing:.12em;
+    color:var(--ink-3);cursor:pointer;
+  }
+  .snd.off{opacity:.5;text-decoration:line-through;}
+  @media (max-height:600px){
+    body{padding:8px;}
+    .app{gap:8px;}
+    .hint{display:none;}
+    .pad{grid-template-rows:repeat(2,38px);}
+  }
+  .scores{display:flex;gap:8px;}
+  .scorebox{min-width:74px;padding:6px 12px;border-radius:10px;background:#fff;border:1px solid var(--line);text-align:center;}
+  .scorebox label{display:block;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);}
+  .scorebox b{display:block;font-size:17px;font-weight:600;line-height:1.3;font-variant-numeric:tabular-nums;}
+  canvas{width:100%;aspect-ratio:1/1;border-radius:14px;display:block;background:var(--board);touch-action:none;}
+  .hint{margin:0;font-size:11.5px;color:var(--ink-3);text-align:center;}
+  .pad{
+    display:grid;grid-template-columns:repeat(3,56px);grid-template-rows:repeat(2,44px);
+    gap:6px;justify-content:center;margin-top:2px;
+  }
+  .pad button{
+    border:1px solid var(--line);background:#fff;border-radius:10px;
+    color:var(--ink-2);font:inherit;font-size:16px;cursor:pointer;
+    transition:background .14s ease, transform .14s ease;
+  }
+  .pad button:active{background:var(--bg);transform:scale(.97);}
+  .pad .up{grid-column:2;grid-row:1;}
+  .pad .left{grid-column:1;grid-row:2;}
+  .pad .down{grid-column:2;grid-row:2;}
+  .pad .right{grid-column:3;grid-row:2;}
+  .overlay{
+    position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(244,241,234,.9);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);padding:24px;z-index:5;
+  }
+  .overlay.show{display:flex;animation:fade .25s ease both;}
+  @keyframes fade{from{opacity:0;}to{opacity:1;}}
+  .panel{
+    width:100%;max-width:300px;background:#fff;border:1px solid var(--line);border-radius:14px;
+    padding:26px 22px 22px;text-align:center;box-shadow:0 20px 50px -24px rgba(25,24,23,.35);
+  }
+  .panel h2{margin:0 0 8px;font-size:19px;font-weight:600;font-family:Georgia,"Songti SC",serif;}
+  .panel p{margin:0 0 18px;font-size:13px;color:var(--ink-2);line-height:1.6;}
+  .btn{
+    height:40px;padding:0 22px;border:0;border-radius:10px;background:var(--btn);color:#fff;
+    font:inherit;font-size:13.5px;font-weight:500;cursor:pointer;
+  }
+  .btn:hover{background:#000;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div class="lead">
+      <button class="back" id="back" type="button">← 返回</button>
+      <button class="snd" id="snd" type="button">SFX</button>
+    </div>
+    <div class="scores">
+      <div class="scorebox"><label>得分</label><b id="score">0</b></div>
+      <div class="scorebox"><label>最佳</label><b id="best">0</b></div>
+    </div>
+  </div>
+  <canvas id="cv" width="420" height="420"></canvas>
+  <p class="hint">方向键 / WASD 控制方向</p>
+  <div class="pad">
+    <button class="up" data-dir="2" type="button">↑</button>
+    <button class="left" data-dir="0" type="button">←</button>
+    <button class="down" data-dir="3" type="button">↓</button>
+    <button class="right" data-dir="1" type="button">→</button>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="panel">
+    <h2 id="ov-title">准备好了吗</h2>
+    <p id="ov-text">用方向键移动，吃到圆点会变长，撞到墙或自己就结束。</p>
+    <button class="btn" id="ov-btn" type="button">开始</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- 音效：全部用 WebAudio 合成，不加载任何外部文件 ---------- */
+  var SFX = (function(){
+    var ctx = null, on = true, out = null;
+    try { on = localStorage.getItem("rtsx.sound.v1") !== "off"; } catch(e) {}
+    function ac(){
+      if (!ctx) {
+        var C = window.AudioContext || window.webkitAudioContext;
+        if (!C) return null;
+        try { ctx = new C(); } catch(e) { return null; }
+      }
+      if (ctx.state === "suspended") { try { ctx.resume(); } catch(e) {} }
+      if (!out) {
+        out = ctx.createDynamicsCompressor();      // 限制器：音量拉满也不炸耳朵
+        out.threshold.value = -2;
+        out.knee.value = 20;
+        out.ratio.value = 12;
+        out.attack.value = 0.004;
+        out.release.value = 0.2;
+        out.connect(ctx.destination);
+      }
+      return ctx;
+    }
+    function tone(f, dur, type, gain, delay, to){
+      if (!on) return;
+      var c = ac(); if (!c) return;
+      var t0 = c.currentTime + (delay || 0);
+      var o = c.createOscillator(), g = c.createGain();
+      o.type = type || "sine";
+      o.frequency.setValueAtTime(f, t0);
+      if (to) o.frequency.exponentialRampToValueAtTime(to, t0 + dur);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(Math.min(0.99, (gain || 0.05) * 14), t0 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      o.connect(g); g.connect(out || c.destination);
+      o.start(t0); o.stop(t0 + dur + 0.03);
+    }
+    var api = {
+      click: function(){ tone(520, 0.055, "triangle", 0.045); },
+      tick:  function(){ tone(330, 0.03, "square", 0.012); },
+      eat:   function(){ tone(760, 0.08, "sine", 0.055, 0, 1080); tone(1120, 0.06, "sine", 0.03, 0.07); },
+      hit:   function(){ tone(190, 0.1, "square", 0.04, 0, 130); },
+      lose:  function(){ tone(260, 0.26, "sawtooth", 0.04, 0, 90); },
+      win:   function(){ tone(660, 0.1, "sine", 0.05); tone(880, 0.12, "sine", 0.05, 0.1); tone(1240, 0.16, "sine", 0.045, 0.2); },
+      isOn:  function(){ return on; },
+      set:   function(v){ on = v; try { localStorage.setItem("rtsx.sound.v1", v ? "on" : "off"); } catch(e) {} }
+    };
+    window.addEventListener("storage", function(e){ if (e.key === "rtsx.sound.v1") on = e.newValue !== "off"; });
+    return api;
+  })();
+
+  var sndBtn = document.getElementById("snd");
+  function paintSnd(){ if (sndBtn) sndBtn.classList.toggle("off", !SFX.isOn()); }
+  paintSnd();
+  if (sndBtn) sndBtn.addEventListener("click", function(){
+    SFX.set(!SFX.isOn()); paintSnd(); if (SFX.isOn()) SFX.click();
+  });
+  window.addEventListener("storage", paintSnd);
+
+  var N = 20, SIZE = 420, CELL = SIZE / N, BEST_KEY = "rtsx.snake.best";
+  var cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+  var scoreEl = document.getElementById("score"), bestEl = document.getElementById("best");
+  var overlay = document.getElementById("overlay");
+
+  var snake, dir, nextDir, food, score, best, state, timer, speed;
+
+  try { best = parseInt(localStorage.getItem(BEST_KEY) || "0", 10) || 0; } catch (e) { best = 0; }
+  bestEl.textContent = best;
+
+  function writeBest(v){ try{ localStorage.setItem(BEST_KEY, String(v)); }catch(e){} }
+
+  function reset(){
+    snake = [{x:9,y:10},{x:8,y:10},{x:7,y:10}];
+    dir = 1; nextDir = 1;
+    score = 0; speed = 150; state = "ready";
+    placeFood();
+    scoreEl.textContent = "0";
+    draw();
+  }
+
+  function placeFood(){
+    var free = [];
+    for (var y = 0; y < N; y++) for (var x = 0; x < N; x++) {
+      var hit = false;
+      for (var i = 0; i < snake.length; i++) if (snake[i].x === x && snake[i].y === y) { hit = true; break; }
+      if (!hit) free.push({x:x,y:y});
+    }
+    food = free[Math.floor(Math.random() * free.length)] || {x:0,y:0};
+  }
+
+  function roundRect(x, y, w, h, r){
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function draw(){
+    ctx.fillStyle = "#EDE7DC";
+    ctx.fillRect(0, 0, SIZE, SIZE);
+
+    // 食物
+    ctx.fillStyle = "#D97757";
+    ctx.beginPath();
+    ctx.arc(food.x * CELL + CELL / 2, food.y * CELL + CELL / 2, CELL * 0.34, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 蛇身
+    for (var i = snake.length - 1; i >= 0; i--) {
+      var s = snake[i];
+      var pad = i === 0 ? 2 : 3;
+      ctx.fillStyle = i === 0 ? "#C4603F" : (i % 2 ? "#D98B6B" : "#D9775A");
+      roundRect(s.x * CELL + pad, s.y * CELL + pad, CELL - pad * 2, CELL - pad * 2, CELL * 0.28);
+      ctx.fill();
+    }
+
+    // 眼睛
+    if (snake.length) {
+      var head = snake[0], cx = head.x * CELL + CELL / 2, cy = head.y * CELL + CELL / 2;
+      var off = CELL * 0.17;
+      ctx.fillStyle = "rgba(255,255,255,.92)";
+      var ex = dir === 1 ? off : dir === 0 ? -off : 0;
+      var ey = dir === 3 ? off : dir === 2 ? -off : 0;
+      ctx.beginPath(); ctx.arc(cx + ex + ey * 0.35, cy + ey - ex * 0.35, CELL * 0.11, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + ex - ey * 0.35, cy + ey + ex * 0.35, CELL * 0.11, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  function tick(){
+    if (state !== "run") return;
+    dir = nextDir;
+
+    var head = {x: snake[0].x, y: snake[0].y};
+    if (dir === 0) head.x--;
+    else if (dir === 1) head.x++;
+    else if (dir === 2) head.y--;
+    else head.y++;
+
+    if (head.x < 0 || head.x >= N || head.y < 0 || head.y >= N) return gameOver();
+    for (var i = 0; i < snake.length - 1; i++) {
+      if (snake[i].x === head.x && snake[i].y === head.y) return gameOver();
+    }
+
+    snake.unshift(head);
+    if (head.x === food.x && head.y === food.y) {
+      score++;
+      SFX.eat();
+      scoreEl.textContent = score;
+      if (score > best) { best = score; writeBest(best); bestEl.textContent = best; }
+      placeFood();
+      if (speed > 80) { speed = Math.max(80, speed - 4); restartTimer(); }
+    } else {
+      snake.pop();
+    }
+    draw();
+  }
+
+  function restartTimer(){
+    clearInterval(timer);
+    timer = setInterval(tick, speed);
+  }
+
+  function start(){
+    if (state === "run") return;
+    if (state === "over") reset();
+    state = "run";
+    SFX.click();
+    hideOverlay();
+    restartTimer();
+  }
+
+  function gameOver(){
+    state = "over";
+    clearInterval(timer);
+    SFX.lose();
+    showOverlay("撞上了", "这局长度 " + score + "，最佳 " + best + "。", "再来一局");
+  }
+
+  // 0=左 1=右 2=上 3=下，反向表不能靠 (dir+2)%4 算
+  var OPPOSITE = [1, 0, 3, 2];
+
+  function setDir(d){
+    if (state === "ready") start();
+    if (state !== "run") return;
+    if (d === nextDir || d === dir) return;                            // 同方向忽略
+    if (d === OPPOSITE[nextDir] || d === OPPOSITE[dir]) return;        // 不能掉头（当前方向也要挡住，防止连按两键凑出 180°）
+    nextDir = d;
+    SFX.tick();
+  }
+
+  function showOverlay(title, text, label){
+    document.getElementById("ov-title").textContent = title;
+    document.getElementById("ov-text").textContent = text;
+    document.getElementById("ov-btn").textContent = label;
+    overlay.classList.add("show");
+  }
+  function hideOverlay(){ overlay.classList.remove("show"); }
+
+  /* 输入 */
+  var KEYS = {ArrowLeft:0, ArrowUp:2, ArrowRight:1, ArrowDown:3, a:0, w:2, d:1, s:3, A:0, W:2, D:1, S:3};
+  document.addEventListener("keydown", function(e){
+    var d = KEYS[e.key];
+    if (d === undefined) { if (e.key === " " || e.key === "Enter") { e.preventDefault(); start(); } return; }
+    e.preventDefault();
+    setDir(d);
+  });
+
+  var pad = document.querySelector(".pad");
+  pad.addEventListener("click", function(e){
+    var b = e.target.closest ? e.target.closest("button[data-dir]") : null;
+    if (b) setDir(parseInt(b.getAttribute("data-dir"), 10));
+  });
+
+  document.getElementById("ov-btn").addEventListener("click", function(){
+    if (state === "over") reset();
+    start();
+  });
+  document.getElementById("back").addEventListener("click", function(){
+    if (window.parent !== window) window.parent.postMessage("rtsx-close", "*");
+    else location.href = "../index.html";
+  });
+
+  /* 触屏滑动 */
+  var sx = 0, sy = 0, tracking = false;
+  cv.addEventListener("touchstart", function(e){
+    if (e.touches.length !== 1) return;
+    tracking = true; sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+    if (state === "ready") start();
+  }, { passive: true });
+  cv.addEventListener("touchend", function(e){
+    if (!tracking) return;
+    tracking = false;
+    var t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
+    setDir(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 0) : (dy > 0 ? 3 : 2));
+  });
+
+  reset();
+  showOverlay("准备好了吗", "用方向键移动，吃到圆点会变长，撞到墙或自己就结束。", "开始");
+
+  // 内嵌在弹层里时，先把焦点拿过来，否则方向键会被外层页面吃掉
+  try { window.focus(); } catch (e) {}
+  document.addEventListener("pointerdown", function(){ try { window.focus(); } catch (e) {} });
+})();
+</script>
+</body>
+</html>

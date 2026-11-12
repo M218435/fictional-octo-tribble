@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>67 专辑 · RTSX</title>
+<style>
+  :root{
+    --ink:#F6F1E8; --dim:rgba(246,241,232,.56); --dim2:rgba(246,241,232,.34);
+    --line:#2F2A24; --clay:#E2916F;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{
+    margin:0;min-height:100vh;
+    background:
+      radial-gradient(90% 60% at 50% 0%, #26221C 0%, rgba(38,34,28,0) 62%),
+      #171513;
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding:calc(18px + env(safe-area-inset-top)) 20px calc(32px + env(safe-area-inset-bottom));
+    overflow-x:hidden;
+  }
+  .bar{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .bar .right{display:flex;align-items:center;gap:12px;}
+  .back{border:0;background:none;font:inherit;font-size:12px;color:var(--dim2);cursor:pointer;padding:4px 0;letter-spacing:.02em;}
+  .back:hover{color:var(--dim);}
+  .snd{
+    border:1px solid var(--line);background:none;border-radius:8px;
+    padding:3px 7px;font:inherit;font-size:10px;letter-spacing:.12em;
+    color:var(--dim2);cursor:pointer;
+  }
+  .snd.off{opacity:.55;text-decoration:line-through;}
+  .badge{
+    font-family:Georgia,serif;font-size:11px;letter-spacing:.28em;
+    color:var(--dim2);text-transform:uppercase;
+  }
+
+  .hero{display:flex;flex-direction:column;align-items:center;margin:26px 0 30px;}
+  .scene{width:112px;height:112px;perspective:820px;margin-bottom:26px;}
+  .cube{
+    position:relative;width:112px;height:112px;
+    transform-style:preserve-3d;
+    animation:spin 16s linear infinite;
+  }
+  @keyframes spin{
+    from{transform:rotateX(-16deg) rotateY(0deg);}
+    to{transform:rotateX(-16deg) rotateY(360deg);}
+  }
+  .face{
+    position:absolute;width:112px;height:112px;
+    display:flex;align-items:center;justify-content:center;
+    font-family:Georgia,"Songti SC",serif;font-size:38px;font-weight:700;
+    letter-spacing:.02em;color:#FBF3E7;
+    background:linear-gradient(150deg,#E08A66 0%,#C4603F 70%,#A94C33 100%);
+    border:1px solid rgba(255,255,255,.16);
+    box-shadow:inset 0 0 40px rgba(0,0,0,.18);
+  }
+  .f1{transform:translateZ(56px);}
+  .f2{transform:rotateY(180deg) translateZ(56px);}
+  .f3{transform:rotateY(90deg) translateZ(56px);}
+  .f4{transform:rotateY(-90deg) translateZ(56px);}
+  .f5{transform:rotateX(90deg) translateZ(56px);}
+  .f6{transform:rotateX(-90deg) translateZ(56px);}
+
+  h1{
+    margin:0 0 10px;font-family:Georgia,"Songti SC","STSong",serif;
+    font-size:34px;font-weight:600;letter-spacing:-.01em;
+  }
+  .sub{margin:0;max-width:470px;text-align:center;font-size:13.5px;line-height:1.75;color:var(--dim);}
+
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:720px;margin:34px auto 0;}
+  .card{
+    display:flex;flex-direction:column;
+    padding:20px 20px 18px;
+    border:1px solid var(--line);border-radius:14px;
+    background:linear-gradient(160deg,#232019 0%,#1C1A17 100%);
+    text-decoration:none;color:var(--ink);
+    transition:transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+  }
+  .card:hover{transform:translateY(-3px);border-color:#443B31;box-shadow:0 18px 40px -28px #000;}
+  .card .tag{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--clay);margin-bottom:10px;}
+  .card h2{
+    margin:0 0 8px;font-family:Georgia,"Songti SC",serif;
+    font-size:20px;font-weight:600;
+  }
+  .card p{margin:0 0 16px;font-size:12.5px;line-height:1.75;color:var(--dim);}
+  .card .go{margin-top:auto;font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--clay);}
+  .card.soon{opacity:.45;pointer-events:none;}
+  .card.soon .tag{color:var(--dim2);}
+  .card.soon .go{color:var(--dim2);}
+
+  @media (max-width:640px){
+    .cards{grid-template-columns:1fr;}
+    h1{font-size:27px;}
+    .scene{width:92px;height:92px;}
+    .cube,.face{width:92px;height:92px;}
+    .face{font-size:32px;}
+    .f1{transform:translateZ(46px);}
+    .f2{transform:rotateY(180deg) translateZ(46px);}
+    .f3{transform:rotateY(90deg) translateZ(46px);}
+    .f4{transform:rotateY(-90deg) translateZ(46px);}
+    .f5{transform:rotateX(90deg) translateZ(46px);}
+    .f6{transform:rotateX(-90deg) translateZ(46px);}
+  }
+</style>
+</head>
+<body>
+  <div class="bar">
+    <button class="back" id="back" type="button">← 返回大厅</button>
+    <div class="right">
+      <button class="snd" id="snd" type="button">SFX</button>
+      <span class="badge">3D Album</span>
+    </div>
+  </div>
+
+  <section class="hero">
+    <div class="scene">
+      <div class="cube">
+        <div class="face f1">67</div>
+        <div class="face f2">67</div>
+        <div class="face f3">67</div>
+        <div class="face f4">67</div>
+        <div class="face f5">67</div>
+        <div class="face f6">67</div>
+      </div>
+    </div>
+    <h1>67 专辑</h1>
+    <p class="sub">一片悬着的棋盘，散落着 67 个方块。走过去把它们捡起来，一个都别落下。</p>
+  </section>
+
+  <div class="cards">
+    <a class="card" href="collect.html?mode=free">
+      <div class="tag">自由模式</div>
+      <h2>收集 67</h2>
+      <p>67 个方块撒在场地各处，走近就会被吸走。集齐那一刻计时停下，用多久全看你路线怎么走。</p>
+      <div class="go">开始 →</div>
+    </a>
+
+    <a class="card" href="collect.html?mode=timed">
+      <div class="tag">限时模式</div>
+      <h2>67 限时</h2>
+      <p>同一个场地，只给 90 秒。能捡多少算多少，本机会记住你最好的一次。</p>
+      <div class="go">开始 →</div>
+    </a>
+
+    <div class="card soon">
+      <div class="tag">敬请期待</div>
+      <h2>67 迷宫</h2>
+      <p>正在做：一座会移动的立体迷宫，出口在 67 号门后面。</p>
+      <div class="go">未开放</div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  var SFX = (function(){
+    var ctx = null, on = true, out = null;
+    try { on = localStorage.getItem("rtsx.sound.v1") !== "off"; } catch(e) {}
+    function ac(){
+      if (!ctx) {
+        var C = window.AudioContext || window.webkitAudioContext;
+        if (!C) return null;
+        try { ctx = new C(); } catch(e) { return null; }
+      }
+      if (ctx.state === "suspended") { try { ctx.resume(); } catch(e) {} }
+      if (!out) {
+        out = ctx.createDynamicsCompressor();      // 限制器：音量拉满也不炸耳朵
+        out.threshold.value = -2;
+        out.knee.value = 20;
+        out.ratio.value = 12;
+        out.attack.value = 0.004;
+        out.release.value = 0.2;
+        out.connect(ctx.destination);
+      }
+      return ctx;
+    }
+    function tone(f, dur, type, gain, delay, to){
+      if (!on) return;
+      var c = ac(); if (!c) return;
+      var t0 = c.currentTime + (delay || 0);
+      var o = c.createOscillator(), g = c.createGain();
+      o.type = type || "sine";
+      o.frequency.setValueAtTime(f, t0);
+      if (to) o.frequency.exponentialRampToValueAtTime(to, t0 + dur);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(Math.min(0.99, (gain || 0.05) * 14), t0 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      o.connect(g); g.connect(out || c.destination);
+      o.start(t0); o.stop(t0 + dur + 0.03);
+    }
+    var api = {
+      click: function(){ tone(520, 0.055, "triangle", 0.045); },
+      isOn:  function(){ return on; },
+      set:   function(v){ on = v; try { localStorage.setItem("rtsx.sound.v1", v ? "on" : "off"); } catch(e) {} }
+    };
+    window.addEventListener("storage", function(e){ if (e.key === "rtsx.sound.v1") on = e.newValue !== "off"; });
+    return api;
+  })();
+
+  var sndBtn = document.getElementById("snd");
+  function paintSnd(){ if (sndBtn) sndBtn.classList.toggle("off", !SFX.isOn()); }
+  paintSnd();
+  if (sndBtn) sndBtn.addEventListener("click", function(){
+    SFX.set(!SFX.isOn()); paintSnd(); if (SFX.isOn()) SFX.click();
+  });
+  window.addEventListener("storage", paintSnd);
+
+  [].forEach.call(document.querySelectorAll("a.card"), function(a){
+    a.addEventListener("click", function(){ SFX.click(); });
+  });
+
+  document.getElementById("back").addEventListener("click", function(){
+    if (window.parent !== window) window.parent.postMessage("rtsx-close", "*");
+    else location.href = "../index.html";
+  });
+})();
+</script>
+</body>
+</html>

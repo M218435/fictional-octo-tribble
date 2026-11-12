@@ -2,1531 +2,1085 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>vibe 知识大赏是怎么火的？</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2306080E'/%3E%3Cline x1='5' y1='21' x2='27' y2='21' stroke='%23D9A05B' stroke-width='1.5'/%3E%3Ctext x='16' y='16' font-family='monospace' font-size='11' fill='%23D9A05B' text-anchor='middle'%3E11%3C/text%3E%3C/svg%3E">
-<link rel="preconnect" href="https://miaoda.feishu.cn">
-<link rel="preconnect" href="https://sf3-scmcdn-cn.feishucdn.com" crossorigin>
-<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Serif+SC:wght@600&amp;family=Noto+Sans+SC:wght@400;500&amp;display=swap">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#F4F1EA">
+<title>RTSX</title>
 <style>
   :root{
-    --ink:#06080E;
-    --ink2:#0A0F18;
-    --line:#1C2636;
-    --text:#DCE4EF;
-    --muted:#75818F;
-    --amber:#D9A05B;
+    --bg:#F4F1EA;
+    --bg-soft:#FBF9F5;
+    --ink:#191817;
+    --ink-2:#5F5B53;
+    --ink-3:#938E85;
+    --line:#E4E0D7;
+    --line-2:#EFEBE3;
+    --brand:#D97757;
+    --brand-2:#C4603F;
+    --btn:#2A2724;
+    --card:#FFFFFF;
+    --danger:#BC4B2E;
   }
-  *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%;background:#04060A;overflow:hidden}
+  *{box-sizing:border-box;}
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{animation-duration:.001ms !important;transition-duration:.001ms !important;}
+  }
+  html,body{height:100%;}
   body{
-    font-family:'Noto Sans SC','PingFang SC','Microsoft YaHei','Noto Sans CJK SC',sans-serif;
-    color:var(--text);
-    display:flex;align-items:center;justify-content:center;
+    margin:0;
+    background:
+      radial-gradient(120% 80% at 50% -10%, #FDFBF7 0%, rgba(253,251,247,0) 60%),
+      var(--bg);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    font-size:16px;
+    line-height:1.6;
     -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+    overflow-x:hidden;
   }
-  #stage{
-    position:relative;
-    width:min(100vw,177.78vh);
-    aspect-ratio:16/9;
-    background:#06080E;
-    overflow:hidden;
-    box-shadow:0 0 80px rgba(0,0,0,.8);
+  .stage{
+    position:fixed;
+    inset:0;
+    display:flex;
+    align-items:flex-start;          /* 内容超高时从顶部开始，不再把上半截裁掉 */
+    justify-content:center;
+    padding:28px;
+    opacity:0;
+    visibility:hidden;
+    pointer-events:none;
+    transform:translateY(8px);
+    transition:opacity .55s cubic-bezier(.22,.61,.36,1), transform .55s cubic-bezier(.22,.61,.36,1);
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior:contain;
   }
-  #cv{display:block;width:100%;height:100%}
-  #grain{
-    position:absolute;inset:0;pointer-events:none;opacity:.055;
-    mix-blend-mode:overlay;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  .stage > .card,
+  .stage > .home,
+  .stage > .boot-inner{margin-top:auto;margin-bottom:auto;}
+  .stage.on{
+    opacity:1;
+    visibility:visible;
+    pointer-events:auto;
+    transform:none;
   }
 
-  /* ---------- 控制层（不会出现在录屏画面里：录制模式下隐藏） ---------- */
-  #ui{
-    position:absolute;left:0;right:0;bottom:0;
-    padding:18px 22px 16px;
-    display:flex;align-items:center;gap:14px;
-    background:linear-gradient(to top,rgba(3,5,9,.92),rgba(3,5,9,0));
-    transition:opacity .35s ease;
-    font-size:13px;
+  /* ---------- brand mark : RTSX ---------- */
+  .mark{
+    border-radius:13px;
+    background:linear-gradient(155deg,#E2916F 0%, var(--brand) 45%, var(--brand-2) 100%);
+    color:#fff;
+    font-family:Georgia,"Times New Roman",serif;
+    font-weight:700;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    line-height:1;
+    letter-spacing:.02em;
+    box-shadow:0 2px 4px rgba(120,60,40,.18), inset 0 1px 0 rgba(255,255,255,.28);
+    user-select:none;
   }
-  #ui.hide{opacity:0;pointer-events:none}
+  .wordmark{
+    font-family:Georgia,"Times New Roman",serif;
+    letter-spacing:.26em;
+    text-transform:uppercase;
+    color:var(--ink-3);
+    font-size:11px;
+    margin-top:14px;
+    padding-left:.26em;
+  }
+
+  /* ---------- boot ---------- */
+  .boot-inner{display:flex;flex-direction:column;align-items:center;}
+  .boot-mark{width:40px;height:40px;font-size:21px;animation:breathe 1.9s ease-in-out infinite;}
+  @keyframes breathe{
+    0%,100%{opacity:.38;transform:scale(.94);}
+    50%{opacity:1;transform:scale(1);}
+  }
+  .load{width:min(240px,64vw);margin-top:24px;}
+  .load-bar{
+    height:3px;border-radius:99px;background:rgba(25,24,23,.09);overflow:hidden;
+  }
+  .load-fill{
+    display:block;height:100%;width:0;border-radius:99px;
+    background:linear-gradient(90deg,#E2916F,#C4603F);
+    transition:width .4s cubic-bezier(.22,.61,.36,1);
+  }
+  .load-meta{
+    display:flex;align-items:baseline;justify-content:space-between;
+    margin-top:10px;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-3);
+  }
+  .load-meta b{font-variant-numeric:tabular-nums;letter-spacing:.06em;color:#8C877C;font-weight:600;}
+
+  /* 音效开关 */
+  .snd{
+    position:fixed;top:14px;right:14px;z-index:30;
+    border:1px solid var(--line);background:rgba(255,255,255,.82);border-radius:8px;
+    padding:4px 8px;font:inherit;font-size:10px;letter-spacing:.12em;
+    color:var(--ink-3);cursor:pointer;
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  }
+  .snd.off{opacity:.55;text-decoration:line-through;}
+  body.modal-open .snd{display:none;}   /* 弹层打开时让位给游戏自己的开关，避免盖住关闭按钮 */
+
+  /* ---------- card ---------- */
+  .card{
+    width:min(520px,100%);
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:40px 40px 28px;
+    text-align:center;
+    box-shadow:0 1px 2px rgba(25,24,23,.04), 0 24px 60px -28px rgba(25,24,23,.28);
+  }
+  .card .mark{width:44px;height:44px;font-size:23px;margin:0 auto;}
+  .card h1{
+    margin:24px 0 14px;
+    font-family:Georgia,"Songti SC","STSong","Times New Roman",serif;
+    font-weight:600;
+    font-size:25px;
+    line-height:1.35;
+    letter-spacing:-.005em;
+    color:var(--ink);
+  }
+  .lede{
+    margin:0 auto;
+    max-width:396px;
+    font-size:14.5px;
+    line-height:1.75;
+    color:var(--ink-2);
+  }
+  .ref{
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+    margin:20px 0 24px;
+    padding:5px 12px;
+    border:1px solid var(--line);
+    border-radius:999px;
+    background:var(--bg-soft);
+    font-family:ui-monospace,SFMono-Regular,"SF Mono",Consolas,"Liberation Mono",monospace;
+    font-size:11.5px;
+    letter-spacing:.05em;
+    color:var(--ink-3);
+  }
+  .ref b{color:#7E7A70;font-weight:600;}
+
+  .actions{display:flex;flex-direction:column;align-items:center;gap:13px;}
   .btn{
-    width:34px;height:34px;border:1px solid rgba(220,228,239,.22);
-    background:transparent;color:var(--text);cursor:pointer;
-    display:grid;place-items:center;font-size:12px;
-    transition:border-color .2s,background .2s;
-    flex:0 0 auto;
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    height:44px;padding:0 24px;border:0;border-radius:10px;
+    background:var(--btn);color:#fff;
+    font-size:14.5px;font-weight:500;font-family:inherit;
+    text-decoration:none;cursor:pointer;
+    transition:background .18s ease, transform .18s ease, box-shadow .18s ease;
+    box-shadow:0 1px 2px rgba(25,24,23,.18);
+    white-space:nowrap;
   }
-  .btn:hover{border-color:var(--amber);background:rgba(217,160,91,.1)}
-  .btn:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
-  #bar{
-    flex:1 1 auto;height:20px;display:flex;align-items:center;cursor:pointer;min-width:0;
+  .btn:hover{background:#000;transform:translateY(-1px);box-shadow:0 6px 18px -8px rgba(25,24,23,.5);}
+  .btn:active{transform:translateY(0);}
+  .sub-link{
+    background:none;border:0;border-bottom:1px solid var(--line);
+    font-family:inherit;font-size:13.5px;color:var(--ink-2);
+    padding:0 0 1px;cursor:pointer;text-decoration:none;
+    transition:color .18s ease, border-color .18s ease;
   }
-  #barTrack{position:relative;width:100%;height:2px;background:rgba(220,228,239,.18)}
-  #barFill{position:absolute;left:0;top:0;height:2px;width:0%;background:var(--amber)}
-  #barDot{position:absolute;top:-4px;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:var(--amber);left:0}
-  #time{font-family:Consolas,'DejaVu Sans Mono',monospace;color:var(--muted);font-size:12px;letter-spacing:.05em;flex:0 0 auto}
-  #hint{color:var(--muted);font-size:11px;flex:0 0 auto;letter-spacing:.02em}
-  .sep{width:1px;height:16px;background:rgba(220,228,239,.15);flex:0 0 auto}
+  .sub-link:hover{color:var(--ink);border-color:var(--ink-3);}
 
-  /* ---------- 开始遮罩 ---------- */
-  #gate{
-    position:absolute;inset:0;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;gap:26px;
-    background:rgba(4,6,10,.94);
-    backdrop-filter:none;
-    transition:opacity .55s ease;
+  /* ---------- appeal ---------- */
+  .appeal{
+    display:none;
+    margin:22px auto 0;
+    text-align:left;
+    max-width:396px;
+  }
+  .appeal.open{display:block;animation:rise .3s ease both;}
+  @keyframes rise{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:none;}}
+  .appeal-label{
+    font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--ink-3);margin-bottom:8px;
+  }
+  .appeal-row{display:flex;gap:8px;}
+  .appeal input{
+    flex:1 1 auto;min-width:0;height:44px;
+    border:1px solid var(--line);border-radius:10px;
+    background:var(--bg-soft);padding:0 14px;
+    font:inherit;font-size:14px;color:var(--ink);
+    outline:none;
+    transition:border-color .18s ease, box-shadow .18s ease, background .18s ease;
+  }
+  .appeal input::placeholder{color:#B3ADA2;}
+  .appeal input:focus{
+    border-color:#CDBFAF;background:#fff;
+    box-shadow:0 0 0 3px rgba(217,119,87,.14);
+  }
+  .appeal .btn{height:44px;padding:0 18px;font-size:14px;}
+  .appeal-note{margin:9px 0 0;font-size:12px;line-height:1.6;color:var(--ink-3);}
+  .appeal-err{
+    display:none;margin:9px 0 0;font-size:12.5px;line-height:1.6;color:var(--danger);
+  }
+  .appeal-err.show{display:block;}
+
+  /* ---------- terms (全站自包含，无外链) ---------- */
+  .terms{
+    display:none;
+    margin:20px auto 0;
+    max-width:398px;
+    text-align:left;
+    background:var(--bg-soft);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:15px 17px 13px;
+  }
+  .terms.open{display:block;animation:rise .3s ease both;}
+  .terms-head{
+    font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--ink-3);margin-bottom:9px;
+  }
+  .terms-list{
+    margin:0;padding-left:17px;
+    font-size:12.5px;line-height:1.8;color:var(--ink-2);
+  }
+  .terms-list li{margin-bottom:2px;}
+  .shake{animation:shake .38s cubic-bezier(.36,.07,.19,.97) both;}
+  @keyframes shake{
+    10%,90%{transform:translateX(-2px);}
+    20%,80%{transform:translateX(4px);}
+    30%,50%,70%{transform:translateX(-7px);}
+    40%,60%{transform:translateX(7px);}
+  }
+
+  .foot{
+    margin-top:26px;padding-top:20px;
+    border-top:1px solid var(--line-2);
+    font-size:12.5px;line-height:1.75;color:var(--ink-3);
+  }
+  .foot a{color:var(--ink-3);text-decoration:underline;text-underline-offset:2px;}
+  .foot a:hover{color:var(--ink-2);}
+
+  /* ---------- home : game lobby ---------- */
+  .home{width:min(760px,100%);text-align:center;}
+  .home .mark{width:52px;height:52px;font-size:27px;margin:0 auto;}
+  .home h1{
+    margin:24px 0 6px;
+    font-family:Georgia,"Songti SC","STSong","Times New Roman",serif;
+    font-weight:600;
+    font-size:30px;
+    line-height:1.3;
+    letter-spacing:-.01em;
+  }
+  .home-sub{margin:0 0 28px;font-size:13.5px;color:var(--ink-3);letter-spacing:.02em;}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;text-align:left;}
+  .tile{
+    display:flex;flex-direction:column;gap:6px;
+    padding:18px 18px 15px;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:14px;
+    font-family:inherit;
+    text-align:left;
     cursor:pointer;
-    text-align:center;padding:40px;
+    box-shadow:0 1px 2px rgba(25,24,23,.04);
+    transition:transform .18s ease, box-shadow .2s ease, border-color .18s ease;
   }
-  #gate.gone{opacity:0;pointer-events:none}
-  #gate .mark{font-size:11px;letter-spacing:.42em;color:var(--muted);text-transform:uppercase}
-  #gate h1{font-family:'Noto Serif SC','Songti SC',serif;font-size:clamp(22px,3.4vw,44px);font-weight:600;letter-spacing:.06em;line-height:1.3}
-  #gate h1 span{display:block;color:var(--amber);font-size:clamp(26px,4.2vw,56px);margin-top:6px}
-  #gate .meta{font-size:12px;color:var(--muted);letter-spacing:.12em}
-  #gate .play{
-    margin-top:8px;display:flex;align-items:center;gap:12px;
-    border:1px solid rgba(217,160,91,.5);padding:13px 30px;color:var(--amber);
-    font-size:14px;letter-spacing:.16em;background:rgba(217,160,91,.04);
-    transition:background .25s,border-color .25s;
+  .tile:hover{transform:translateY(-2px);border-color:#DCD5C8;box-shadow:0 12px 28px -20px rgba(25,24,23,.5);}
+  .tile:active{transform:translateY(0);}
+  .tile .ico{width:42px;height:42px;margin-bottom:8px;color:var(--brand);}
+  .tile .ico svg{display:block;width:100%;height:100%;}
+  .tile .name{font-size:16px;font-weight:600;color:var(--ink);letter-spacing:.01em;}
+  .tile .desc{font-size:12.5px;color:var(--ink-3);line-height:1.55;}
+  .tile .go{
+    margin-top:9px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--brand);display:flex;align-items:center;gap:6px;
   }
-  #gate:hover .play{background:rgba(217,160,91,.14);border-color:var(--amber)}
-  #gate .tip{font-size:11px;color:#4E5866;letter-spacing:.06em;line-height:1.9}
 
-  #toast{
-    position:absolute;left:50%;bottom:80px;transform:translateX(-50%) translateY(10px);
-    background:rgba(10,15,24,.9);border:1px solid rgba(220,228,239,.16);
-    padding:9px 16px;font-size:12px;letter-spacing:.06em;color:var(--text);
-    opacity:0;pointer-events:none;transition:opacity .3s,transform .3s;
+  .tile.feature{
+    grid-column:span 2;
+    flex-direction:row;align-items:center;gap:18px;
+    padding:20px 22px;
+    background:linear-gradient(140deg,#262320 0%,#1B1A18 62%);
+    border-color:#2E2A24;
+    box-shadow:0 2px 4px rgba(25,24,23,.14), 0 22px 44px -34px rgba(0,0,0,.6);
   }
-  #toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  .tile.feature:hover{border-color:#4A423A;transform:translateY(-2px);}
+  .tile.feature .ico{width:54px;height:54px;margin:0;flex:none;color:#E2916F;}
+  .tile.feature .txt{display:flex;flex-direction:column;gap:5px;min-width:0;}
+  .tile.feature .name{color:#F8F4EE;font-size:17px;}
+  .tile.feature .desc{color:rgba(246,242,236,.58);}
+  .tile.feature .go{color:#E2916F;margin-top:7px;}
+  .home-foot{margin-top:26px;font-size:11.5px;letter-spacing:.06em;color:#B7B1A4;}
 
-  @media (max-width:760px){
-    #ui{gap:9px;padding:10px 12px;flex-wrap:wrap}
-    #hint{display:none}
-    #time{display:none}
-    .btn{width:34px;height:34px;font-size:11px}
-    /* 竖屏时画面高度有限，遮罩内容整体收紧，避免互相压叠 */
-    #gate{gap:12px;padding:16px 20px 64px}
-    #gate .mark{font-size:9px;letter-spacing:.28em}
-    #gate h1{font-size:clamp(17px,6.4vw,30px)}
-    #gate h1 span{font-size:clamp(19px,7.4vw,34px);margin-top:2px}
-    #gate .meta{font-size:10px;letter-spacing:.08em}
-    #gate .play{padding:9px 18px;font-size:12px;gap:8px}
-    #gate .tip{font-size:9px;line-height:1.7}
-    #toast{bottom:56px;font-size:11px;padding:7px 12px}
+  /* ---------- game modal ---------- */
+  .game-modal{
+    position:fixed;inset:0;z-index:20;
+    display:flex;align-items:center;justify-content:center;
+    padding:20px;
+    background:rgba(25,24,23,.55);
+    -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+    opacity:0;visibility:hidden;pointer-events:none;
+    transition:opacity .25s ease;
   }
-  @media (prefers-reduced-motion:reduce){
-    #ui{transition:none}
+  .game-modal.open{opacity:1;visibility:visible;pointer-events:auto;}
+  .game-shell{
+    width:min(900px,100%);height:min(92vh,780px);height:min(92dvh,780px);
+    display:flex;flex-direction:column;
+    background:var(--card);border-radius:16px;overflow:hidden;
+    box-shadow:0 30px 80px -30px rgba(0,0,0,.6);
+    transform:translateY(10px) scale(.985);
+    transition:transform .25s ease;
+  }
+  .game-modal.open .game-shell{transform:none;}
+  .game-bar{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:10px 14px 10px 20px;
+    border-bottom:1px solid var(--line-2);
+    background:#fff;
+  }
+  .game-bar .t{font-size:13.5px;font-weight:600;color:var(--ink);letter-spacing:.02em;}
+  .game-bar .tools{display:flex;align-items:center;gap:14px;}
+  .game-bar .tools a{
+    font-size:12px;color:var(--ink-3);text-decoration:none;
+    border-bottom:1px solid var(--line);padding-bottom:1px;
+  }
+  .game-bar .tools a:hover{color:var(--ink-2);}
+  #game-close{
+    height:30px;padding:0 14px;border-radius:8px;border:1px solid var(--line);
+    background:#fff;color:var(--ink-2);font:inherit;font-size:12.5px;cursor:pointer;
+    transition:background .16s ease, border-color .16s ease;
+  }
+  #game-close:hover{background:var(--bg-soft);border-color:#D9D2C5;}
+  #game-frame{flex:1 1 auto;width:100%;border:0;background:var(--bg);display:block;}
+
+  /* ---------- toast ---------- */
+  .toast{
+    position:fixed;left:50%;bottom:32px;
+    transform:translate(-50%,14px);
+    background:#221F1C;color:#F6F2EC;
+    font-size:13px;letter-spacing:.02em;
+    padding:10px 18px;border-radius:999px;
+    box-shadow:0 10px 30px -12px rgba(0,0,0,.55);
+    opacity:0;pointer-events:none;
+    transition:opacity .35s ease, transform .35s ease;
+    z-index:9;white-space:nowrap;
+  }
+  .toast.show{opacity:1;transform:translate(-50%,0);}
+
+  .parody{
+    position:absolute;left:0;right:0;bottom:16px;
+    text-align:center;font-size:10.5px;letter-spacing:.04em;
+    color:#BCB6A9;padding:0 16px;
+  }
+
+  @media (max-width:560px){
+    .stage{padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom));}
+    .card{padding:32px 20px 22px;border-radius:14px;}
+    .card h1{font-size:21px;}
+    .home h1{font-size:24px;margin:20px 0 6px;}
+    .home .mark{width:46px;height:46px;font-size:24px;}
+    .grid{grid-template-columns:1fr;gap:12px;}
+    .tile.feature{grid-column:span 1;padding:16px 18px;gap:14px;}
+    .tile.feature .ico{width:46px;height:46px;}
+    .game-modal{padding:0;}
+    .game-shell{height:100dvh;max-height:100dvh;border-radius:0;box-shadow:none;}
+    .game-bar{padding:calc(8px + env(safe-area-inset-top)) 12px 8px 14px;}
+    .game-bar .tools a{display:none;}
+    #game-close{height:34px;padding:0 16px;}
+    .appeal-row{flex-direction:column;}
+    .appeal .btn{width:100%;height:44px;}
+    .snd{top:calc(10px + env(safe-area-inset-top));right:10px;}
+    .toast{bottom:calc(24px + env(safe-area-inset-bottom));}
+  }
+  /* 手机横屏：压缩首页，避免卡片被裁 */
+  @media (max-height:520px) and (min-width:561px){
+    .home h1{margin:14px 0 4px;font-size:24px;}
+    .home .mark{width:40px;height:40px;font-size:20px;}
+    .home-sub{margin-bottom:16px;}
+    .grid{grid-template-columns:1fr 1fr 1fr;}
+    .tile.feature{grid-column:span 3;padding:14px 18px;}
   }
 </style>
 </head>
 <body>
 
-<div id="stage">
-  <canvas id="cv" width="1920" height="1080" aria-label="vibe 知识大赏是怎么火的？——代码生成的动态短片"></canvas>
-  <div id="grain"></div>
-
-  <div id="ui">
-    <button class="btn" id="btnPlay" aria-label="播放或暂停">▶</button>
-    <div id="bar" role="slider" aria-label="播放进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0">
-      <div id="barTrack"><div id="barFill"></div><div id="barDot"></div></div>
+<!-- ========== boot ========== -->
+<div class="stage on" id="stage-boot">
+  <div class="boot-inner">
+    <div class="mark boot-mark">R</div>
+    <div class="load">
+      <div class="load-bar"><span class="load-fill" id="load-fill"></span></div>
+      <div class="load-meta"><span>Loading</span><b id="load-pct">0%</b></div>
     </div>
-    <div id="time">00:00 / 03:02</div>
-    <div class="sep"></div>
-    <button class="btn" id="btnMute" aria-label="静音">
-      <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false">
-        <path d="M4 9.5h4L13 5v14L8 14.5H4z" fill="currentColor"/>
-        <path id="muteSlash" d="M16.5 9l5.5 6M22 9l-5.5 6" stroke="currentColor"
-              stroke-width="1.8" stroke-linecap="round" fill="none" opacity="0"/>
-      </svg>
-    </button>
-    <button class="btn" id="btnRec" aria-label="录制模式：隐藏所有控件">REC</button>
-    <button class="btn" id="btnFull" aria-label="全屏">
-      <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false">
-        <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" stroke="currentColor"
-              stroke-width="1.8" stroke-linecap="round" fill="none"/>
-      </svg>
-    </button>
-    <div id="hint">空格 播放　F 全屏　R 录制模式</div>
   </div>
-
-  <div id="gate">
-    <div class="mark">Vibe 知识大赏 · 现象复盘</div>
-    <h1>vibe 知识大赏<span>是怎么火的？</span></h1>
-    <div class="meta">3 分 02 秒 · 无旁白 · 全部画面由代码实时生成</div>
-    <div class="play">▶ 　开始播放</div>
-    <div class="tip">建议先全屏，再按 R 进入录制模式（隐藏所有控件）<br>音乐 We Never · bgm.mp3</div>
-  </div>
-
-  <div id="toast"></div>
 </div>
 
-<audio id="bgm" src="assets/bgm.mp3" preload="auto"></audio>
+<button class="snd" id="snd" type="button" aria-label="音效开关">SFX</button>
+
+<!-- ========== banned ========== -->
+<div class="stage" id="stage-ban">
+  <div class="card">
+    <div class="mark">R</div>
+    <div class="wordmark">RTSX</div>
+
+    <h1 id="ban-title">你的账号已被停用</h1>
+    <p class="lede" id="ban-lede"></p>
+
+    <div class="ref"><span id="ref-label">参考号</span> <b id="ref-id">&mdash;</b></div>
+
+    <div class="actions">
+      <button class="btn" id="appeal-toggle" type="button">提交申诉</button>
+      <button class="sub-link" id="terms-toggle" type="button">查看服务条款</button>
+    </div>
+
+    <div class="appeal" id="appeal">
+      <div class="appeal-label" id="appeal-label">申诉校验码</div>
+      <div class="appeal-row">
+        <input id="code-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="XXXXXXXX">
+        <button class="btn" id="code-submit" type="button">校验并提交</button>
+      </div>
+      <p class="appeal-note" id="appeal-note"></p>
+      <p class="appeal-err" id="appeal-err"></p>
+    </div>
+
+    <div class="terms" id="terms">
+      <div class="terms-head" id="terms-head">服务条款 · 摘要</div>
+      <ol class="terms-list" id="terms-list"></ol>
+    </div>
+
+    <div class="foot">
+      <span id="foot-main"></span><br>
+      <span id="foot-sub"></span>
+    </div>
+  </div>
+  <div class="parody" id="parody"></div>
+</div>
+
+<!-- ========== home ========== -->
+<div class="stage" id="stage-home">
+  <div class="home">
+    <div class="mark">R</div>
+    <div class="wordmark">RTSX</div>
+    <h1 id="greeting">你好</h1>
+    <p class="home-sub" id="home-sub">挑一个开始玩</p>
+
+    <div class="grid" id="game-grid">
+      <button class="tile feature" type="button" data-file="games/67/index.html" data-title="67 专辑"
+              data-name-zh="67 专辑" data-name-en="67 Album"
+              data-desc-zh="3D 小游戏合集 · 收集散落的 67" data-desc-en="3D mini-game album · collect the scattered 67s">
+        <span class="ico" aria-hidden="true">
+          <svg viewBox="0 0 42 42" fill="none">
+            <path d="M21 4 36 12.5v17L21 38 6 29.5v-17z" stroke="currentColor" stroke-width="2"/>
+            <path d="M6 12.5 21 21l15-8.5M21 21v17" stroke="currentColor" stroke-width="2" opacity=".55"/>
+          </svg>
+        </span>
+        <span class="txt">
+          <span class="name" data-name>67 专辑</span>
+          <span class="desc" data-desc>3D 小游戏合集 · 收集散落的 67</span>
+          <span class="go">Enter <span aria-hidden="true">→</span></span>
+        </span>
+      </button>
+
+      <button class="tile" type="button" data-file="games/2048.html" data-title="2048"
+              data-name-zh="2048" data-name-en="2048"
+              data-desc-zh="滑动合并数字，冲击 2048" data-desc-en="Slide and merge tiles to reach 2048">
+        <span class="ico" aria-hidden="true">
+          <svg viewBox="0 0 42 42" fill="none">
+            <rect x="3" y="3" width="16" height="16" rx="4" stroke="currentColor" stroke-width="2"/>
+            <rect x="23" y="10" width="16" height="16" rx="4" fill="currentColor" opacity=".85"/>
+            <rect x="3" y="23" width="16" height="16" rx="4" fill="currentColor" opacity=".32"/>
+            <rect x="23" y="30" width="16" height="16" rx="4" stroke="currentColor" stroke-width="2"/>
+          </svg>
+        </span>
+        <span class="name" data-name>2048</span>
+        <span class="desc" data-desc>滑动合并数字，冲击 2048</span>
+        <span class="go">Play <span aria-hidden="true">→</span></span>
+      </button>
+
+      <button class="tile" type="button" data-file="games/snake.html" data-title="贪吃蛇"
+              data-name-zh="贪吃蛇" data-name-en="Snake"
+              data-desc-zh="越吃越长，别撞墙也别咬到自己" data-desc-en="Eat, grow, and avoid walls and your tail">
+        <span class="ico" aria-hidden="true">
+          <svg viewBox="0 0 42 42" fill="none">
+            <path d="M5 31c5 0 6-8 11-8s6 8 11 8 6-9 11-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+            <circle cx="9" cy="12" r="3.5" fill="currentColor"/>
+            <circle cx="9" cy="12" r="1.2" fill="#fff" opacity=".9"/>
+            <circle cx="34" cy="24" r="2.6" fill="currentColor" opacity=".5"/>
+          </svg>
+        </span>
+        <span class="name" data-name>贪吃蛇</span>
+        <span class="desc" data-desc>越吃越长，别撞墙也别咬到自己</span>
+        <span class="go">Play <span aria-hidden="true">→</span></span>
+      </button>
+
+      <button class="tile" type="button" data-file="games/breakout.html" data-title="打砖块"
+              data-name-zh="打砖块" data-name-en="Breakout"
+              data-desc-zh="控制挡板，反弹小球清空砖墙" data-desc-en="Bounce the ball and clear every brick">
+        <span class="ico" aria-hidden="true">
+          <svg viewBox="0 0 42 42" fill="none">
+            <rect x="3" y="6" width="11" height="6" rx="2" fill="currentColor"/>
+            <rect x="16" y="6" width="11" height="6" rx="2" fill="currentColor" opacity=".55"/>
+            <rect x="29" y="6" width="10" height="6" rx="2" fill="currentColor"/>
+            <rect x="3" y="15" width="11" height="6" rx="2" fill="currentColor" opacity=".55"/>
+            <rect x="16" y="15" width="11" height="6" rx="2" fill="currentColor"/>
+            <rect x="29" y="15" width="10" height="6" rx="2" fill="currentColor" opacity=".55"/>
+            <circle cx="21" cy="29" r="4" fill="currentColor" opacity=".8"/>
+            <rect x="12" y="35" width="18" height="4" rx="2" fill="currentColor"/>
+          </svg>
+        </span>
+        <span class="name" data-name>打砖块</span>
+        <span class="desc" data-desc>控制挡板，反弹小球清空砖墙</span>
+        <span class="go">Play <span aria-hidden="true">→</span></span>
+      </button>
+
+      <button class="tile" type="button" data-file="games/memory.html" data-title="记忆翻牌"
+              data-name-zh="记忆翻牌" data-name-en="Memory"
+              data-desc-zh="翻出 8 对图案，步数越少越好" data-desc-en="Find all 8 pairs in as few moves as you can">
+        <span class="ico" aria-hidden="true">
+          <svg viewBox="0 0 42 42" fill="none">
+            <rect x="6" y="8" width="16" height="22" rx="3" fill="currentColor" opacity=".3"/>
+            <rect x="20" y="12" width="16" height="22" rx="3" stroke="currentColor" stroke-width="2" fill="#fff"/>
+            <path d="M28 20l3 5h-6z" fill="currentColor"/>
+            <circle cx="28" cy="29" r="2.2" fill="currentColor"/>
+          </svg>
+        </span>
+        <span class="name" data-name>记忆翻牌</span>
+        <span class="desc" data-desc>翻出 8 对图案，步数越少越好</span>
+        <span class="go">Play <span aria-hidden="true">→</span></span>
+      </button>
+    </div>
+
+    <div class="home-foot" id="home-foot"></div>
+  </div>
+</div>
+
+<!-- ========== game modal ========== -->
+<div class="game-modal" id="game-modal" aria-hidden="true">
+  <div class="game-shell" role="dialog" aria-modal="true" aria-labelledby="game-title">
+    <header class="game-bar">
+      <span class="t" id="game-title">游戏</span>
+      <div class="tools">
+        <a id="game-newwin" href="#" target="_blank" rel="noopener">新窗口打开</a>
+        <button id="game-close" type="button">关闭</button>
+      </div>
+    </header>
+    <iframe id="game-frame" title="迷你游戏"></iframe>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
 
 <script>
-/* ============================================================
-   vibe 知识大赏是怎么火的？
-   —— 全部画面由一个纯时间函数 render(t) 生成，无外部动画库。
-   时钟以 BGM 的 currentTime 为准，保证音画不漂移。
-   ============================================================ */
+(function () {
+  "use strict";
 
-var cv  = document.getElementById('cv');
-var ctx = cv.getContext('2d');
-var W = 1920, H = 1080, CX = W / 2;
+  var UNLOCK_CODE = "{open:ban--ip}";
+  var STORE_KEY   = "rtsx.state.v1";
+  var CHINA_REGIONS = ["CN", "HK", "MO", "TW"];
 
-var C = {
-  ink:   '#06080E',
-  ink2:  '#0A0F18',
-  line:  '#1C2636',
-  text:  '#DCE4EF',
-  muted: '#75818F',
-  dim:   '#3E4856',
-  amber: '#D9A05B',
-  teal:  '#4FB0C0'
-};
-var SANS = '"Noto Sans SC","PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif';
-var SERIF = '"Noto Serif SC","Songti SC","SimSun","Noto Serif CJK SC",serif';
-var MONO = 'Consolas,"SF Mono","DejaVu Sans Mono",monospace';
+  // 免 key、允许跨域的 IP 归属地接口，谁先返回用谁
+  var PROVIDERS = [
+    { url: "https://ipwho.is/",       read: function (j) { return j && j.success !== false ? j.country_code : null; } },
+    { url: "https://api.country.is/", read: function (j) { return j && j.country; } },
+    { url: "https://ipapi.co/json/",  read: function (j) { return j && j.country_code; } },
+    { url: "https://ipinfo.io/json",  read: function (j) { return j && j.country; } }
+  ];
 
-var DUR = 181.99;
-var T = 0, playing = false, started = false, muted = false, recMode = false;
-var audio = document.getElementById('bgm');
-var audioReady = false;
-var useAudio = true;
+  var COPY = {
+    zh: {
+      lang: "zh-CN",
+      banTitle: "你的账号已被停用",
+      banLede: "系统对近期活动进行了自动审核，该账号被判定违反 RTSX 服务条款。访问权限已永久关闭，且无法通过常规方式恢复。",
+      refLabel: "参考号",
+      appealToggle: "提交申诉",
+      termsToggle: "查看服务条款",
+      termsHead: "服务条款 · 摘要",
+      termsList: [
+        "账号仅限本人使用，不得共享、出租或转让。",
+        "禁止使用自动化手段批量注册、抓取数据或转售服务。",
+        "禁止将服务用于违反所在地法律法规的用途。",
+        "异常登录与异常调用会触发自动风控，可能导致账号被直接停用。",
+        "申诉以安全团队复核结论为准，复核期间访问权限保持关闭。"
+      ],
+      appealLabel: "申诉校验码",
+      appealNote: "请输入通知邮件中提供的校验码，每次申诉仅可提交一次。",
+      appealSubmit: "校验并提交",
+      appealPlaceholder: "XXXXXXXX",
+      appealErr: "校验码无效，申诉未通过。请核对后重新输入。",
+      footMain: "如果你认为这是误判，可在上方提交一次申诉，我们的安全团队将在 5 个工作日内完成复核。",
+      footSub: "如需进一步协助，请通过上方申诉通道提交，其余渠道不予受理。",
+      greeting: ["夜深了", "早上好", "下午好", "晚上好"],
+      homeSub: "挑一个开始玩",
+      homeFoot: "全部游戏在本地运行 · 不联网、不加载外部资源",
+      toast: "限制已解除",
+      parody: "演示页面 · 与任何真实公司或服务无关"
+    },
+    en: {
+      lang: "en",
+      banTitle: "Your account has been disabled",
+      banLede: "After an automatic review of recent activity, this account was found to be in violation of the RTSX Terms of Service. Access has been permanently closed and cannot be restored through normal means.",
+      refLabel: "Reference",
+      appealToggle: "Submit an appeal",
+      termsToggle: "Read our Terms of Service",
+      termsHead: "Terms of Service · summary",
+      termsList: [
+        "Accounts are personal and may not be shared, rented or resold.",
+        "Automated bulk registration, scraping and resale of the service are prohibited.",
+        "The service may not be used for purposes that violate local law.",
+        "Unusual sign-ins or call patterns trigger automated review and may disable the account.",
+        "Appeal outcomes follow the safety team's review; access stays closed while it is pending."
+      ],
+      appealLabel: "Appeal verification code",
+      appealNote: "Enter the verification code from your notice email. Only one appeal may be submitted.",
+      appealSubmit: "Verify and submit",
+      appealPlaceholder: "XXXXXXXX",
+      appealErr: "That verification code is invalid. The appeal was not accepted.",
+      footMain: "If you believe this decision was made in error, submit one appeal above and our safety team will review it within 5 business days.",
+      footSub: "For anything else, use the appeal channel above.",
+      greeting: ["Still up?", "Good morning", "Good afternoon", "Good evening"],
+      homeSub: "Pick one and start playing",
+      homeFoot: "All games run locally · no network, no external assets",
+      toast: "Restriction lifted",
+      parody: "Demo page — not affiliated with any real company or service"
+    }
+  };
 
-audio.addEventListener('canplaythrough', function(){ audioReady = true; });
-audio.addEventListener('loadeddata', function(){ audioReady = true; });
-audio.addEventListener('error', function(){
-  if (audioReady) return;
-  useAudio = false;
-  toast('没加载到 assets/bgm.mp3，画面改为无声计时播放');
-});
+  var el = {
+    boot: document.getElementById("stage-boot"),
+    ban: document.getElementById("stage-ban"),
+    home: document.getElementById("stage-home"),
+    banTitle: document.getElementById("ban-title"),
+    banLede: document.getElementById("ban-lede"),
+    refLabel: document.getElementById("ref-label"),
+    refId: document.getElementById("ref-id"),
+    appealToggle: document.getElementById("appeal-toggle"),
+    appeal: document.getElementById("appeal"),
+    termsToggle: document.getElementById("terms-toggle"),
+    terms: document.getElementById("terms"),
+    termsHead: document.getElementById("terms-head"),
+    termsList: document.getElementById("terms-list"),
+    appealLabel: document.getElementById("appeal-label"),
+    appealNote: document.getElementById("appeal-note"),
+    appealErr: document.getElementById("appeal-err"),
+    appealSubmit: document.getElementById("code-submit"),
+    input: document.getElementById("code-input"),
+    footMain: document.getElementById("foot-main"),
+    footSub: document.getElementById("foot-sub"),
+    parody: document.getElementById("parody"),
+    greeting: document.getElementById("greeting"),
+    homeSub: document.getElementById("home-sub"),
+    homeFoot: document.getElementById("home-foot"),
+    grid: document.getElementById("game-grid"),
+    modal: document.getElementById("game-modal"),
+    gameTitle: document.getElementById("game-title"),
+    gameFrame: document.getElementById("game-frame"),
+    gameNewWin: document.getElementById("game-newwin"),
+    gameClose: document.getElementById("game-close"),
+    toast: document.getElementById("toast")
+  };
 
-/* ---------------- 基础工具 ---------------- */
-function clamp(x, a, b){ return x < a ? a : (x > b ? b : x); }
-function seg(t, a, b){ return clamp((t - a) / (b - a), 0, 1); }
-function ease(x){ x = clamp(x, 0, 1); return 1 - Math.pow(1 - x, 3); }
-function easeIn(x){ x = clamp(x, 0, 1); return x * x * x; }
-function lerp(a, b, p){ return a + (b - a) * p; }
-function mixA(a, b, p){ return a * (1 - p) + b * p; }
-function fmt(n){ return n.toLocaleString('en-US'); }
-
-/* 稳定伪随机：同一 seed 每一帧结果一致，保证画面可复现 */
-function rnd(seed){
-  var s = Math.sin(seed * 127.1 + 311.7) * 43758.5453123;
-  return s - Math.floor(s);
-}
-
-function setFont(size, opts){
-  opts = opts || {};
-  var fam = opts.mono ? MONO : (opts.serif ? SERIF : SANS);
-  var weight = opts.weight || (opts.serif ? 600 : 400);
-  ctx.font = weight + ' ' + size + 'px ' + fam;
-  ctx.letterSpacing = (opts.ls || 0) + 'px';
-}
-
-function text(str, x, y, size, color, opts){
-  opts = opts || {};
-  ctx.save();
-  ctx.globalAlpha *= (opts.alpha === undefined ? 1 : opts.alpha);
-  setFont(size, opts);
-  ctx.fillStyle = color;
-  ctx.textAlign = opts.align || 'left';
-  ctx.textBaseline = opts.baseline || 'alphabetic';
-  ctx.fillText(str, x, y);
-  ctx.restore();
-}
-
-function line(x1, y1, x2, y2, color, w, alpha){
-  ctx.save();
-  ctx.globalAlpha *= (alpha === undefined ? 1 : alpha);
-  ctx.strokeStyle = color;
-  ctx.lineWidth = w || 1;
-  ctx.beginPath();
-  ctx.moveTo(x1, y1);
-  ctx.lineTo(x2, y2);
-  ctx.stroke();
-  ctx.restore();
-}
-
-/* ---------------- 背景：测量仪的地面 ---------------- */
-function drawBg(t){
-  ctx.fillStyle = C.ink;
-  ctx.fillRect(0, 0, W, H);
-
-  // 极弱的中心冷光，让深底有纵深但不形成紫色渐变
-  var rg = ctx.createRadialGradient(CX, 430, 60, CX, 430, 1180);
-  rg.addColorStop(0, 'rgba(32,52,78,.32)');
-  rg.addColorStop(0.55, 'rgba(14,26,42,.14)');
-  rg.addColorStop(1, 'rgba(6,8,14,0)');
-  ctx.fillStyle = rg;
-  ctx.fillRect(0, 0, W, H);
-
-  // 刻度网格，随时间极慢漂移
-  var step = 80;
-  var drift = (t * 0.55) % step;
-  ctx.save();
-  ctx.strokeStyle = C.line;
-  ctx.globalAlpha = 0.38;
-  ctx.lineWidth = 1;
-  for (var x = -step + drift; x < W + step; x += step){
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
-  }
-  for (var y = -step + (t * 0.2) % step; y < H + step; y += step){
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-  }
-  ctx.restore();
-
-  // 扫描带：14 秒一次的极淡水平扫光，让画面始终在动
-  var scan = ((t * 1) % 14) / 14;
-  var sy = scan * (H + 260) - 130;
-  var sg = ctx.createLinearGradient(0, sy - 120, 0, sy + 120);
-  sg.addColorStop(0, 'rgba(120,170,220,0)');
-  sg.addColorStop(0.5, 'rgba(120,170,220,.055)');
-  sg.addColorStop(1, 'rgba(120,170,220,0)');
-  ctx.fillStyle = sg;
-  ctx.fillRect(0, sy - 120, W, 240);
-
-  // 暗角
-  var vg = ctx.createRadialGradient(CX, H * 0.45, H * 0.35, CX, H * 0.45, H * 1.05);
-  vg.addColorStop(0, 'rgba(0,0,0,0)');
-  vg.addColorStop(1, 'rgba(0,0,0,.55)');
-  ctx.fillStyle = vg;
-  ctx.fillRect(0, 0, W, H);
-}
-
-/* 全片贯穿的地平线 */
-var HZ = 742;
-function drawHorizon(t, alpha){
-  var g = ease(seg(t, 1.4, 4.4));
-  if (g <= 0) return;
-  var half = 780 * g;
-  var a = (alpha === undefined ? 1 : alpha);
-  ctx.save();
-  ctx.globalAlpha *= a;
-  var grd = ctx.createLinearGradient(CX - half, 0, CX + half, 0);
-  grd.addColorStop(0, 'rgba(217,160,91,0)');
-  grd.addColorStop(0.18, 'rgba(217,160,91,.55)');
-  grd.addColorStop(0.5, 'rgba(217,160,91,.95)');
-  grd.addColorStop(0.82, 'rgba(217,160,91,.55)');
-  grd.addColorStop(1, 'rgba(217,160,91,0)');
-  ctx.strokeStyle = grd;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(CX - half, HZ); ctx.lineTo(CX + half, HZ); ctx.stroke();
-  ctx.restore();
-}
-
-/* ---------------- 字幕 ---------------- */
-var SUBS = [
-[6.4, 9.4, '20 天，一条话题，11.7 亿次播放。', 'Twenty days. One hashtag. 1.17 billion views.'],
-[9.6, 12.6, '一场关于「知识」的集体爆红。', 'A sudden, collective fever for knowledge.'],
-[13.4, 16.9, '它是怎么火起来的？', 'So how did it happen?'],
-[18.2, 22.4, 'Vibe 知识，是把一段话变成一支片子。', 'Vibe knowledge turns a sentence into a film.'],
-[22.6, 26.4, '不需要团队，不需要剪辑台，不需要出镜。', 'No crew. No edit bay. No face on camera.'],
-[26.6, 31.0, '模型写 HTML，写 Canvas，暴露一个 render(t)。', 'The model writes HTML and Canvas: one function, render(t).'],
-[31.2, 36.4, '每一帧，都是同一个时间函数的一次求值。', 'Every frame is that function, evaluated at a new t.'],
-[36.6, 40.0, '再逐帧截图，把音乐合上去。', 'Capture the frames, lay the music underneath.'],
-[40.6, 44.6, '2026 年 9 月 22 日，这道门槛被削平了。', 'On September 22, 2026, that barrier was flattened.'],
-[44.8, 48.6, 'Opus 5.5 把它压缩成了几句提示词。', 'Opus 5.5 compressed it into a few lines of prompt.'],
-[48.8, 52.0, '门槛消失之后，地平线就露了出来。', 'Once the barrier is gone, the horizon shows.'],
-[52.4, 56.2, '2019 年，回形针的一条 5 分钟片子。', '2019: one five-minute film at PaperClip.'],
-[56.4, 60.2, '4 到 5 个人，2 到 4 周。', '4–5 people. 2–4 weeks.'],
-[60.4, 63.6, '现在：一个人，几个小时，几块钱。', 'Now: one person, a few hours, a few yuan.'],
-[63.8, 66.8, '同一种片子，成本差了一万倍。', 'Same kind of film. Ten thousand times cheaper.'],
-[67.0, 70.6, '9 月 29 日。平台先动了。', 'September 29. The platform moved first.'],
-[70.8, 74.6, '10 月 2 日之后，配着同一段 BGM 的片子密集出现。', 'After Oct 2, films with the same track appear everywhere.'],
-[74.8, 78.6, '10 月 20 日：11.7 亿次播放，5.1 万人参与。', 'Oct 20: 1.17 billion views, 51,000 creators.'],
-[78.8, 82.6, '11 月：30 亿。日均新发 150 条以上。', 'November: 3 billion. Over 150 new posts a day.'],
-[82.8, 86.0, '曲线的斜率，在 9 月 29 日之后变了。', 'The slope changes right after September 29.'],
-[86.8, 90.6, '它不是自然爆的。', 'It did not blow up on its own.'],
-[90.8, 94.6, '9 月 29 日，抖音运营已经在私信邀约创作者。', 'On Sept 29, Douyin was already DMing creators.'],
-[94.8, 98.6, '那时候，话题播放量只有几百万。', 'The hashtag had only a few million views then.'],
-[98.8, 102.0, '先有扶持，才有爆发。', 'The push came first. The explosion came after.'],
-[102.4, 106.2, '平台的算盘也很清楚。', 'The platforms had their own arithmetic.'],
-[106.4, 110.2, '一年之内，它的月活涨了 184.5%。', 'In one year, its monthly users grew 184.5%.'],
-[110.4, 113.6, '娱乐见顶了，知识是最确定的增量。', 'Entertainment has peaked. Knowledge is the safest growth.'],
-[113.8, 117.6, '观众一直在，只是能看的本来不多。', 'The audience was always there. The supply was not.'],
-[117.8, 121.6, '两亿多人在那里学东西。', 'Over 200 million people study there.'],
-[121.8, 125.6, '缺的从来是供给。', 'What was scarce was supply.'],
-[125.8, 129.6, '51 条爆款里，一半的作者粉丝不到 1500。', 'Half of 51 viral hits came from accounts under 1,500 followers.'],
-[129.8, 133.6, '一个账号 6 天发 7 条，涨粉 1.3 万。', 'One account posted 7 in 6 days and gained 13,000.'],
-[133.8, 137.0, '门槛塌了，所有人都进来了。', 'The barrier fell. Everyone walked in.'],
-[137.2, 141.0, '暗色背景。发光线条。同一批选题。', 'Dark backgrounds. Glowing lines. The same topics.'],
-[141.2, 145.0, '囚徒困境，熵增，墨菲定律。', "Prisoner's dilemma. Entropy. Murphy's law."],
-[145.2, 149.0, '刷到第 10 支，你已经分不清了。', 'By the tenth one, you cannot tell them apart.'],
-[149.2, 152.0, '窗口期，比你想的短。', 'The window is shorter than you think.'],
-[152.4, 156.6, '工具降下来的，是制作门槛。', 'The tools lowered the cost of making.'],
-[156.8, 160.6, '不是审美门槛。', 'Not the cost of judging.'],
-[160.8, 164.6, '知道该讲什么，仍然是最贵的那部分。', 'Knowing what to say is still the expensive part.'],
-[164.8, 168.0, '这部分，没有工具能替你做。', 'No tool does that part for you.']
-];
-
-function drawSubs(t){
-  for (var i = 0; i < SUBS.length; i++){
-    var s = SUBS[i];
-    if (t < s[0] - 0.1 || t > s[1]) continue;
-    var pin = ease(seg(t, s[0], s[0] + 0.55));
-    var pout = 1 - ease(seg(t, s[1] - 0.45, s[1]));
-    var a = Math.min(pin, pout);
-    if (a <= 0) continue;
-    var dy = (1 - pin) * 12;
-    var zhSize = s[2].length > 27 ? 40 : 46;
-    ctx.save();
-    ctx.globalAlpha = a;
-    setFont(zhSize, {ls: 0.5});
-    ctx.fillStyle = C.text;
-    ctx.textAlign = 'center';
-    ctx.fillText(s[2], CX, 872 + dy);
-    setFont(19, {mono: false, ls: 0.4});
-    ctx.fillStyle = 'rgba(220,228,239,.52)';
-    ctx.fillText(s[3], CX, 918 + dy * 0.7);
-    ctx.restore();
-  }
-}
-
-/* ---------------- 片头角标 ---------------- */
-var CHAPTERS = [
-  {a:0,   b:17.5,  n:'01'},
-  {a:17.5,b:40,    n:'02'},
-  {a:40,  b:52,    n:'03'},
-  {a:52,  b:64,    n:'04'},
-  {a:64,  b:86,    n:'05'},
-  {a:86,  b:102,   n:'06'},
-  {a:102, b:113,   n:'07'},
-  {a:113, b:134,   n:'08'},
-  {a:134, b:152,   n:'09'},
-  {a:152, b:167,   n:'10'},
-  {a:167, b:182,   n:'—'}
-];
-
-function drawChrome(t){
-  var fadeOut = 1 - ease(seg(t, 176, 181));
-  ctx.save();
-  ctx.globalAlpha = fadeOut;
-
-  text('vibe 知识大赏', 120, 78, 16, 'rgba(117,129,143,.95)', {ls: 4});
-  text('一支用代码做的片子', 120, 106, 13, 'rgba(62,72,86,.95)', {ls: 1.5});
-
-  var cur = CHAPTERS[CHAPTERS.length - 1];
-  for (var i = 0; i < CHAPTERS.length; i++){
-    if (t >= CHAPTERS[i].a && t < CHAPTERS[i].b) cur = CHAPTERS[i];
-  }
-  text(cur.n, 1800, 78, 17, 'rgba(117,129,143,.9)', {mono: true, align: 'right', ls: 2});
-  text('We Never', 1800, 1030, 12, C.dim, {mono: true, align: 'right', ls: 1.5});
-  text('bgm.mp3', 1800, 1050, 10, 'rgba(62,72,86,.75)', {mono: true, align: 'right', ls: 1.2});
-  ctx.restore();
-}
-
-/* ============================================================
-   幕 01 · 开场：11.7 亿（0 – 18s）
-   ============================================================ */
-function sIntro(t){
-  drawHorizon(t, 1 - ease(seg(t, 16.2, 17.6)) * 0.85);
-
-  // —— 数字 11.7 亿
-  var inn = ease(seg(t, 2.9, 5.9));
-  var out = ease(seg(t, 11.6, 13.2));
-  if (inn > 0 && out < 1){
-    var a = inn * (1 - out);
-    var dy = (1 - inn) * 52 - out * 74;
-    ctx.save();
-    ctx.globalAlpha = a;
-    text('#vibe知识大赏 · 抖音 · 2026.10.20', CX, 452 + dy * 0.6, 15,
-         'rgba(117,129,143,.85)', {align: 'center', ls: 3.4});
-    text('11.7', CX, 616 + dy, 176, C.amber, {mono: true, align: 'center', ls: 2});
-    text('亿次播放', CX, 688 + dy * 0.9, 30, 'rgba(217,160,91,.62)', {align: 'center', ls: 7});
-    ctx.restore();
-  }
-
-  // —— 片名
-  var tp = ease(seg(t, 13.3, 14.6));
-  var tq = ease(seg(t, 13.7, 15.2));
-  var ta = Math.min(tp, 1 - ease(seg(t, 16.4, 17.6)));
-  if (tp > 0 && ta > 0){
-    ctx.save();
-    ctx.globalAlpha = ta;
-    ctx.beginPath();
-    ctx.rect(0, 400, W * tp, 250);
-    ctx.clip();
-    text('vibe 知识大赏', CX, 486, 76, C.text, {align: 'center', ls: 6, serif: true});
-    ctx.restore();
-
-    ctx.save();
-    ctx.globalAlpha = ta;
-    ctx.beginPath();
-    ctx.rect(0, 500, W * tq, 210);
-    ctx.clip();
-    text('是怎么火的？', CX, 596, 106, C.amber, {align: 'center', ls: 8, serif: true});
-    ctx.restore();
-
-    text('一支用代码做出来的片子，讲一个用代码做出来的现象。', CX, 676, 24,
-         'rgba(220,228,239,.5)', {align: 'center', ls: 1.2,
-         alpha: ease(seg(t, 14.6, 15.8)) * ta});
-  }
-}
-
-/* ============================================================
-   幕 02 · 方法：一句话 → 一支片子（18 – 40s）
-   ============================================================ */
-var CODE_LINES = [
-  'const t = audio.currentTime;',
-  'scene.background(ctx, t);',
-  'scene.grid(ctx, t);',
-  'scene.number(ctx, t);',
-  'scene.subtitle(ctx, t);',
-  '',
-  '// 每一帧，只做一次求值'
-];
-
-function sDefine(t){
-  // —— 前半：两行命题
-  var pa = ease(seg(t, 17.8, 19.4));
-  var pb = ease(seg(t, 19.5, 21.0));
-  var fadeOut = ease(seg(t, 22.6, 24.2));
-  var keep = 1 - fadeOut;
-
-  if (pa > 0 && keep > 0){
-    ctx.save();
-    ctx.globalAlpha = keep;
-    // 左侧竖线
-    var lh = ease(seg(t, 17.8, 19.2)) * 190;
-    ctx.strokeStyle = C.amber;
-    ctx.lineWidth = 2;
-    ctx.globalAlpha = keep * 0.75;
-    ctx.beginPath();
-    ctx.moveTo(168, 402);
-    ctx.lineTo(168, 402 + lh);
-    ctx.stroke();
-    ctx.globalAlpha = keep;
-
-    text('把一段话，', 200, 448, 58, C.text,
-         {alpha: pa, ls: 1, serif: true});
-    text('变成一支片子。', 200, 546, 58, C.amber,
-         {alpha: pb, ls: 1, serif: true});
-    ctx.restore();
-  }
-
-  // —— 后半：代码 + 预览
-  var cb = ease(seg(t, 24.4, 25.2));
-  var cOut = 1 - ease(seg(t, 38.6, 40.0));
-  if (cb > 0 && cOut > 0){
-    ctx.save();
-    ctx.globalAlpha = cOut;
-
-    // 代码区
-    var lx = 150, ly = 252;
-    ctx.strokeStyle = 'rgba(220,228,239,.14)';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(lx - 18, ly - 46); ctx.lineTo(lx - 18, ly + 264); ctx.stroke();
-
-    for (var i = 0; i < CODE_LINES.length; i++){
-      var la = ease(seg(t, 24.5 + i * 0.42, 25.0 + i * 0.42));
-      if (la <= 0) continue;
-      var yy = ly + i * 42;
-      var isComment = CODE_LINES[i].indexOf('//') === 0 || CODE_LINES[i] === '';
-      ctx.save();
-      ctx.globalAlpha *= la;
-      if (CODE_LINES[i] !== ''){
-        text(String(i + 1).padStart(2, '0'), lx - 44, yy, 14, 'rgba(117,129,143,.5)', {mono: true});
-        text(CODE_LINES[i], lx + (1 - la) * 8, yy, 22,
-             isComment ? 'rgba(117,129,143,.85)' : 'rgba(220,228,239,.95)', {mono: true});
+  /* ================= 音效（WebAudio 合成，零外部文件） ================= */
+  var SFX = (function () {
+    var ctx = null, on = true, out = null;
+    try { on = localStorage.getItem("rtsx.sound.v1") !== "off"; } catch (e) {}
+    function ac() {
+      if (!ctx) {
+        var C = window.AudioContext || window.webkitAudioContext;
+        if (!C) return null;
+        try { ctx = new C(); } catch (e) { return null; }
       }
-      ctx.restore();
-    }
-
-    // 预览窗
-    var px = 840, py = 232, pw = 560, ph = 352;
-    var pIn = ease(seg(t, 25.6, 26.6));
-    ctx.save();
-    ctx.globalAlpha *= pIn;
-    ctx.strokeStyle = 'rgba(220,228,239,.10)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(px, py, pw, ph);
-
-    ctx.save();
-    ctx.beginPath(); ctx.rect(px, py, pw, ph); ctx.clip();
-    ctx.fillStyle = '#04060B';
-    ctx.fillRect(px, py, pw, ph);
-
-    // 网格
-    var gi = ease(seg(t, 27.6, 28.6));
-    ctx.strokeStyle = 'rgba(63,80,104,' + (0.55 * gi) + ')';
-    for (var gx = px; gx < px + pw; gx += 40){
-      ctx.beginPath(); ctx.moveTo(gx, py); ctx.lineTo(gx, py + ph); ctx.stroke();
-    }
-    for (var gy = py; gy < py + ph; gy += 40){
-      ctx.beginPath(); ctx.moveTo(px, gy); ctx.lineTo(px + pw, gy); ctx.stroke();
-    }
-
-    // 中心环
-    var ri = ease(seg(t, 29.0, 31.2));
-    if (ri > 0){
-      var cx2 = px + pw / 2, cy2 = py + ph / 2 - 10;
-      ctx.strokeStyle = 'rgba(217,160,91,' + (0.85 * ri) + ')';
-      ctx.lineWidth = 1.4;
-      for (var k = 0; k < 3; k++){
-        var r = (26 + k * 26) * (0.6 + ri * 0.4) + Math.sin(t * 1.6 + k * 1.2) * 4;
-        ctx.globalAlpha = ri * (0.8 - k * 0.2);
-        ctx.beginPath(); ctx.arc(cx2, cy2, r, 0, Math.PI * 2); ctx.stroke();
+      if (ctx.state === "suspended") { try { ctx.resume(); } catch (e) {} }
+      if (!out) {
+        out = ctx.createDynamicsCompressor();      // 限制器：音量拉满也不炸耳朵
+        out.threshold.value = -2;
+        out.knee.value = 20;
+        out.ratio.value = 12;
+        out.attack.value = 0.004;
+        out.release.value = 0.2;
+        out.connect(ctx.destination);
       }
-      ctx.globalAlpha = ri;
-      // 轨道点
-      var ang = t * 0.9;
-      ctx.fillStyle = C.amber;
-      ctx.beginPath();
-      ctx.arc(cx2 + Math.cos(ang) * 52, cy2 + Math.sin(ang) * 52, 3.2, 0, Math.PI * 2);
-      ctx.fill();
+      return ctx;
+    }
+    function tone(f, dur, type, gain, delay, to) {
+      if (!on) return;
+      var c = ac(); if (!c) return;
+      var t0 = c.currentTime + (delay || 0);
+      var o = c.createOscillator(), g = c.createGain();
+      o.type = type || "sine";
+      o.frequency.setValueAtTime(f, t0);
+      if (to) o.frequency.exponentialRampToValueAtTime(to, t0 + dur);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(Math.min(0.99, (gain || 0.05) * 14), t0 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      o.connect(g); g.connect(out || c.destination);
+      o.start(t0); o.stop(t0 + dur + 0.03);
+    }
+    var api = {
+      click: function () { tone(520, 0.055, "triangle", 0.045); },
+      open:  function () { tone(420, 0.09, "sine", 0.045, 0, 620); },
+      ok:    function () { tone(660, 0.1, "sine", 0.05); tone(880, 0.12, "sine", 0.05, 0.1); },
+      bad:   function () { tone(210, 0.14, "square", 0.04, 0, 140); },
+      isOn:  function () { return on; },
+      set:   function (v) { on = v; try { localStorage.setItem("rtsx.sound.v1", v ? "on" : "off"); } catch (e) {} }
+    };
+    window.addEventListener("storage", function (e) {
+      if (e.key === "rtsx.sound.v1") on = e.newValue !== "off";
+    });
+    return api;
+  })();
+
+  var sndBtn = document.getElementById("snd");
+  function paintSnd() { if (sndBtn) sndBtn.classList.toggle("off", !SFX.isOn()); }
+  paintSnd();
+  if (sndBtn) sndBtn.addEventListener("click", function () {
+    SFX.set(!SFX.isOn()); paintSnd(); if (SFX.isOn()) SFX.click();
+  });
+  window.addEventListener("storage", paintSnd);
+
+  /* ================= 资源预载：给慢网络一个进度条 ================= */
+  var ASSETS = [
+    "games/67/index.html",
+    "games/67/collect.html",
+    "games/2048.html",
+    "games/snake.html",
+    "games/breakout.html",
+    "games/memory.html"
+  ];
+
+  var bootReady = false, ipReady = false, pendingEnter = null;
+  var loadFill = document.getElementById("load-fill"), loadPct = document.getElementById("load-pct");
+
+  function setProgress(v) {
+    var pct = Math.round(Math.max(0, Math.min(1, v)) * 100);
+    if (loadFill) loadFill.style.width = pct + "%";
+    if (loadPct) loadPct.textContent = pct + "%";
+  }
+
+  function checkEnter() {
+    if (!pendingEnter || !bootReady || !ipReady) return;
+    var fn = pendingEnter;
+    pendingEnter = null;
+    fn();
+  }
+  function gate(fn) { pendingEnter = fn; checkEnter(); }
+
+  function preload() {
+    var t0 = Date.now(), done = 0, total = ASSETS.length || 1, settled = false;
+
+    function finish() {
+      if (settled) return;
+      settled = true;
+      setProgress(1);
+      bootReady = true;
+      checkEnter();
     }
 
-    // 数字
-    var ni = ease(seg(t, 30.6, 32.0));
-    if (ni > 0){
-      ctx.globalAlpha = ni;
-      text('11.7', px + pw / 2 - 26, py + ph - 86, 58, C.amber, {mono: true, align: 'right'});
-      text('亿', px + pw / 2 - 8, py + ph - 98, 26, 'rgba(217,160,91,.85)');
-    }
-
-    // 字幕条
-    var si = ease(seg(t, 31.6, 32.8));
-    if (si > 0){
-      ctx.globalAlpha = si;
-      ctx.fillStyle = 'rgba(220,228,239,' + (0.2 * si) + ')';
-      ctx.fillRect(px + 70, py + ph - 52, 300, 3);
-    }
-    ctx.restore(); // clip
-
-    text('t = ' + t.toFixed(2) + ' s', px, py + ph + 36, 17, 'rgba(220,228,239,.7)', {mono: true, ls: 1});
-    text('render(t)', px + pw, py + ph + 36, 17, 'rgba(217,160,91,.85)', {mono: true, align: 'right', ls: 1});
-    ctx.restore();
-    ctx.restore();
-  }
-}
-
-/* ============================================================
-   幕 03 · 门槛：9.22（40 – 52s）
-   ============================================================ */
-function sThreshold(t){
-  var a = ease(seg(t, 40.4, 41.4)) * (1 - ease(seg(t, 50.8, 52.0)));
-  if (a <= 0) return;
-
-  ctx.save();
-  ctx.globalAlpha = a;
-
-  text('2026.09.22', CX, 330, 30, 'rgba(220,228,239,.55)', {mono: true, align: 'center', ls: 6});
-  text('Claude Opus 5.5 发布', CX, 376, 22, C.amber,
-       {align: 'center', ls: 2, alpha: ease(seg(t, 42.4, 43.6))});
-
-  // 门槛：一堵有高度的墙，被削平，最后落成地平线
-  var cut = ease(seg(t, 42.4, 44.8));
-  var sink = ease(seg(t, 44.8, 48.4));
-  var topY = lerp(470, HZ, cut);
-  var wallW = 380;
-  var wx = CX - wallW / 2;
-
-  ctx.save();
-  ctx.globalAlpha = a * (0.94 - 0.50 * sink);
-
-  ctx.fillStyle = 'rgba(217,160,91,.10)';
-  ctx.fillRect(wx, topY, wallW, Math.max(0, HZ - topY));
-
-  ctx.strokeStyle = C.amber;
-  ctx.lineWidth = lerp(1.6, 1.0, sink);
-  ctx.strokeRect(wx, topY, wallW, Math.max(0, HZ - topY));
-
-  // 顶面亮线：削平过程中最醒目的一条
-  ctx.fillStyle = 'rgba(217,160,91,.95)';
-  ctx.fillRect(wx, topY - 1.5, wallW, 3.4);
-  ctx.restore();
-
-  text('一个人 · 一支团队 · 几周', CX, 424, 15, 'rgba(117,129,143,.75)',
-       {align: 'center', ls: 1.4, alpha: 1 - ease(seg(t, 42.6, 44.6))});
-
-  // 门槛落下后，地平线亮起
-  var lit = ease(seg(t, 48.4, 50.2));
-  if (lit > 0){
-    ctx.globalAlpha = a * lit;
-    var grd = ctx.createLinearGradient(CX - 720, 0, CX + 720, 0);
-    grd.addColorStop(0, 'rgba(217,160,91,0)');
-    grd.addColorStop(0.5, 'rgba(217,160,91,.7)');
-    grd.addColorStop(1, 'rgba(217,160,91,0)');
-    ctx.strokeStyle = grd;
-    ctx.lineWidth = 1.3;
-    ctx.beginPath(); ctx.moveTo(CX - 720, HZ); ctx.lineTo(CX + 720, HZ); ctx.stroke();
-  }
-  ctx.restore();
-}
-
-function lerpColor(fromA, toA, p){
-  return 'rgba(217,160,91,' + (fromA * (1 - p) + toA * p) + ')';
-}
-
-/* ============================================================
-   幕 04 · 成本：一条 5.18 万，一条 3 块（52 – 64s）
-   ============================================================ */
-function sCost(t){
-  var a = ease(seg(t, 52.3, 53.4)) * (1 - ease(seg(t, 62.4, 64.0)));
-  if (a <= 0) return;
-
-  var x0 = 200, x1 = 1400, len = x1 - x0;
-  var p1 = ease(seg(t, 53.4, 56.0));
-  var p2 = ease(seg(t, 57.2, 58.2));
-
-  ctx.save();
-  ctx.globalAlpha = a;
-
-  // —— 条 1（2019）
-  ctx.globalAlpha = a;
-  text('2019 · 回形针 PaperClip', x0, 386, 18, 'rgba(220,228,239,.68)', {ls: 1});
-  text('¥51,800 / 条', x1, 386, 22, C.amber, {mono: true, align: 'right', ls: 1});
-
-  ctx.fillStyle = C.amber;
-  ctx.globalAlpha = a * 0.92;
-  ctx.fillRect(x0, 414, len * p1, 16);
-
-  // —— 条 2（2026）
-  if (p2 > 0){
-    ctx.globalAlpha = a;
-    text('2026 · 一个人 + 一个模型', x0, 536, 18, 'rgba(220,228,239,.68)', {ls: 1});
-
-    // 同一把尺子的幽灵刻度
-    ctx.save();
-    ctx.globalAlpha = a * 0.13;
-    ctx.strokeStyle = 'rgba(220,228,239,.9)';
-    ctx.setLineDash([2, 8]);
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(x0, 574); ctx.lineTo(x1, 574); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.restore();
-
-    var shortW = Math.max(5, len * (3 / 51800));
-    ctx.fillStyle = C.amber;
-    ctx.globalAlpha = a;
-    ctx.fillRect(x0, 566, shortW, 16);
-
-    // 极短条右侧的引注
-    ctx.strokeStyle = 'rgba(217,160,91,.45)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(x0 + shortW + 8, 574);
-    ctx.lineTo(x0 + shortW + 66, 574);
-    ctx.stroke();
-    text('≈ ¥3', x0 + shortW + 78, 584, 34, C.amber, {mono: true, ls: 1});
-    text('同一刻度尺', x0 + shortW + 78, 612, 12, 'rgba(117,129,143,.75)', {ls: 1});
-  }
-
-  // —— 结论
-  var ca = ease(seg(t, 59.4, 61.0));
-  if (ca > 0){
-    ctx.globalAlpha = a * ca;
-    text('51,800 : 3', x0, 700, 34, C.amber, {mono: true, ls: 2});
-    text('单条成本之比 · 按 2019 年公开的全年支出与产量折算', x0 + 270, 700, 15,
-         'rgba(117,129,143,.75)', {ls: 0.8});
-  }
-  ctx.restore();
-}
-
-/* ============================================================
-   幕 05 · 时间线：斜率在 9.29 改变（64 – 86s）
-   ============================================================ */
-var TL = {
-  x0: 220, x1: 1700, y: 680, top: 372,
-  span: 51,
-  nodes: [
-    {d: 0,  label: '9.22',  sub: '模型发布',            t: 66.4, v: 0,    unit: '0'},
-    {d: 7,  label: '9.29',  sub: '平台私信邀约',         t: 68.6, v: 3,    unit: '300 万'},
-    {d: 28, label: '10.20', sub: '11.7 亿次播放',        t: 74.4, v: 1170, unit: '11.7 亿'},
-    {d: 51, label: '11.12', sub: '30 亿 · 日均 150 条',  t: 79.0, v: 3000, unit: '30 亿'}
-  ]
-};
-
-function tlX(d){ return TL.x0 + (d / TL.span) * (TL.x1 - TL.x0); }
-function tlYLog(lv){
-  return TL.y - (TL.y - TL.top) * (lv / Math.log10(3001));
-}
-function tlY(v){ return tlYLog(Math.log10(1 + v)); }
-
-/* 在对数空间线性插值：曲线是平滑上升的折线，而不是对数轴上的假跳变 */
-function tlLogAt(t){
-  var n = TL.nodes, cur = 0;
-  for (var i = 0; i < n.length; i++){
-    if (t >= n[i].t){
-      if (i < n.length - 1){
-        var p = seg(t, n[i].t, n[i + 1].t);
-        cur = lerp(Math.log10(1 + n[i].v), Math.log10(1 + n[i + 1].v), p);
-      } else cur = Math.log10(1 + n[i].v);
-    }
-  }
-  return cur;
-}
-
-/* 读数取离散节点值：与字幕里的数字严格一致 */
-function tlRead(t){
-  var n = TL.nodes, idx = 0;
-  for (var i = 0; i < n.length; i++){ if (t >= n[i].t) idx = i; }
-  var p = ease(clamp((t - n[idx].t) / 0.5, 0, 1));
-  return {cur: n[idx].unit, prev: idx > 0 ? n[idx - 1].unit : n[idx].unit, p: p};
-}
-
-function sTimeline(t){
-  var a = ease(seg(t, 64.2, 65.2)) * (1 - ease(seg(t, 84.2, 86.0)));
-  if (a <= 0) return;
-
-  ctx.save();
-  ctx.globalAlpha = a;
-
-  // 对数刻度参考线
-  var refs = [[100, '1 亿'], [1000, '10 亿'], [3000, '30 亿']];
-  var ra = ease(seg(t, 65.4, 66.8));
-  for (var r = 0; r < refs.length; r++){
-    if (ra <= 0) continue;
-    var ry = tlY(refs[r][0]);
-    ctx.save();
-    ctx.globalAlpha = a * ra * 0.45;
-    ctx.strokeStyle = 'rgba(140,160,190,.5)';
-    ctx.setLineDash([5, 7]);
-    ctx.beginPath(); ctx.moveTo(TL.x0, ry); ctx.lineTo(TL.x1, ry); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.restore();
-    text(refs[r][1], TL.x1, ry - 10, 13, 'rgba(117,129,143,.75)', {align: 'right', ls: 1, alpha: a * ra});
-  }
-  if (ra > 0){
-    text('对数刻度', TL.x1, 258, 12, 'rgba(117,129,143,.6)', {align: 'right', ls: 3, alpha: a * ra});
-  }
-
-  // 轴
-  var grow = ease(seg(t, 64.6, 66.4));
-  ctx.strokeStyle = 'rgba(220,228,239,.30)';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(TL.x0, TL.y); ctx.lineTo(TL.x0 + (TL.x1 - TL.x0) * grow, TL.y); ctx.stroke();
-
-  // 年份刻度
-  for (var d = 0; d <= TL.span; d += 7){
-    if (d / TL.span > grow) continue;
-    ctx.strokeStyle = 'rgba(220,228,239,.12)';
-    ctx.beginPath(); ctx.moveTo(tlX(d), TL.y - 4); ctx.lineTo(tlX(d), TL.y + 4); ctx.stroke();
-  }
-
-  // 累计曲线（时间连续，读数离散）
-  var pts = [];
-  if (t > 66.4){
-    var span = 260;
-    for (var i = 0; i < span; i++){
-      var tt = 66.4 + (i / (span - 1)) * (t - 66.4);
-      pts.push([tlTimeToX(tt), tlYLog(tlLogAt(tt))]);
-    }
-  }
-  if (pts.length > 1){
-    ctx.strokeStyle = 'rgba(217,160,91,.92)';
-    ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    ctx.moveTo(pts[0][0], pts[0][1]);
-    for (var j = 1; j < pts.length; j++) ctx.lineTo(pts[j][0], pts[j][1]);
-    ctx.stroke();
-
-    // 曲线下的极淡面积
-    ctx.fillStyle = 'rgba(217,160,91,.085)';
-    ctx.beginPath();
-    ctx.moveTo(pts[0][0], TL.y);
-    for (var m = 0; m < pts.length; m++) ctx.lineTo(pts[m][0], pts[m][1]);
-    ctx.lineTo(pts[pts.length - 1][0], TL.y);
-    ctx.closePath();
-    ctx.fill();
-
-    // 曲线末端的光点
-    var lastPt = pts[pts.length - 1];
-    ctx.fillStyle = C.amber;
-    ctx.beginPath(); ctx.arc(lastPt[0], lastPt[1], 4.2, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = 'rgba(217,160,91,.35)';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(lastPt[0], lastPt[1], 11, 0, Math.PI * 2); ctx.stroke();
-  }
-
-  // 节点
-  for (var q = 0; q < TL.nodes.length; q++){
-    var nd = TL.nodes[q];
-    var na = ease(seg(t, nd.t, nd.t + 0.5));
-    if (na <= 0) continue;
-    var nx = tlX(nd.d);
-    ctx.save();
-    ctx.globalAlpha = a * na;
-    ctx.fillStyle = C.amber;
-    ctx.beginPath(); ctx.arc(nx, TL.y, 3.4 * na, 0, Math.PI * 2); ctx.fill();
-
-    // 引线
-    ctx.strokeStyle = 'rgba(217,160,91,.32)';
-    ctx.beginPath(); ctx.moveTo(nx, TL.y); ctx.lineTo(nx, TL.y + 12); ctx.stroke();
-
-    text(nd.label, nx, TL.y + 42, 17, 'rgba(220,228,239,.78)', {mono: true, align: 'center', ls: 1});
-    text(nd.sub, nx, TL.y + 72, 15, q === 1 ? C.amber : 'rgba(117,129,143,.9)',
-         {align: 'center', ls: 0.4});
-    ctx.restore();
-  }
-
-  // 平台介入区间标注
-  var rIn = ease(seg(t, 69.6, 70.6));
-  if (rIn > 0){
-    ctx.save();
-    ctx.globalAlpha = a * rIn;
-    ctx.strokeStyle = 'rgba(217,160,91,.5)';
-    ctx.setLineDash([3, 4]);
-    ctx.beginPath();
-    ctx.moveTo(tlX(7), TL.y - 14);
-    ctx.lineTo(tlX(10), TL.y - 14);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    text('10.2 之后：同一段 BGM 密集出现', tlX(10) + 12, TL.y - 9, 13, 'rgba(217,160,91,.72)', {ls: 0.5});
-    ctx.restore();
-  }
-
-  // 左上读数：取离散节点值，与字幕里的数字严格一致
-  if (t > 67.4){
-    var rd = tlRead(t);
-    var vIn = ease(seg(t, 67.4, 68.4));
-    ctx.save();
-    ctx.globalAlpha = a * vIn;
-    text('累计播放', TL.x0, 392, 14, 'rgba(117,129,143,.85)', {ls: 3});
-    if (rd.p < 1) text(rd.prev, TL.x0, 486, 78, 'rgba(217,160,91,.45)', {mono: true, ls: 1, alpha: 1 - rd.p});
-    text(rd.cur, TL.x0, 486, 78, C.amber, {mono: true, ls: 1, alpha: rd.p});
-    ctx.restore();
-  }
-  ctx.restore();
-}
-
-function tlTimeToX(tt){
-  var n = TL.nodes;
-  if (tt <= n[0].t) return TL.x0;
-  for (var i = 0; i < n.length - 1; i++){
-    if (tt <= n[i + 1].t){
-      var p = (tt - n[i].t) / (n[i + 1].t - n[i].t);
-      return tlX(n[i].d + (n[i + 1].d - n[i].d) * p);
-    }
-  }
-  return TL.x1;
-}
-
-/* ============================================================
-   幕 06 · 安静段：它不是自然爆的（86 – 102s）
-   ============================================================ */
-function sQuiet(t){
-  var veil = 0.62 * ease(seg(t, 86.0, 87.6)) * (1 - ease(seg(t, 100.2, 102.0)));
-  ctx.fillStyle = 'rgba(6,8,14,' + veil + ')';
-  ctx.fillRect(0, 0, W, H);
-
-  // 一个日期立起来（不重复字幕里的句子）
-  var a2 = ease(seg(t, 88.4, 90.2)) * (1 - ease(seg(t, 97.8, 99.4)));
-  if (a2 > 0){
-    ctx.save();
-    ctx.globalAlpha = a2;
-    var pop = ease(seg(t, 88.4, 90.4));
-    text('9.29', CX, 548 + (1 - pop) * 18, 190, C.amber, {mono: true, align: 'center', ls: 12});
-    text('platform push begins', CX, 612, 12, 'rgba(117,129,143,.65)', {align: 'center', ls: 6});
-    ctx.restore();
-  }
-
-  // 因果
-  var a3 = ease(seg(t, 98.8, 100.2));
-  if (a3 > 0){
-    ctx.save();
-    ctx.globalAlpha = a3;
-    text('平台扶持', CX - 190, 498, 34, 'rgba(220,228,239,.9)', {align: 'right', ls: 2});
-    text('内容爆发', CX + 190, 498, 34, C.amber, {ls: 2});
-    ctx.strokeStyle = 'rgba(217,160,91,.7)';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.moveTo(CX - 150, 486);
-    ctx.lineTo(CX + 146, 486);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(CX + 146, 486);
-    ctx.lineTo(CX + 134, 480);
-    ctx.moveTo(CX + 146, 486);
-    ctx.lineTo(CX + 134, 492);
-    ctx.stroke();
-    ctx.restore();
-  }
-}
-
-/* ============================================================
-   幕 07 · 平台：为什么是它在推（102 – 113s）
-   ============================================================ */
-function sPlatform(t){
-  var a = ease(seg(t, 102.3, 103.3)) * (1 - ease(seg(t, 111.6, 113.0)));
-  if (a <= 0) return;
-
-  ctx.save();
-  ctx.globalAlpha = a;
-
-  // 柱子
-  var bx = 340, bw = 118, by = 700, maxH = 344;
-  var ph = ease(seg(t, 103.0, 106.8)) * maxH;
-
-  ctx.fillStyle = 'rgba(217,160,91,.20)';
-  ctx.fillRect(bx, by - ph, bw, ph);
-  ctx.strokeStyle = 'rgba(217,160,91,.85)';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(bx, by - ph); ctx.lineTo(bx, by); ctx.lineTo(bx + bw, by);
-  ctx.stroke();
-
-  // 柱顶读数：绝对值
-  var na = ease(seg(t, 105.6, 107.0));
-  text('4224.1', bx, by - ph - 34, 46, C.amber, {mono: true, ls: 1, alpha: na});
-  text('万', bx + 186, by - ph - 44, 22, 'rgba(217,160,91,.8)', {alpha: na});
-  text('抖音精选 · 月活用户', bx, 738, 15, 'rgba(220,228,239,.62)', {ls: 1.2});
-  text('2025 年 12 月 · QuestMobile', bx, 762, 12, 'rgba(117,129,143,.75)', {ls: 0.6});
-
-  // 增长箭头
-  var g = ease(seg(t, 107.0, 108.8));
-  if (g > 0){
-    var ax = bx + bw + 46;
-    var ay1 = by - 8, ay2 = by - ph - 8;
-    ctx.strokeStyle = 'rgba(217,160,91,.8)';
-    ctx.lineWidth = 1.6;
-    ctx.beginPath();
-    ctx.moveTo(ax, ay1);
-    ctx.lineTo(ax, ay1 + (ay2 - ay1) * g);
-    ctx.stroke();
-    if (g > 0.85){
-      var ha = ease(clamp((g - 0.85) / 0.15, 0, 1));
-      ctx.globalAlpha = a * ha;
-      ctx.beginPath();
-      ctx.moveTo(ax, ay2 - 2);
-      ctx.lineTo(ax - 7, ay2 + 12);
-      ctx.moveTo(ax, ay2 - 2);
-      ctx.lineTo(ax + 7, ay2 + 12);
-      ctx.stroke();
-      ctx.globalAlpha = a;
-    }
-
-    text('+184.5%', ax + 36, by - ph + 96, 62, C.amber, {mono: true, ls: 1,
-         alpha: ease(seg(t, 108.0, 109.2))});
-    text('同比', ax + 38, by - ph + 128, 13, 'rgba(117,129,143,.8)', {ls: 3,
-         alpha: ease(seg(t, 108.0, 109.2))});
-  }
-
-  // 右下角两条旁证
-  var ca = ease(seg(t, 108.4, 110.0));
-  if (ca > 0){
-    ctx.globalAlpha = a * ca;
-    ctx.strokeStyle = 'rgba(220,228,239,.18)';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(1240, 600); ctx.lineTo(1760, 600); ctx.stroke();
-    text('月人均使用 10.4 小时', 1760, 636, 16, 'rgba(117,129,143,.92)', {align: 'right', ls: 0.8});
-    text('科技内容 · 年播放 1.4 万亿次', 1760, 676, 18, 'rgba(220,228,239,.78)', {align: 'right', ls: 0.8});
-    ctx.globalAlpha = a;
-  }
-  ctx.restore();
-}
-
-/* ============================================================
-   幕 08 · 供给：缺的从来是供给（113 – 134s）
-   ============================================================ */
-function sSupply(t){
-  var a = ease(seg(t, 113.2, 114.2)) * (1 - ease(seg(t, 132.4, 134.0)));
-  if (a <= 0) return;
-
-  // 上半：3.6 亿
-  var a1 = ease(seg(t, 113.4, 115.0)) * (1 - ease(seg(t, 121.4, 123.2)));
-  if (a1 > 0){
-    ctx.save();
-    ctx.globalAlpha = a * a1;
-    text('3.6 亿', 240, 508, 118, C.text, {mono: true, ls: 2});
-    text('次播放 / 每天', 780, 452, 18, 'rgba(220,228,239,.6)', {ls: 1.4});
-    text('B 站知识区', 780, 486, 14, 'rgba(117,129,143,.8)', {ls: 2});
-
-    ctx.strokeStyle = 'rgba(217,160,91,.34)';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(240, 552); ctx.lineTo(1560, 552); ctx.stroke();
-    ctx.restore();
-  }
-
-  // 下半：51 条爆款
-  var a2 = ease(seg(t, 123.6, 125.2));
-  if (a2 > 0){
-    ctx.save();
-    ctx.globalAlpha = a * a2;
-
-    var cols = 17, cw = 44, ch = 44, gap = 10;
-    var gx0 = 170, gy0 = 436;
-    for (var i = 0; i < 51; i++){
-      var ci = i % cols, ri = Math.floor(i / cols);
-      var cellIn = ease(seg(t, 125.6 + i * 0.05, 126.0 + i * 0.05));
-      if (cellIn <= 0) continue;
-      var x = gx0 + ci * (cw + gap);
-      var y = gy0 + ri * (ch + gap);
-      var hollow = i % 2 === 1; // 一半空心 = 粉丝不到 1500
-      ctx.save();
-      ctx.globalAlpha = a * a2 * cellIn;
-      if (hollow){
-        ctx.strokeStyle = 'rgba(220,228,239,.42)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x, y, cw, ch);
-      } else {
-        ctx.fillStyle = 'rgba(217,160,91,.30)';
-        ctx.fillRect(x, y, cw, ch);
-        ctx.strokeStyle = 'rgba(217,160,91,.85)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x, y, cw, ch);
+    setProgress(0);
+    var bump = function () {
+      done++;
+      setProgress(done / total);
+      if (done >= total) {
+        // 留一点时间让进度条走完，避免一闪而过
+        var wait = Math.max(0, 700 - (Date.now() - t0));
+        setTimeout(finish, wait);
       }
-      ctx.restore();
+    };
+
+    ASSETS.forEach(function (u) {
+      if (!window.fetch) { bump(); return; }
+      fetch(u, { credentials: "same-origin" })
+        .then(function (r) { return r.text(); })
+        .then(bump, bump);
+    });
+
+    // 网络卡住也不要一直停在进度条上
+    setTimeout(finish, 8000);
+  }
+
+  /* ================= 永久状态存储 ================= */
+  function readState() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return null;
+      var o = JSON.parse(raw);
+      return o && o.state ? o : null;
+    } catch (e) { return null; }
+  }
+  function writeState(state, lang) {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify({ state: state, lang: lang, at: Date.now() }));
+    } catch (e) { /* 隐私模式等，静默降级 */ }
+  }
+  function clearState() {
+    try { localStorage.removeItem(STORE_KEY); } catch (e) {}
+  }
+
+  /* ================= IP 归属地（只取国家代码） ================= */
+  function probe(p) {
+    var ctrl = window.AbortController ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 5000);
+    var opt = { cache: "no-store", credentials: "omit", headers: { "Accept": "application/json" } };
+    if (ctrl) opt.signal = ctrl.signal;
+
+    return fetch(p.url, opt).then(function (r) {
+      if (!r.ok) throw new Error("http " + r.status);
+      return r.json();
+    }).then(function (j) {
+      var code = p.read(j);
+      if (!code || typeof code !== "string" || code.trim().length !== 2) throw new Error("no country");
+      return code.trim().toUpperCase();
+    }).then(function (code) {
+      clearTimeout(timer);
+      return code;
+    }, function (e) {
+      clearTimeout(timer);
+      throw e;
+    });
+  }
+
+  function anyCountry() {
+    if (!window.fetch) return Promise.reject(new Error("no fetch"));
+    if (!Promise.any) {
+      return new Promise(function (resolve, reject) {
+        var queue = PROVIDERS.slice(), lastErr = null;
+        (function next() {
+          if (!queue.length) return reject(lastErr || new Error("all failed"));
+          probe(queue.shift()).then(resolve, function (e) { lastErr = e; next(); });
+        })();
+      });
+    }
+    return Promise.any(PROVIDERS.map(probe));
+  }
+
+  /* ================= 文案与语言 ================= */
+  function pickLang(country) {
+    if (country && CHINA_REGIONS.indexOf(country) !== -1) return "zh";
+    if (country) return "en";
+    var nav = (navigator.language || "").toLowerCase();
+    return nav.indexOf("zh") === 0 ? "zh" : "en";
+  }
+
+  function applyCopy(lang) {
+    var c = COPY[lang] || COPY.zh;
+    document.documentElement.lang = c.lang;
+    el.banTitle.textContent = c.banTitle;
+    el.banLede.textContent = c.banLede;
+    el.refLabel.textContent = c.refLabel;
+    el.appealToggle.textContent = c.appealToggle;
+    el.termsToggle.textContent = c.termsToggle;
+    el.termsHead.textContent = c.termsHead;
+    el.termsList.innerHTML = "";
+    c.termsList.forEach(function (t) {
+      var li = document.createElement("li");
+      li.textContent = t;
+      el.termsList.appendChild(li);
+    });
+    el.appealLabel.textContent = c.appealLabel;
+    el.appealNote.textContent = c.appealNote;
+    el.appealSubmit.textContent = c.appealSubmit;
+    el.input.placeholder = c.appealPlaceholder;
+    el.appealErr.textContent = c.appealErr;
+    el.footMain.textContent = c.footMain;
+    el.footSub.textContent = c.footSub;
+    el.homeSub.textContent = c.homeSub;
+    el.homeFoot.textContent = c.homeFoot;
+
+    var tiles = el.grid.querySelectorAll(".tile");
+    for (var i = 0; i < tiles.length; i++) {
+      var t = tiles[i];
+      t.querySelector("[data-name]").textContent = t.getAttribute(lang === "zh" ? "data-name-zh" : "data-name-en");
+      t.querySelector("[data-desc]").textContent = t.getAttribute(lang === "zh" ? "data-desc-zh" : "data-desc-en");
+    }
+    el.parody.textContent = c.parody;
+
+    var h = new Date().getHours();
+    if (h < 5) el.greeting.textContent = c.greeting[0];
+    else if (h < 12) el.greeting.textContent = c.greeting[1];
+    else if (h < 18) el.greeting.textContent = c.greeting[2];
+    else el.greeting.textContent = c.greeting[3];
+  }
+
+  function makeRef() {
+    var hex = "0123456789ABCDEF", a = "", b = "";
+    for (var i = 0; i < 4; i++) a += hex.charAt(Math.floor(Math.random() * 16));
+    for (var k = 0; k < 4; k++) b += hex.charAt(Math.floor(Math.random() * 16));
+    return a + "-" + b;
+  }
+
+  /* ================= 视图切换 ================= */
+  function show(stage) {
+    el.boot.classList.remove("on");
+    setTimeout(function () { stage.classList.add("on"); }, 120);
+  }
+
+  var currentLang = "zh";
+
+  function enterBan(lang, persist) {
+    currentLang = lang;
+    applyCopy(lang);
+    el.refId.textContent = makeRef();
+    if (persist) writeState("banned", lang);
+    show(el.ban);
+  }
+
+  function enterHome(lang) {
+    currentLang = lang;
+    applyCopy(lang);
+    show(el.home);
+  }
+
+  function toast(text) {
+    el.toast.textContent = text;
+    el.toast.classList.add("show");
+    setTimeout(function () { el.toast.classList.remove("show"); }, 2400);
+  }
+
+  /* ================= 申诉：输入 {open:ban--ip} 解封 ================= */
+  el.appealToggle.addEventListener("click", function () {
+    SFX.click();
+    var open = el.appeal.classList.toggle("open");
+    if (open) setTimeout(function () { el.input.focus(); }, 60);
+  });
+
+  el.termsToggle.addEventListener("click", function () {
+    SFX.click();
+    el.terms.classList.toggle("open");
+  });
+
+  function tryUnlock() {
+    var val = (el.input.value || "").trim();
+    if (val === UNLOCK_CODE) {
+      el.appealErr.classList.remove("show");
+      writeState("unlocked", currentLang);   // 永久解除，重开页面也不再封
+      SFX.ok();
+      enterHome(currentLang);
+      toast(COPY[currentLang].toast);
+      return;
+    }
+    SFX.bad();
+    el.appealErr.classList.add("show");
+    el.appeal.classList.remove("shake");
+    void el.appeal.offsetWidth;
+    el.appeal.classList.add("shake");
+    el.input.select();
+  }
+
+  el.appealSubmit.addEventListener("click", tryUnlock);
+  el.input.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); tryUnlock(); }
+  });
+
+  /* ================= 游戏弹层 ================= */
+  function openGame(file, title) {
+    el.gameTitle.textContent = title || "RTSX";
+    el.gameFrame.src = file;
+    el.gameNewWin.href = file;
+    el.modal.classList.add("open");
+    el.modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeGame() {
+    SFX.click();
+    el.modal.classList.remove("open");
+    el.modal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("modal-open");
+    el.gameFrame.src = "about:blank";     // 卸载页面，顺带停掉游戏循环
+    document.body.style.overflow = "";
+  }
+
+  el.grid.addEventListener("click", function (e) {
+    var tile = e.target.closest ? e.target.closest(".tile") : null;
+    if (!tile) return;
+    SFX.open();
+    var nameEl = tile.querySelector("[data-name]");
+    openGame(tile.getAttribute("data-file"), nameEl ? nameEl.textContent : "");
+  });
+
+  el.gameClose.addEventListener("click", closeGame);
+  el.gameFrame.addEventListener("load", function () {
+    try { el.gameFrame.contentWindow.focus(); } catch (e) {}
+  });
+  el.modal.addEventListener("mousedown", function (e) {
+    if (e.target === el.modal) closeGame();
+  });
+  window.addEventListener("message", function (e) {
+    if (e && e.data === "rtsx-close") closeGame();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && el.modal.classList.contains("open")) closeGame();
+  });
+
+  /* ================= 启动 ================= */
+  function run() {
+    var qs = new URLSearchParams(location.search);
+    var force = (qs.get("force") || "").toLowerCase();
+
+    if (qs.get("reset") === "1") clearState();
+
+    if (force === "ban")  {
+      enterBan("zh", false);
+      var panel = (qs.get("panel") || qs.get("appeal") === "1" ? (qs.get("panel") || "appeal") : "").toLowerCase();
+      if (panel === "appeal") el.appeal.classList.add("open");   // 调试：展开申诉框
+      if (panel === "terms")  el.terms.classList.add("open");    // 调试：展开条款
+      return;
+    }
+    if (force === "home") {
+      bootReady = true; ipReady = true;
+      enterHome(qs.get("lang") === "zh" ? "zh" : "en");
+      return;
     }
 
-    // 右侧读数
-    var rx = 1200;
-    text('51', rx, 512, 92, C.amber, {mono: true, ls: 1, alpha: ease(seg(t, 126.4, 127.8))});
-    text('条爆款视频', rx + 120, 490, 17, 'rgba(220,228,239,.6)', {ls: 1});
-    text('25 / 51', rx, 610, 52, C.amber, {mono: true, ls: 1.5, alpha: ease(seg(t, 127.6, 129.0))});
-    text('小红书 · 爆款样本', rx, 640, 14, 'rgba(117,129,143,.8)', {ls: 0.8,
-         alpha: ease(seg(t, 127.6, 129.0))});
-
-    // 图例
-    var lg = ease(seg(t, 129.2, 130.6));
-    ctx.globalAlpha = a * a2 * lg;
-    ctx.fillStyle = 'rgba(217,160,91,.16)';
-    ctx.fillRect(rx, 672, 14, 14);
-    ctx.strokeStyle = 'rgba(217,160,91,.6)';
-    ctx.strokeRect(rx, 672, 14, 14);
-    text('粉丝 ≥ 1500', rx + 24, 685, 13, 'rgba(220,228,239,.65)', {ls: 0.6});
-    ctx.strokeStyle = 'rgba(220,228,239,.2)';
-    ctx.strokeRect(rx + 170, 672, 14, 14);
-    text('粉丝 < 1500', rx + 194, 685, 13, 'rgba(117,129,143,.85)', {ls: 0.6});
-    ctx.restore();
-  }
-}
-
-/* ============================================================
-   幕 09 · 同质化：第 10 支（134 – 152s）
-   ============================================================ */
-var CARD_W = 200, CARD_H = 118, CARD_GX = 214, CARD_GY = 134;
-var TOPICS = ['熵增', '囚徒困境', '墨菲定律', '信息论', '光遗传学', '贝叶斯', '自由意志', '涌现'];
-var cardSeed = null;
-
-function buildCardLayer(){
-  var oc = document.createElement('canvas');
-  oc.width = CARD_W; oc.height = CARD_H;
-  var ox = oc.getContext('2d');
-  ox.fillStyle = '#070B13';
-  ox.fillRect(0, 0, CARD_W, CARD_H);
-  ox.strokeStyle = 'rgba(220,228,239,.07)';
-  ox.lineWidth = 1;
-  ox.strokeRect(0.5, 0.5, CARD_W - 1, CARD_H - 1);
-
-  // 网格
-  ox.strokeStyle = 'rgba(70,90,120,.20)';
-  for (var x = 20; x < CARD_W; x += 26){
-    ox.beginPath(); ox.moveTo(x, 0); ox.lineTo(x, CARD_H); ox.stroke();
-  }
-
-  // 发光曲线
-  ox.save();
-  ox.shadowColor = 'rgba(217,160,91,.9)';
-  ox.shadowBlur = 9;
-  ox.strokeStyle = 'rgba(217,160,91,.92)';
-  ox.lineWidth = 1.3;
-  ox.beginPath();
-  for (var i = 0; i <= 60; i++){
-    var px = 14 + (i / 60) * (CARD_W - 28);
-    var py = 62 + Math.sin(i * 0.16) * 16 + Math.sin(i * 0.42) * 5;
-    if (i === 0) ox.moveTo(px, py); else ox.lineTo(px, py);
-  }
-  ox.stroke();
-  ox.restore();
-
-  // 粒子
-  ox.fillStyle = 'rgba(217,160,91,.8)';
-  for (var p = 0; p < 7; p++){
-    var sx = 20 + rnd(p + 1) * (CARD_W - 40);
-    var sy = 20 + rnd(p + 17) * (CARD_H - 40);
-    ox.beginPath(); ox.arc(sx, sy, 1.2 + rnd(p + 31) * 1.4, 0, Math.PI * 2); ox.fill();
-  }
-  return oc;
-}
-
-function sSameness(t){
-  var a = ease(seg(t, 134.2, 135.4)) * (1 - ease(seg(t, 150.4, 152.0)));
-  if (a <= 0) return;
-  if (!cardSeed) cardSeed = buildCardLayer();
-
-  var n = 0;
-  if (t >= 134.6) n = 1;
-  if (t >= 136.4) n = 3;
-  if (t >= 138.4) n = 7;
-  if (t >= 141.0) n = 14;
-    if (t >= 144.0) n = 28;
-
-  var gx0 = 138, gy0 = 168;
-  var blurOn = ease(seg(t, 146.6, 148.6));
-
-  ctx.save();
-  ctx.globalAlpha = a;
-  for (var i = 0; i < n; i++){
-    var ci = i % 7, ri = Math.floor(i / 7);
-    var cx = gx0 + ci * CARD_GX;
-    var cy = gy0 + ri * CARD_GY;
-    var pop = ease(seg(t, 134.6 + i * 0.11, 135.1 + i * 0.11));
-    if (pop <= 0) continue;
-
-    ctx.save();
-    ctx.globalAlpha = a * pop * (1 - blurOn * 0.25);
-
-    // 重影
-    if (blurOn > 0){
-      ctx.globalAlpha = a * pop * blurOn * 0.28;
-      ctx.drawImage(cardSeed, cx + 4, cy + 3);
-      ctx.drawImage(cardSeed, cx - 4, cy - 2);
+    var stored = readState();
+    if (stored && stored.state === "banned") {       // 已永久封禁：直接出封禁页，不必等资源
+      enterBan(stored.lang === "en" ? "en" : "zh", false);
+      return;
     }
-    ctx.globalAlpha = a * pop;
-    ctx.drawImage(cardSeed, cx, cy);
 
-    text(TOPICS[i % TOPICS.length], cx + 14, cy + 30, 16, 'rgba(220,228,239,.82)', {ls: 1});
-    text('0' + ((i % 9) + 1), cx + CARD_W - 14, cy + 30, 12, 'rgba(117,129,143,.65)',
-         {mono: true, align: 'right'});
-    ctx.restore();
-  }
+    preload();
 
-  // 密度提示
-  var da = ease(seg(t, 145.2, 146.6));
-  if (da > 0){
-    text('同一套模板，换八个选题', 138, 742, 15, 'rgba(117,129,143,.85)', {ls: 1.2, alpha: da});
-  }
-  ctx.restore();
-}
-
-/* ============================================================
-   幕 10 · 落点：不是审美门槛（152 – 167s）
-   ============================================================ */
-function sVerdict(t){
-  var a = ease(seg(t, 152.2, 153.0));
-  if (a <= 0) return;
-  ctx.fillStyle = 'rgba(6,8,14,' + (0.7 * a) + ')';
-  ctx.fillRect(0, 0, W, H);
-
-  var p1 = ease(seg(t, 153.6, 156.2));
-  var p2 = ease(seg(t, 155.8, 157.4));
-  var out = 1 - ease(seg(t, 165.0, 166.8));
-
-  var bx = 470, fullW = 700;
-
-  ctx.save();
-  ctx.globalAlpha = a * out;
-
-  // —— 制作门槛：缩水
-  if (p1 > 0){
-    ctx.save();
-    ctx.globalAlpha = a * out * ease(seg(t, 153.6, 154.8));
-    text('制作门槛', 250, 500, 40, 'rgba(220,228,239,.9)', {serif: true, ls: 2});
-
-    // 原长度的幽灵虚线
-    ctx.strokeStyle = 'rgba(220,228,239,.30)';
-    ctx.setLineDash([5, 9]);
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(bx, 488); ctx.lineTo(bx + fullW, 488); ctx.stroke();
-    ctx.setLineDash([]);
-
-    // 实线缩短
-    var w1 = fullW * (1 - 0.94 * p1);
-    ctx.fillStyle = 'rgba(220,228,239,.85)';
-    ctx.fillRect(bx, 480, Math.max(4, w1), 16);
-    ctx.restore();
-  }
-
-  // —— 审美门槛：不动
-  if (p2 > 0){
-    ctx.save();
-    ctx.globalAlpha = a * out * p2;
-    text('审美门槛', 250, 610, 40, C.amber, {serif: true, ls: 2});
-    ctx.fillStyle = C.amber;
-    ctx.fillRect(bx, 590, fullW, 16);
-
-    // 尾部标记：仍在原位
-    ctx.strokeStyle = 'rgba(217,160,91,.75)';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(bx + fullW + 20, 578); ctx.lineTo(bx + fullW + 20, 618); ctx.stroke();
-    ctx.restore();
-  }
-
-  ctx.restore();
-}
-
-/* ============================================================
-   幕 11 · 片尾（167 – 182s）
-   ============================================================ */
-var SOURCES = [
-  '36 氪 ·《新人半月涨粉 60 万，抖音、B 站、小红书抢跑「Vibe 知识」赛道》· 2026.10.20',
-  '今日头条 ·《20 天涨粉 66 万、12 亿播放：这波 Vibe 知识大赏怎么做到的》· 2026.10.21',
-  '站长之家 ·《从 Vibe Coding 到 Vibe 知识，抖音精选成了 AI 创作新玩法的试验场》· 2026.11.08',
-  '微博 @i陆三金 · 关于 9 月 29 日平台邀约的公开回忆 · 2026.10.10'
-];
-
-function sEnd(t){
-  var fade = 1 - ease(seg(t, 178.4, 181.4));
-  var a = ease(seg(t, 168.6, 170.2)) * fade;
-  if (a <= 0) return;
-
-  ctx.fillStyle = 'rgba(6,8,14,' + (0.55 * ease(seg(t, 167.4, 169.0))) + ')';
-  ctx.fillRect(0, 0, W, H);
-
-  ctx.save();
-  ctx.globalAlpha = a;
-  text('《vibe 知识大赏是怎么火的？》', CX, 400, 50, 'rgba(220,228,239,.86)',
-       {align: 'center', ls: 3, serif: true});
-
-  var sa = ease(seg(t, 171.6, 173.0));
-  if (sa > 0){
-    ctx.globalAlpha = a * sa * 0.9;
-    ctx.strokeStyle = 'rgba(220,228,239,.16)';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(560, 452); ctx.lineTo(1360, 452); ctx.stroke();
-
-    text('数据来源', CX, 494, 12, 'rgba(117,129,143,.95)', {align: 'center', ls: 5});
-    for (var i = 0; i < SOURCES.length; i++){
-      var la = ease(seg(t, 172.6 + i * 0.7, 173.4 + i * 0.7));
-      if (la <= 0) continue;
-      text(SOURCES[i], CX, 530 + i * 28, 14, 'rgba(220,228,239,.62)',
-           {align: 'center', ls: 0.6, alpha: a * sa * la});
+    if (stored && stored.state === "unlocked") {
+      var lang = stored.lang === "en" ? "en" : "zh";
+      ipReady = true;
+      gate(function () { enterHome(lang); });
+      return;
     }
+
+    var t0 = Date.now();
+    var decided = false;
+    var settle = function (country) {
+      if (decided) return;
+      decided = true;
+      var wait = Math.max(0, 700 - (Date.now() - t0));
+      setTimeout(function () {
+        ipReady = true;
+        gate(function () {
+          if (country && CHINA_REGIONS.indexOf(country) !== -1) {
+            enterBan("zh", true);         // 国内 IP：永久记录为封禁
+          } else {
+            enterHome(pickLang(country)); // 其它地区：正常首页，不写入状态
+          }
+        });
+      }, wait);
+    };
+
+    var guard = setTimeout(function () { settle(null); }, 8000);
+
+    anyCountry().then(function (code) {
+      clearTimeout(guard);
+      settle(code);
+    }, function () {
+      clearTimeout(guard);
+      settle(null);
+    });
   }
 
-  text('本片由 HTML 与 Canvas 实时生成，无真人出镜', CX, 694, 13, 'rgba(117,129,143,.85)',
-       {align: 'center', ls: 2, alpha: ease(seg(t, 176.4, 177.6))});
-  text('We Never · bgm.mp3', CX, 722, 11, 'rgba(62,72,86,.9)', {align: 'center', ls: 2});
-  ctx.restore();
-}
-
-/* ============================================================
-   场景表 / 渲染 / 播放控制
-   ============================================================ */
-var SCENES = [
-  {a: 0,    b: 18.0,  f: sIntro},
-  {a: 17.4, b: 40.0,  f: sDefine},
-  {a: 40.0, b: 52.0,  f: sThreshold},
-  {a: 52.0, b: 64.0,  f: sCost},
-  {a: 64.0, b: 86.0,  f: sTimeline},
-  {a: 86.0, b: 102.0, f: sQuiet},
-  {a: 102.0, b: 113.0, f: sPlatform},
-  {a: 113.0, b: 134.0, f: sSupply},
-  {a: 134.0, b: 152.0, f: sSameness},
-  {a: 152.0, b: 167.0, f: sVerdict},
-  {a: 167.0, b: 182.5, f: sEnd}
-];
-
-function draw(t){
-  ctx.clearRect(0, 0, W, H);
-  drawBg(t);
-
-  // 贯穿全片的极淡基线
-  if (t > 3.6){
-    ctx.save();
-    ctx.globalAlpha = 0.10;
-    ctx.strokeStyle = C.amber;
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(120, HZ); ctx.lineTo(1800, HZ); ctx.stroke();
-    ctx.restore();
-  }
-
-  for (var i = 0; i < SCENES.length; i++){
-    if (t >= SCENES[i].a && t < SCENES[i].b) SCENES[i].f(t);
-  }
-  drawChrome(t);
-  drawSubs(t);
-}
-
-/* ---------- 控制 ---------- */
-var ui      = document.getElementById('ui');
-var gate    = document.getElementById('gate');
-var btnPlay = document.getElementById('btnPlay');
-var btnMute = document.getElementById('btnMute');
-var btnRec  = document.getElementById('btnRec');
-var btnFull = document.getElementById('btnFull');
-var bar     = document.getElementById('bar');
-var barFill = document.getElementById('barFill');
-var barDot  = document.getElementById('barDot');
-var timeEl  = document.getElementById('time');
-var toastEl = document.getElementById('toast');
-
-var toastTimer = null;
-function toast(msg){
-  toastEl.textContent = msg;
-  toastEl.classList.add('on');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(function(){ toastEl.classList.remove('on'); }, 1600);
-}
-
-function mmss(s){
-  s = Math.max(0, Math.round(s));
-  var m = Math.floor(s / 60), r = s % 60;
-  return (m < 10 ? '0' : '') + m + ':' + (r < 10 ? '0' : '') + r;
-}
-
-function setPlaying(p){
-  playing = p;
-  btnPlay.textContent = p ? '❚❚' : '▶';
-  if (p){
-    if (useAudio && audioReady){
-      try { audio.currentTime = T; audio.play(); } catch(e){ useAudio = false; }
-    }
-    pokeUI();
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", run);
   } else {
-    try { audio.pause(); } catch(e){}
-    clearTimeout(hideTimer);
-    ui.classList.remove('hide');
+    run();
   }
-}
-
-function seekTo(t){
-  T = clamp(t, 0, DUR);
-  if (useAudio && audioReady){
-    try { audio.currentTime = T; } catch(e){}
-  }
-  renderUI();
-  if (!playing) draw(T);
-}
-
-function renderUI(){
-  var p = clamp(T / DUR, 0, 1) * 100;
-  barFill.style.width = p + '%';
-  barDot.style.left = p + '%';
-  timeEl.textContent = mmss(T) + ' / 03:02';
-  bar.setAttribute('aria-valuenow', Math.round(p));
-}
-
-var hideTimer = null;
-function pokeUI(){
-  if (recMode) return;
-  ui.classList.remove('hide');
-  clearTimeout(hideTimer);
-  if (playing){
-    hideTimer = setTimeout(function(){ if (playing && !recMode) ui.classList.add('hide'); }, 2400);
-  }
-}
-
-function toggleRec(){
-  recMode = !recMode;
-  ui.classList.toggle('hide', recMode);
-  document.getElementById('stage').style.cursor = recMode ? 'none' : 'default';
-  toast(recMode ? '录制模式：控件已隐藏，按 R 恢复' : '已退出录制模式');
-}
-
-/* 开始 */
-function start(){
-  if (started) return;
-  started = true;
-  gate.classList.add('gone');
-  T = 0;
-  setPlaying(true);
-}
-
-gate.addEventListener('click', start);
-gate.addEventListener('keydown', function(e){ if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); start(); } });
-gate.tabIndex = 0;
-
-btnPlay.addEventListener('click', function(){
-  if (!started) { start(); return; }
-  if (T >= DUR - 0.1) { T = 0; }
-  setPlaying(!playing);
-});
-btnMute.addEventListener('click', function(){
-  muted = !muted;
-  audio.muted = muted;
-  var ms = document.getElementById('muteSlash');
-  if (ms) ms.style.opacity = muted ? 1 : 0;
-  btnMute.style.opacity = muted ? 0.45 : 1;
-  toast(muted ? '已静音（画面时钟改为本地计时）' : '已恢复音乐');
-  if (!muted && useAudio && audioReady && playing) audio.play().catch(function(){});
-});
-btnRec.addEventListener('click', toggleRec);
-btnFull.addEventListener('click', function(){
-  if (!document.fullscreenElement){
-    document.documentElement.requestFullscreen().catch(function(){ toast('全屏失败，按 F11 试试'); });
-  } else {
-    document.exitFullscreen().catch(function(){});
-  }
-});
-
-/* 进度条拖动 */
-var dragging = false;
-function barSeek(e){
-  var rect = bar.getBoundingClientRect();
-  var x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-  seekTo(clamp(x / rect.width, 0, 1) * DUR);
-}
-bar.addEventListener('mousedown', function(e){ dragging = true; barSeek(e); });
-window.addEventListener('mousemove', function(e){ if (dragging) barSeek(e); });
-window.addEventListener('mouseup', function(){ dragging = false; });
-bar.addEventListener('touchstart', function(e){ barSeek(e); }, {passive: true});
-bar.addEventListener('touchmove', function(e){ barSeek(e); }, {passive: true});
-
-/* 键盘 */
-window.addEventListener('keydown', function(e){
-  if (e.target && (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT')) return;
-  var k = e.key;
-  if (k === ' '){ e.preventDefault(); if (!started) start(); else setPlaying(!playing); }
-  else if (k === 'ArrowRight'){ e.preventDefault(); seekTo(T + 5); }
-  else if (k === 'ArrowLeft'){ e.preventDefault(); seekTo(T - 5); }
-  else if (k === 'r' || k === 'R'){ e.preventDefault(); toggleRec(); }
-  else if (k === 'm' || k === 'M'){ e.preventDefault(); btnMute.click(); }
-  else if (k === 'f' || k === 'F'){
-    e.preventDefault();
-    if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(function(){});
-    else document.exitFullscreen().catch(function(){});
-  }
-});
-
-window.addEventListener('mousemove', pokeUI);
-window.addEventListener('touchstart', pokeUI, {passive: true});
-
-/* ---------- 主循环：以音频为主时钟 ---------- */
-var lastNow = performance.now();
-var lastT = -1;
-
-function frame(now){
-  var dt = Math.min((now - lastNow) / 1000, 0.08);
-  lastNow = now;
-
-  if (playing){
-    if (useAudio && audioReady && !audio.paused && !audio.ended){
-      T = audio.currentTime;
-    } else if (useAudio && audioReady && muted && !audio.paused){
-      T = audio.currentTime;
-    } else {
-      T = Math.min(T + dt, DUR);
-    }
-    if (T >= DUR - 0.02){
-      T = DUR;
-      setPlaying(false);
-      if (recMode){ /* 停在末帧，方便停止录制 */ }
-    }
-  }
-
-  if (!playing && Math.abs(T - lastT) < 0.0005){
-    // 暂停时只在需要时重绘（保证首帧与 seek 后正确）
-  } else {
-    draw(T);
-    lastT = T;
-  }
-  renderUI();
-  requestAnimationFrame(frame);
-}
-
-/* 字体就绪后强制重绘一次 */
-if (document.fonts && document.fonts.ready){
-  document.fonts.ready.then(function(){ draw(T); });
-}
-
-/* 支持 ?t=秒 直接定位到某一帧（便于逐幕核对与截图） */
-var qs = new URLSearchParams(location.search);
-if (qs.has('t')){
-  T = clamp(parseFloat(qs.get('t')) || 0, 0, DUR);
-  started = true;
-  gate.classList.add('gone');
-  if (qs.get('ui') === '0'){ recMode = true; ui.classList.add('hide'); document.getElementById('stage').style.cursor = 'none'; }
-}
-
-/* 首帧 */
-draw(T);
-renderUI();
-requestAnimationFrame(frame);
+})();
 </script>
 </body>
 </html>
