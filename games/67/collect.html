@@ -59,20 +59,30 @@
     font-size:11px;letter-spacing:.04em;color:rgba(80,72,62,.55);
   }
 
-  .dpad{
-    position:absolute;right:16px;bottom:calc(46px + env(safe-area-inset-bottom));
-    display:none;grid-template-columns:repeat(3,46px);grid-template-rows:repeat(3,46px);gap:4px;
-  }
-  .dpad button{
-    border:1px solid rgba(228,224,215,.9);background:rgba(255,255,255,.85);
-    border-radius:10px;color:var(--dim);font-size:15px;font-family:inherit;
+  /* 手机：屏幕正下方居中的摇杆 */
+  .stick{
+    position:absolute;left:50%;bottom:calc(74px + env(safe-area-inset-bottom));
+    width:136px;height:136px;margin-left:-68px;border-radius:50%;
+    display:none;touch-action:none;z-index:2;
+    background:radial-gradient(circle at 50% 42%,rgba(255,255,255,.92) 0%,rgba(244,241,234,.9) 70%,rgba(233,228,218,.92) 100%);
+    border:1px solid rgba(228,224,215,.95);
+    box-shadow:0 16px 34px -26px rgba(25,24,23,.7),inset 0 1px 0 rgba(255,255,255,.9);
     backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
   }
-  .dpad .u{grid-column:2;grid-row:1;}
-  .dpad .l{grid-column:1;grid-row:2;}
-  .dpad .d{grid-column:2;grid-row:2;}
-  .dpad .r{grid-column:3;grid-row:2;}
-  @media (pointer:coarse), (max-width:640px){ .dpad{display:grid;} .tip{display:none;} }
+  .stick::after{
+    content:"";position:absolute;left:50%;top:50%;width:88px;height:88px;margin:-44px 0 0 -44px;
+    border-radius:50%;border:1px dashed rgba(107,98,87,.26);pointer-events:none;
+  }
+  .stick .knob{
+    position:absolute;left:50%;top:50%;width:56px;height:56px;border-radius:50%;
+    background:linear-gradient(180deg,#e2875f,#cd6f45);
+    box-shadow:0 10px 18px -8px rgba(160,88,52,.8),inset 0 1px 0 rgba(255,255,255,.45);
+    transform:translate(-50%,-50%);pointer-events:none;
+  }
+  @media (pointer:coarse), (max-width:640px){
+    .stick{display:block;}
+    .tip{display:none;}
+  }
 
   .overlay{
     position:absolute;inset:0;display:none;align-items:center;justify-content:center;
@@ -118,12 +128,7 @@
 </div>
 <div class="tip">WASD / 方向键移动</div>
 
-<div class="dpad" id="dpad">
-  <button class="u" data-k="up" type="button">↑</button>
-  <button class="l" data-k="left" type="button">←</button>
-  <button class="d" data-k="down" type="button">↓</button>
-  <button class="r" data-k="right" type="button">→</button>
-</div>
+<div class="stick" id="stick"><div class="knob" id="knob"></div></div>
 
 <div class="overlay show" id="overlay">
   <div class="panel">
@@ -534,15 +539,44 @@
     keys.up = keys.down = keys.left = keys.right = false;
   });
 
-  var dpad = document.getElementById("dpad");
-  function bindPad(el, k){
-    el.addEventListener("pointerdown", function(e){ e.preventDefault(); keys[k] = true; });
-    el.addEventListener("pointerup", function(e){ e.preventDefault(); keys[k] = false; });
-    el.addEventListener("pointercancel", function(){ keys[k] = false; });
-    el.addEventListener("pointerleave", function(){ keys[k] = false; });
+  /* 触屏摇杆：屏幕上正下方居中，向哪推就往哪走（可斜向） */
+  function mountStick(handler){
+    var base = document.getElementById("stick"), knob = document.getElementById("knob");
+    if (!base || !knob) return;
+    var R = 40, pid = null;
+    function place(cx, cy){
+      var r = base.getBoundingClientRect();
+      var x = cx - (r.left + r.width / 2), y = cy - (r.top + r.height / 2);
+      var len = Math.sqrt(x * x + y * y);
+      if (len > R) { x = x * R / len; y = y * R / len; }
+      knob.style.transform = "translate(calc(-50% + " + x.toFixed(1) + "px),calc(-50% + " + y.toFixed(1) + "px))";
+      handler(x / R, y / R);
+    }
+    function down(e){
+      if (pid !== null) return;
+      pid = e.pointerId;
+      R = Math.max(26, base.clientWidth / 2 - 30);
+      try { base.setPointerCapture(pid); } catch (err) {}
+      place(e.clientX, e.clientY);
+      e.preventDefault(); e.stopPropagation();
+    }
+    function move(e){ if (pid === null || e.pointerId !== pid) return; place(e.clientX, e.clientY); e.preventDefault(); }
+    function up(e){
+      if (pid === null || e.pointerId !== pid) return;
+      pid = null;
+      knob.style.transform = "translate(-50%,-50%)";
+      handler(0, 0);
+    }
+    base.addEventListener("pointerdown", down);
+    base.addEventListener("pointermove", move);
+    base.addEventListener("pointerup", up);
+    base.addEventListener("pointercancel", up);
+    base.addEventListener("lostpointercapture", up);
   }
-  [].forEach.call(dpad.querySelectorAll("button[data-k]"), function(b){
-    bindPad(b, b.getAttribute("data-k"));
+  mountStick(function(dx, dy){
+    var z = 0.28;
+    keys.left = dx < -z;  keys.right = dx > z;
+    keys.up = dy < -z;    keys.down = dy > z;
   });
 
   document.getElementById("ovBtn").addEventListener("click", start);

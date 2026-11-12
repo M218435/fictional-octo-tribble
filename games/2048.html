@@ -87,6 +87,28 @@
   .vbig{background:#3D1A13;color:#fff;}
 
   .bottom{display:flex;justify-content:center;margin-top:2px;}
+  /* 手机：居中的摇杆，往哪推就朝哪合并一步 */
+  .stick{
+    display:none;position:relative;width:132px;height:132px;margin:2px auto 0;
+    border-radius:50%;touch-action:none;
+    background:radial-gradient(circle at 50% 42%,#fff 0%,#f3efe7 68%,#e8e3d9 100%);
+    border:1px solid var(--line);
+    box-shadow:0 14px 30px -22px rgba(25,24,23,.55),inset 0 1px 0 #fff;
+  }
+  .stick::after{
+    content:"";position:absolute;left:50%;top:50%;width:86px;height:86px;margin:-43px 0 0 -43px;
+    border-radius:50%;border:1px dashed rgba(147,142,133,.28);pointer-events:none;
+  }
+  .stick .knob{
+    position:absolute;left:50%;top:50%;width:56px;height:56px;border-radius:50%;
+    background:linear-gradient(180deg,#e2875f,#cf7046);
+    box-shadow:0 10px 20px -8px rgba(160,88,52,.75),inset 0 1px 0 rgba(255,255,255,.45);
+    transform:translate(-50%,-50%);pointer-events:none;
+  }
+  @media (pointer:coarse),(max-width:640px){
+    .stick{display:block;}
+    .hint{display:none;}
+  }
   .btn{
     height:40px;padding:0 22px;border:0;border-radius:10px;
     background:var(--btn);color:#fff;font:inherit;font-size:13.5px;font-weight:500;
@@ -131,6 +153,7 @@
   </div>
   <p class="hint">方向键 / WASD / 滑动</p>
   <div class="board" id="board"></div>
+  <div class="stick" id="stick"><div class="knob" id="knob"></div></div>
   <div class="bottom"><button class="btn" id="restart" type="button">重新开始</button></div>
 </div>
 
@@ -356,6 +379,7 @@
   var app = document.getElementById("app");
   app.addEventListener("touchstart", function(e){
     if (e.touches.length !== 1) return;
+    if (e.target && e.target.closest && e.target.closest(".stick")) { tracking = false; return; }  // 摇杆上的拖动不算滑动
     tracking = true; sx = e.touches[0].clientX; sy = e.touches[0].clientY;
   }, { passive: true });
   app.addEventListener("touchmove", function(e){ if (tracking) e.preventDefault(); }, { passive: false });
@@ -365,6 +389,50 @@
     var t = e.changedTouches[0];
     var dx = t.clientX - sx, dy = t.clientY - sy;
     if (Math.max(Math.abs(dx), Math.abs(dy)) < 28) return;
+    if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 1 : 0);
+    else move(dy > 0 ? 3 : 2);
+  });
+
+  /* 触屏摇杆：居中在棋盘下方，往哪推就合并一步；回中后可以再推一次 */
+  function mountStick(handler){
+    var base = document.getElementById("stick"), knob = document.getElementById("knob");
+    if (!base || !knob) return;
+    var R = 40, pid = null;
+    function place(cx, cy){
+      var r = base.getBoundingClientRect();
+      var x = cx - (r.left + r.width / 2), y = cy - (r.top + r.height / 2);
+      var len = Math.sqrt(x * x + y * y);
+      if (len > R) { x = x * R / len; y = y * R / len; }
+      knob.style.transform = "translate(calc(-50% + " + x.toFixed(1) + "px),calc(-50% + " + y.toFixed(1) + "px))";
+      handler(x / R, y / R);
+    }
+    function down(e){
+      if (pid !== null) return;
+      pid = e.pointerId;
+      R = Math.max(26, base.clientWidth / 2 - 30);
+      try { base.setPointerCapture(pid); } catch (err) {}
+      place(e.clientX, e.clientY);
+      e.preventDefault();
+    }
+    function move_(e){ if (pid === null || e.pointerId !== pid) return; place(e.clientX, e.clientY); e.preventDefault(); }
+    function up(e){
+      if (pid === null || e.pointerId !== pid) return;
+      pid = null;
+      knob.style.transform = "translate(-50%,-50%)";
+      handler(0, 0);
+    }
+    base.addEventListener("pointerdown", down);
+    base.addEventListener("pointermove", move_);
+    base.addEventListener("pointerup", up);
+    base.addEventListener("pointercancel", up);
+    base.addEventListener("lostpointercapture", up);
+  }
+  var armed = true;
+  mountStick(function(dx, dy){
+    var big = Math.max(Math.abs(dx), Math.abs(dy));
+    if (big < 0.18) { armed = true; return; }
+    if (!armed || big < 0.5) return;
+    armed = false;
     if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 1 : 0);
     else move(dy > 0 ? 3 : 2);
   });
