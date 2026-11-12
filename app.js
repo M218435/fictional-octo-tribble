@@ -4,7 +4,7 @@
 
   /* ===== AI 配置（智谱 GLM）===== */
   var API_CONFIG = {
-    API_URL: 'https://open.bigmodel.cn/api/paas/v4',
+    API_URL: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
     MODEL: 'glm-4.7-flash',
     API_KEYS: [
       '319acc34d3a749fe9dc335d7ffd70aba.GwuZ2qfbl4epViPL',
