@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>微信 · 本地演示版</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cellipse cx='32' cy='29' rx='26' ry='21' fill='%2307C160'/%3E%3Cpath d='M16.5 45 L12 58 L27 49 Z' fill='%2307C160'/%3E%3Ccircle cx='23' cy='27' r='4.4' fill='%23fff'/%3E%3Ccircle cx='41' cy='27' r='4.4' fill='%23fff'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#E9EDE7;
+    --app:#F3F5F1;
+    --card:#FFFFFF;
+    --ink:#15181A;
+    --sub:#6C7570;
+    --line:#E3E6E1;
+    --green:#07C160;
+    --green-deep:#049B4B;
+    --bubble:#95EC69;
+    --chat-bg:#EDEFEA;
+    --danger:#B0453B;
+    --ease:cubic-bezier(.22,1,.36,1);
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Source Han Sans SC","Noto Sans CJK SC",system-ui,sans-serif;
+    color:var(--ink);
+    background:radial-gradient(120% 80% at 50% 30%, #F7F9F5 0%, var(--bg) 62%, #DDE2DA 100%);
+    -webkit-font-smoothing:antialiased;
+    display:flex;align-items:stretch;justify-content:center;
+  }
+
+  .app{
+    position:relative;width:100%;max-width:430px;height:100svh;
+    background:var(--app);overflow:hidden;isolation:isolate;
+  }
+  @media (min-width:560px){
+    body{align-items:center}
+    .app{height:min(880px,94svh);border-radius:26px;
+      box-shadow:0 1px 2px rgba(10,16,12,.08), 0 46px 90px -46px rgba(10,16,12,.45)}
+  }
+
+  .view{position:absolute;inset:0;opacity:0;pointer-events:none;transition:opacity .22s ease;overflow:hidden}
+  .view.on{opacity:1;pointer-events:auto}
+
+  /* ===== 启动：加载 → 入口 ===== */
+  .splash{position:absolute;inset:0;background:radial-gradient(118% 78% at 50% 34%, #FFFFFF 0%, var(--app) 62%, #EEF1EB 100%)}
+
+  .loader{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;
+    transition:opacity .3s ease;
+  }
+  .loader.gone{opacity:0;pointer-events:none}
+  .track{width:clamp(180px,44vw,246px);height:4px;border-radius:999px;background:rgba(20,24,21,.10);overflow:hidden}
+  .fill{width:100%;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--green-deep),var(--green));
+    transform:scaleX(0);transform-origin:left center;will-change:transform}
+  .meta{width:clamp(180px,44vw,246px);margin:13px auto 0;font-size:12px;font-variant-numeric:tabular-nums;
+    letter-spacing:.08em;color:var(--sub);text-align:center}
+  .meta.failed{color:var(--danger);letter-spacing:.02em}
+
+  .entry-btn{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    display:flex;flex-direction:column;align-items:center;
+    padding:16px 26px 20px;margin:0;border:0;background:none;color:inherit;font:inherit;
+    cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;
+    opacity:0;pointer-events:none;transition:opacity .4s ease .05s;
+  }
+  .entry-btn.on{opacity:1;pointer-events:auto}
+  .entry-btn:focus-visible{outline:2px solid var(--green);outline-offset:14px;border-radius:40px}
+
+  .tile{
+    display:grid;place-items:center;
+    width:clamp(132px,36vw,170px);height:clamp(132px,36vw,170px);
+    border-radius:calc(clamp(132px,36vw,170px) * .225);
+    background:#fff;
+    box-shadow:0 1px 2px rgba(20,24,21,.05), 0 22px 46px -20px rgba(20,24,21,.30);
+    transform:scale(.93) translateY(9px);transition:transform .6s var(--ease) .05s;
+  }
+  .entry-btn.on .tile{transform:none}
+  .tile img{width:60%;height:auto;display:block;user-select:none;-webkit-user-drag:none}
+
+  .entry-name{margin-top:clamp(22px,4.2vh,34px);font-size:clamp(26px,5.4vw,30px);font-weight:600;
+    line-height:1.2;letter-spacing:.03em;transform:translateY(11px);transition:transform .58s var(--ease) .16s}
+  .entry-btn.on .entry-name{transform:none}
+  .entry-hint{margin-top:10px;font-size:14px;line-height:1.5;letter-spacing:.06em;color:var(--sub);
+    transform:translateY(9px);transition:transform .58s var(--ease) .26s}
+  .entry-btn.on .entry-hint{transform:none}
+
+  /* ===== 通用控件 ===== */
+  .bar{height:52px;display:flex;align-items:center;gap:2px;padding:0 4px;
+    background:var(--app);border-bottom:1px solid var(--line);position:relative;z-index:3;flex:0 0 auto}
+  .bar-title{flex:1;min-width:0;text-align:center;font-size:16px;font-weight:600;letter-spacing:.02em;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px}
+  .icon-btn{width:44px;height:44px;flex:0 0 auto;display:grid;place-items:center;border:0;background:none;
+    color:var(--ink);cursor:pointer;border-radius:10px}
+  .icon-btn:focus-visible{outline:2px solid var(--green);outline-offset:1px}
+  .icon-btn svg{width:22px;height:22px;display:block}
+  .icon-btn.ghost{color:var(--sub)}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:46px;padding:0 18px;
+    border:1px solid transparent;border-radius:12px;font:inherit;font-size:15px;font-weight:500;
+    cursor:pointer;background:var(--green);color:#fff;-webkit-tap-highlight-color:transparent}
+  .btn:active{background:var(--green-deep)}
+  .btn:focus-visible{outline:2px solid var(--green-deep);outline-offset:2px}
+  .btn.block{width:100%}
+  .btn.plain{background:#fff;color:var(--ink);border-color:var(--line)}
+  .btn.danger{background:#fff;color:var(--danger);border-color:#E7CFCB}
+  .btn[disabled]{opacity:.55;cursor:default}
+
+  .toast{position:absolute;left:50%;bottom:96px;transform:translate(-50%,10px);max-width:80%;
+    padding:10px 16px;border-radius:10px;background:rgba(21,24,26,.9);color:#fff;font-size:13.5px;
+    line-height:1.5;text-align:center;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:60}
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+
+  .mask{position:absolute;inset:0;background:rgba(18,22,20,.42);display:flex;align-items:center;
+    justify-content:center;padding:22px;opacity:0;pointer-events:none;transition:opacity .2s ease;z-index:50}
+  .mask.on{opacity:1;pointer-events:auto}
+  .modal{width:100%;max-width:340px;max-height:calc(100% - 48px);overflow:auto;background:#fff;
+    border-radius:16px;padding:20px;box-shadow:0 30px 60px -30px rgba(0,0,0,.4);
+    transform:translateY(10px) scale(.98);transition:transform .28s var(--ease)}
+  .mask.on .modal{transform:none}
+  .modal-title{margin:0 0 10px;font-size:16px;font-weight:600;letter-spacing:.02em}
+  .modal-body{margin:0;font-size:14px;line-height:1.7;color:var(--sub)}
+  .modal-body strong{color:var(--ink)}
+  .modal-actions{display:flex;gap:10px;margin-top:18px}
+  .modal-actions .btn{flex:1;height:42px;font-size:14.5px}
+  /* ===== 登录 / 注册 ===== */
+  .auth{height:100%;overflow-y:auto;padding:26px 22px 30px;display:flex;flex-direction:column}
+  .auth-head{display:flex;flex-direction:column;align-items:center;margin:10px 0 20px}
+  .auth-logo{width:62px;height:62px;display:block}
+  .auth-head h1{margin:13px 0 0;font-size:22px;font-weight:600;letter-spacing:.06em}
+  .auth-sub{margin:6px 0 0;font-size:12.5px;letter-spacing:.04em;color:var(--sub)}
+
+  .notice{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:18px}
+  .notice-t{margin:0;font-size:14.5px;font-weight:600;letter-spacing:.02em}
+  .notice-t::before{content:"";display:inline-block;width:6px;height:6px;border-radius:3px;
+    background:var(--green);margin-right:8px;vertical-align:2px}
+  .notice-b{margin:8px 0 0;font-size:13px;line-height:1.75;color:var(--sub)}
+  .notice-b b{color:var(--ink);font-weight:600}
+
+  .seg{display:flex;background:#fff;border:1px solid var(--line);border-radius:12px;padding:3px;margin-bottom:16px}
+  .seg button{flex:1;height:38px;border:0;background:none;border-radius:10px;font:inherit;
+    font-size:14.5px;color:var(--sub);cursor:pointer}
+  .seg button.on{background:var(--green);color:#fff;font-weight:500}
+
+  .field{margin-bottom:12px}
+  .field label{display:block;font-size:12.5px;color:var(--sub);letter-spacing:.03em;margin:0 0 6px 2px}
+  .field input{width:100%;height:48px;padding:0 14px;border:1px solid var(--line);border-radius:12px;
+    background:#fff;font:inherit;font-size:16px;color:var(--ink);outline:none;
+    transition:border-color .16s,box-shadow .16s}
+  .field input::placeholder{color:#A6AEA8}
+  .field input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(7,193,96,.12)}
+  .field textarea{width:100%;padding:10px 14px;border:1px solid var(--line);border-radius:12px;
+    background:#fff;font:inherit;font-size:13px;line-height:1.6;color:var(--ink);resize:vertical;max-height:96px}
+  .field textarea:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(7,193,96,.12);outline:none}
+  .field .err{margin:6px 2px 0;font-size:12.5px;color:var(--danger);line-height:1.5}
+
+  .auth-form .btn.block{margin-top:8px}
+  .auth-links{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:14px;flex-wrap:wrap}
+  .link{border:0;background:none;padding:6px 4px;font:inherit;font-size:13px;color:var(--green-deep);
+    cursor:pointer;border-radius:6px}
+  .link:focus-visible{outline:2px solid var(--green);outline-offset:1px}
+  .link[disabled]{color:#9DB3A5;cursor:default}
+  .auth-foot{margin-top:auto;padding-top:20px;font-size:12px;line-height:1.7;color:#98A19A;text-align:center}
+
+  /* ===== 主界面 ===== */
+  .main{position:absolute;inset:0;display:flex;flex-direction:column}
+  .content{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .panel{display:none}
+  .panel.on{display:block}
+
+  .tabbar{flex:0 0 auto;display:grid;grid-template-columns:repeat(4,1fr);
+    border-top:1px solid var(--line);background:#FBFCFA;padding-bottom:env(safe-area-inset-bottom)}
+  .tab{height:56px;border:0;background:none;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:4px;font:inherit;font-size:11.5px;letter-spacing:.04em;
+    color:var(--sub);cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .tab svg{width:23px;height:23px;display:block}
+  .tab.on{color:var(--green-deep)}
+  .tab:focus-visible{outline:2px solid var(--green);outline-offset:-3px;border-radius:8px}
+
+  .row{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--card);
+    border-bottom:1px solid var(--line);cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .row:active{background:#F7F9F5}
+  .row:focus-visible{outline:2px solid var(--green);outline-offset:-2px}
+  .av{width:42px;height:42px;flex:0 0 auto;border-radius:9px;display:grid;place-items:center;
+    color:#fff;font-size:16px;font-weight:600;letter-spacing:.02em;overflow:hidden;user-select:none}
+  .av.sm{width:34px;height:34px;border-radius:7px;font-size:13px}
+  .row-main{flex:1;min-width:0}
+  .row-top{display:flex;align-items:baseline;gap:8px}
+  .row-name{font-size:15px;font-weight:500;letter-spacing:.02em;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .row-time{margin-left:auto;flex:0 0 auto;font-size:11px;color:#9AA39C;font-variant-numeric:tabular-nums}
+  .row-sub{margin:4px 0 0;font-size:13px;line-height:1.4;color:var(--sub);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .badge{min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#FA5151;color:#fff;
+    font-size:11px;line-height:18px;text-align:center;flex:0 0 auto;font-variant-numeric:tabular-nums}
+  .group-label{padding:14px 16px 8px;font-size:12.5px;color:#8E978F;letter-spacing:.06em}
+
+  .empty{padding:52px 30px;text-align:center;color:var(--sub)}
+  .empty p{margin:0;font-size:14px;line-height:1.8}
+  .empty .empty-t{margin-bottom:6px;font-size:15px;color:var(--ink)}
+
+  .cells{background:var(--card);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .cell{display:flex;align-items:center;gap:12px;min-height:54px;padding:8px 14px;
+    border-bottom:1px solid var(--line);cursor:pointer;background:none;width:100%;
+    font:inherit;text-align:left;color:inherit;-webkit-tap-highlight-color:transparent}
+  .cell:last-child{border-bottom:0}
+  .cell:active{background:#F7F9F5}
+  .cell:focus-visible{outline:2px solid var(--green);outline-offset:-2px}
+  .cell-ico{width:30px;height:30px;flex:0 0 auto;border-radius:8px;display:grid;place-items:center;
+    background:#F1F4EF;color:#3D4A42}
+  .cell-ico svg{width:18px;height:18px;display:block}
+  .cell-label{flex:1;font-size:15px;letter-spacing:.02em}
+  .cell-value{font-size:13px;color:#98A19A}
+  .cell-chev{color:#B9C0BA;display:flex;align-items:center}
+  .cell-chev svg{width:16px;height:16px;display:block}
+
+  .me-head{display:flex;align-items:center;gap:14px;padding:22px 18px 20px;background:var(--card);
+    border-bottom:1px solid var(--line)}
+  .me-head .av{width:56px;height:56px;border-radius:12px;font-size:19px}
+  .me-info{min-width:0}
+  .me-name{margin:0;font-size:19px;font-weight:600;letter-spacing:.02em;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .me-id{margin:6px 0 0;font-size:12.5px;color:var(--sub);letter-spacing:.02em}
+
+  /* ===== 聊天 ===== */
+  .chat{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--chat-bg)}
+  .chat .bar{background:var(--app)}
+  .msgs{flex:1;min-height:0;overflow-y:auto;padding:14px 12px 18px;display:flex;flex-direction:column;gap:12px}
+  .msg{display:flex;align-items:flex-start;gap:8px;max-width:100%}
+  .msg.me{flex-direction:row-reverse}
+  .msg .av{width:34px;height:34px;border-radius:7px;font-size:13px}
+  .bubble{max-width:74%;padding:9px 12px;border-radius:8px;background:#fff;font-size:15px;
+    line-height:1.55;letter-spacing:.01em;overflow-wrap:anywhere;box-shadow:0 1px 0 rgba(20,24,21,.04)}
+  .msg.me .bubble{background:var(--bubble)}
+  .bubble.sys{max-width:none;margin:0 auto;background:transparent;box-shadow:none;color:#8A938C;
+    font-size:12.5px;line-height:1.6;text-align:center;padding:2px 6px}
+  .bubble.err{background:#FFF3F1;color:#8D4038;border:1px solid #F1D8D3}
+  .typing{display:inline-flex;gap:4px;align-items:center;height:20px}
+  .typing i{width:5px;height:5px;border-radius:50%;background:#9AA39C;animation:blink 1.2s infinite}
+  .typing i:nth-child(2){animation-delay:.2s}
+  .typing i:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
+
+  .composer{flex:0 0 auto;display:flex;gap:8px;align-items:flex-end;
+    padding:8px 10px calc(8px + env(safe-area-inset-bottom));background:var(--app);
+    border-top:1px solid var(--line)}
+  .composer input{flex:1;min-width:0;height:40px;border:1px solid var(--line);border-radius:10px;
+    background:#fff;padding:0 12px;font:inherit;font-size:16px;color:var(--ink);outline:none}
+  .composer input:focus{border-color:var(--green)}
+  .send{height:40px;padding:0 16px;border:0;border-radius:10px;background:var(--green);color:#fff;
+    font:inherit;font-size:14.5px;cursor:pointer}
+  .send[disabled]{opacity:.5;cursor:default}
+  .hint-bar{flex:0 0 auto;padding:8px 14px;background:#FFF9E9;border-top:1px solid #F0E4C6;
+    color:#8A6B23;font-size:12.5px;line-height:1.6;display:flex;gap:10px;align-items:center}
+  .hint-bar span{flex:1;min-width:0}
+  .hint-bar .link{flex:0 0 auto;color:#8A6B23;text-decoration:underline;font-size:12.5px;padding:2px}
+
+  /* ===== 朋友圈 ===== */
+  .moments{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--app)}
+  .moments-list{flex:1;min-height:0;overflow-y:auto;padding-bottom:20px}
+  .post{display:flex;gap:12px;padding:16px 14px;background:var(--card);border-bottom:1px solid var(--line)}
+  .post-body{flex:1;min-width:0}
+  .post-name{margin:0;font-size:14.5px;font-weight:600;color:#576B95;letter-spacing:.02em}
+  .post-text{margin:6px 0 0;font-size:14.5px;line-height:1.7;overflow-wrap:anywhere;white-space:pre-wrap}
+  .post-foot{display:flex;align-items:center;gap:14px;margin-top:10px;font-size:12px;color:#98A19A}
+  .like{border:0;background:none;padding:6px 2px;font:inherit;font-size:12px;color:#7B858C;
+    cursor:pointer;display:inline-flex;align-items:center;gap:5px;border-radius:6px}
+  .like svg{width:15px;height:15px;display:block}
+  .like.on{color:#E0574B}
+  .like:focus-visible{outline:2px solid var(--green);outline-offset:1px}
+  .post-time{margin-left:auto;font-variant-numeric:tabular-nums}
+
+  .sheet-in{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 12px;
+    font:inherit;font-size:16px;outline:none;background:#fff;color:var(--ink);resize:vertical;
+    min-height:96px;line-height:1.6}
+  .sheet-in:focus{border-color:var(--green)}
+  .modal-error{margin:8px 0 0;font-size:12.5px;color:var(--danger);min-height:18px}
+
+  @media (prefers-reduced-motion:reduce){
+    .view,.loader,.entry-btn,.tile,.entry-name,.entry-hint,.mask,.modal{transition-duration:.01ms !important;transition-delay:0s !important}
+    .typing i{animation:none;opacity:.6}
+    .tile,.entry-name,.entry-hint{transform:none !important}
+  }
+
+  /* 矮屏（笔记本 / 横屏手机）收紧登录页，保证按钮在一屏内 */
+  @media (max-height:780px){
+    .auth{padding:16px 22px 22px}
+    .auth-head{margin:2px 0 14px}
+    .auth-logo{width:50px;height:50px}
+    .auth-head h1{margin-top:9px;font-size:20px}
+    .auth-sub{margin-top:4px}
+    .notice{padding:12px 14px;margin-bottom:14px}
+    .notice-b{margin-top:6px;font-size:12.5px;line-height:1.65}
+    .seg{margin-bottom:12px}
+    .field{margin-bottom:9px}
+    .field input{height:44px}
+    .auth-links{margin-top:10px}
+    .auth-foot{padding-top:12px}
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <!-- ===== 视图：启动（加载 → 入口） ===== -->
+  <section class="view on" id="v-splash" aria-label="微信启动页">
+    <div class="splash">
+      <div class="loader" id="loader">
+        <div class="track"><div class="fill" id="fill"></div></div>
+        <div class="meta" id="meta">0%</div>
+      </div>
+      <button class="entry-btn" id="entryBtn" type="button" aria-label="微信，点击进入主界面">
+        <span class="tile"><img id="icon" src="icon/ODF-hd.png" alt="微信图标" width="102" height="102" draggable="false" decoding="sync"></span>
+        <span class="entry-name">微信</span>
+        <span class="entry-hint" id="hint">点击进入主界面</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ===== 视图：登录 / 注册 ===== -->
+  <section class="view" id="v-auth" aria-label="登录或注册">
+    <div class="auth">
+      <header class="auth-head">
+        <img class="auth-logo" src="icon/ODF-hd.png" alt="">
+        <h1>微信</h1>
+        <p class="auth-sub">本地演示版 · 与腾讯微信无关</p>
+      </header>
+
+      <div class="notice">
+        <p class="notice-t">这不是真正的微信</p>
+        <p class="notice-b">这是跑在本机的演示程序，不连腾讯服务器，<b>真实微信账号无法登录</b>。请先注册一个演示账号，数据只保存在这台电脑上。</p>
+      </div>
+
+      <div class="seg" id="authSeg">
+        <button type="button" class="on" data-act="auth-tab" data-tab="login">登录</button>
+        <button type="button" data-act="auth-tab" data-tab="register">注册</button>
+      </div>
+
+      <form class="auth-form" id="authForm" autocomplete="off" novalidate></form>
+
+      <div class="auth-links">
+        <button class="link" type="button" data-act="ai-nick" id="aiNickBtn">用 AI 起一个昵称</button>
+        <span id="authDot" style="color:#C3CAC4" aria-hidden="true">·</span>
+        <button class="link" type="button" data-act="about">关于本演示</button>
+      </div>
+
+      <p class="auth-foot">账号信息仅存于本机浏览器，不会上传到任何服务器。<br>AI 对话由智谱开放平台提供，需要联网。</p>
+    </div>
+  </section>
+
+  <!-- ===== 视图：主界面 ===== -->
+  <section class="view" id="v-main" aria-label="主界面">
+    <div class="main">
+      <header class="bar">
+        <div class="bar-title" id="mainTitle">微信</div>
+        <button class="icon-btn ghost" type="button" data-act="plus" aria-label="发起聊天">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </header>
+      <div class="content">
+        <div class="panel on" id="panel-chats"></div>
+        <div class="panel" id="panel-contacts"></div>
+        <div class="panel" id="panel-discover"></div>
+        <div class="panel" id="panel-me"></div>
+      </div>
+      <nav class="tabbar" id="tabbar" aria-label="主界面导航">
+        <button class="tab on" type="button" data-act="tab" data-tab="chats">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7A2.5 2.5 0 0 1 17.5 16H9l-4 3.2V16H6.5A2.5 2.5 0 0 1 4 13.5z"/></svg>
+          <span>微信</span>
+        </button>
+        <button class="tab" type="button" data-act="tab" data-tab="contacts">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="3.2"/><path d="M3.6 19c.6-3 2.9-4.6 5.4-4.6s4.8 1.6 5.4 4.6"/><path d="M16.5 6.4c1.6 0 2.8 1.2 2.8 2.7s-1.2 2.7-2.8 2.7"/><path d="M17.6 14.6c1.9.2 3.3 1.6 3.8 3.9"/></svg>
+          <span>通讯录</span>
+        </button>
+        <button class="tab" type="button" data-act="tab" data-tab="discover">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="m15.2 8.8-2 4.4-4.4 2 2-4.4z"/></svg>
+          <span>发现</span>
+        </button>
+        <button class="tab" type="button" data-act="tab" data-tab="me">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.4"/><path d="M5 19.4c1-3.4 3.7-5.2 7-5.2s6 1.8 7 5.2"/></svg>
+          <span>我</span>
+        </button>
+      </nav>
+    </div>
+  </section>
+
+  <!-- ===== 视图：聊天 ===== -->
+  <section class="view" id="v-chat" aria-label="聊天">
+    <div class="chat">
+      <header class="bar">
+        <button class="icon-btn" type="button" data-act="chat-back" aria-label="返回">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5 8 12l6.5 7"/></svg>
+        </button>
+        <div class="bar-title" id="chatTitle">聊天</div>
+        <button class="icon-btn ghost" type="button" data-act="chat-more" aria-label="会话设置">
+          <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.5" cy="12" r="1.7"/></svg>
+        </button>
+      </header>
+      <div class="msgs" id="msgs"></div>
+      <div id="aiHint"></div>
+      <form class="composer" id="composer">
+        <input id="chatInput" type="text" placeholder="说点什么…" autocomplete="off" maxlength="400" aria-label="输入消息">
+        <button class="send" id="sendBtn" type="submit">发送</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- ===== 视图：朋友圈 ===== -->
+  <section class="view" id="v-moments" aria-label="朋友圈">
+    <div class="moments">
+      <header class="bar">
+        <button class="icon-btn" type="button" data-act="moments-back" aria-label="返回">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5 8 12l6.5 7"/></svg>
+        </button>
+        <div class="bar-title">朋友圈</div>
+        <button class="icon-btn ghost" type="button" data-act="moments-new" aria-label="发布">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </header>
+      <div class="moments-list" id="momentsList"></div>
+    </div>
+  </section>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="mask" id="mask"><div class="modal" id="modal"></div></div>
+</div>
+
+<script src="app.js"></script>
+
+</body>
+</html>
