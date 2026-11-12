@@ -1,0 +1,1535 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>外挂是怎样做出的？｜vibe知识</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2304060c'/%3E%3Cpath d='M16 6 26 16 16 26 6 16z' fill='none' stroke='%237fd6ff' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='2.4' fill='%23ff5a3c'/%3E%3C/svg%3E">
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #03040a;
+    overflow: hidden;
+    font-family: "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  #stage {
+    position: fixed; inset: 0;
+    display: grid; place-items: center;
+    cursor: none;
+    background: #03040a;
+  }
+  #film {
+    display: block;
+    width: min(100vw, calc(100vh * 16 / 9));
+    height: auto;
+    aspect-ratio: 16 / 9;
+    background: #03040a;
+  }
+  #gate {
+    position: fixed; inset: 0; z-index: 20;
+    display: grid; place-items: center;
+    background: radial-gradient(circle at 50% 45%, #080e1c 0%, #03040a 62%);
+    cursor: default;
+    transition: opacity .55s ease, visibility .55s;
+  }
+  #gate.out { opacity: 0; visibility: hidden; pointer-events: none; }
+  .gate-inner { width: min(720px, 82vw); text-align: left; }
+  .kicker {
+    font: 500 12px/1 "Cascadia Mono", Consolas, monospace;
+    letter-spacing: .34em;
+    color: #4a93b8;
+    text-transform: uppercase;
+    margin-bottom: 26px;
+  }
+  .gate-title {
+    font-size: clamp(28px, 4.4vw, 54px);
+    font-weight: 700;
+    letter-spacing: .02em;
+    color: #e9eef7;
+    margin: 0 0 10px;
+  }
+  .gate-en {
+    font: 400 13px/1.5 "Cascadia Mono", Consolas, monospace;
+    letter-spacing: .22em;
+    color: #68788e;
+    margin: 0 0 34px;
+    text-transform: uppercase;
+  }
+  .gate-meta {
+    display: flex; flex-wrap: wrap; gap: 10px 22px;
+    font: 400 13px/1.6 "Cascadia Mono", Consolas, monospace;
+    color: #68788e;
+    margin-bottom: 34px;
+    padding-top: 22px;
+    border-top: 1px solid rgba(127, 214, 255, .16);
+  }
+  .gate-meta b { color: #9fb3c8; font-weight: 500; }
+  #start {
+    appearance: none; border: 1px solid rgba(127, 214, 255, .5);
+    background: transparent; color: #e9eef7;
+    font: 500 15px/1 "Microsoft YaHei UI", sans-serif;
+    letter-spacing: .16em;
+    padding: 16px 34px;
+    cursor: pointer;
+    transition: background .25s, border-color .25s, color .25s;
+  }
+  #start:hover { background: rgba(127, 214, 255, .1); border-color: #7fd6ff; }
+  #start:focus-visible { outline: 2px solid #7fd6ff; outline-offset: 4px; }
+  .gate-hint {
+    margin-top: 20px;
+    font: 400 12px/1.9 "Cascadia Mono", Consolas, monospace;
+    color: #46566b;
+    letter-spacing: .06em;
+  }
+  @media (max-width: 640px) {
+    .gate-meta { font-size: 11px; }
+    #start { padding: 14px 24px; width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="film" width="1920" height="1080" aria-label="外挂是怎样做出的：反作弊机制科普短片"></canvas></div>
+
+<div id="gate">
+  <div class="gate-inner">
+    <div class="kicker">vibe 知识 · 反作弊科普</div>
+    <h1 class="gate-title">外挂是怎样做出的？</h1>
+    <p class="gate-en">How a game cheat is made — and why it keeps dying</p>
+    <div class="gate-meta">
+      <span>时长 <b>02:06</b></span>
+      <span>画幅 <b>16:9 / 1920×1080</b></span>
+      <span>音轨 <b>BGM + 25 处音效</b></span>
+      <span>镜头 <b>9</b></span>
+    </div>
+    <button id="start" type="button">开始播放</button>
+    <div class="gate-hint">空格 播放/暂停　← → 快退/快进 2 秒　R 重播　H 隐藏界面　F 全屏　M 静音（BGM 与音效）<br>录屏建议：全屏后按 H 隐藏进度条，鼠标 2 秒不动会自动隐藏。把 bgm.mp3 放在本文件同目录，点开始即同步播放。</div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ============ 基础常量 ============ */
+const W = 1920, H = 1080;
+const TOTAL = 126.04;
+
+const C = {
+  ink:    '#03040a',
+  deep:   '#080e1c',
+  panel:  '#0a1120',
+  cyan:   '#7fd6ff',
+  cyan2:  '#4a93b8',
+  hot:    '#ff5a3c',
+  hot2:   '#a33a28',
+  text:   '#e9eef7',
+  mute:   '#68788e',
+  faint:  'rgba(127,214,255,0.14)'
+};
+
+const F = {
+  cn:   '"Microsoft YaHei","Microsoft YaHei UI","PingFang SC","Noto Sans SC",sans-serif',
+  mono: '"Cascadia Mono",Consolas,"Courier New",monospace'
+};
+
+const cvs = document.getElementById('film');
+const ctx = cvs.getContext('2d', { alpha: false });
+const gate = document.getElementById('gate');
+
+function fitCanvas() {
+  const dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+  cvs.width = Math.round(W * dpr);
+  cvs.height = Math.round(H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+fitCanvas();
+
+/* ============ 工具 ============ */
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const lerp = (a, b, t) => a + (b - a) * t;
+const eo = t => 1 - Math.pow(1 - clamp(t, 0, 1), 3);
+const eio = t => { t = clamp(t, 0, 1); return t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; };
+const back = t => { t = clamp(t, 0, 1); const s = 1.6; return 1 + (s + 1) * Math.pow(t - 1, 3) + s * Math.pow(t - 1, 2); };
+const rnd = i => { const x = Math.sin(i * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); };
+const jitter = i => (rnd(i * 3.1) + rnd(i * 3.1 + 11) + rnd(i * 3.1 + 23)) - 1.5;
+const seg = (t, a, b) => clamp((t - a) / (b - a), 0, 1);
+
+function T(str, x, y, o) {
+  o = o || {};
+  ctx.save();
+  ctx.font = (o.weight || 400) + ' ' + (o.size || 24) + 'px ' + (o.font || F.cn);
+  ctx.fillStyle = o.color || C.text;
+  ctx.textAlign = o.align || 'left';
+  ctx.textBaseline = o.base || 'alphabetic';
+  ctx.globalAlpha = ctx.globalAlpha * (o.a === undefined ? 1 : o.a);
+  if (o.ls) ctx.letterSpacing = o.ls + 'px';
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+  if (o.glow) { ctx.shadowColor = o.glow; ctx.shadowBlur = o.glowBlur || 18; }
+  if (o.rise) { ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 22; ctx.shadowOffsetY = 5; }
+  ctx.fillText(str, x, y);
+  ctx.restore();
+}
+
+function hair(x, y, w, a, color) {
+  ctx.save();
+  ctx.globalAlpha *= (a === undefined ? 1 : a);
+  ctx.fillStyle = color || 'rgba(127,214,255,0.55)';
+  ctx.fillRect(x, y, w, 1);
+  ctx.restore();
+}
+
+function panel(x, y, w, h, o) {
+  o = o || {};
+  ctx.save();
+  ctx.globalAlpha *= (o.a === undefined ? 1 : o.a);
+  ctx.fillStyle = o.fill || 'rgba(9,15,28,0.55)';
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = o.stroke || 'rgba(127,214,255,0.16)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + .5, y + .5, w - 1, h - 1);
+  // 角标
+  const s = 14;
+  ctx.strokeStyle = o.tick || 'rgba(127,214,255,0.42)';
+  ctx.beginPath();
+  ctx.moveTo(x, y + s); ctx.lineTo(x, y); ctx.lineTo(x + s, y);
+  ctx.moveTo(x + w - s, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + s);
+  ctx.moveTo(x, y + h - s); ctx.lineTo(x, y + h); ctx.lineTo(x + s, y + h);
+  ctx.moveTo(x + w - s, y + h); ctx.lineTo(x + w, y + h); ctx.lineTo(x + w, y + h - s);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function tag(str, x, y, color, a) {
+  T(str, x, y, { size: 15, font: F.mono, color: color || C.cyan2, ls: 2, a: a === undefined ? 1 : a });
+}
+
+/* ============ 背景（贯穿全片） ============ */
+function drawBG(t) {
+  const g = ctx.createRadialGradient(W * .5, H * .44, 80, W * .5, H * .5, W * .78);
+  g.addColorStop(0, '#0a1022');
+  g.addColorStop(.52, '#060a14');
+  g.addColorStop(1, '#020307');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  // 缓慢漂移的网格
+  ctx.save();
+  ctx.strokeStyle = 'rgba(127,214,255,0.05)';
+  ctx.lineWidth = 1;
+  const step = 120, off = (t * 6) % step;
+  for (let x = -step; x <= W + step; x += step) {
+    ctx.beginPath(); ctx.moveTo(x + off, 0); ctx.lineTo(x + off, H); ctx.stroke();
+  }
+  for (let y = -step; y <= H + step; y += step) {
+    ctx.beginPath(); ctx.moveTo(0, y + off * .6); ctx.lineTo(W, y + off * .6); ctx.stroke();
+  }
+  ctx.restore();
+
+  // 浮尘
+  ctx.save();
+  for (let i = 0; i < 46; i++) {
+    const sx = rnd(i * 7.3) * W;
+    const sy0 = rnd(i * 5.1) * H;
+    const sp = 0.6 + rnd(i * 9.7) * 1.6;
+    const sy = (sy0 - t * sp * 8 + H * 2) % (H + 60) - 30;
+    const a = 0.05 + rnd(i * 13.1) * 0.12;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = i % 7 === 0 ? C.hot : C.cyan;
+    ctx.fillRect(sx, sy, 2, 2);
+  }
+  ctx.restore();
+
+  // 暗角
+  const v = ctx.createRadialGradient(W * .5, H * .5, H * .42, W * .5, H * .5, H * .95);
+  v.addColorStop(0, 'rgba(0,0,0,0)');
+  v.addColorStop(1, 'rgba(0,0,0,0.72)');
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, W, H);
+}
+
+/* ============ 字幕 ============ */
+const CUES = [
+  { t0: 4.57,  t1: 8.0,  cn: '接下来两分钟，只看它为什么活不长。', en: 'The next two minutes: why it never survives.' },
+  { t0: 8.32,  t1: 13.6, cn: '在你自己的电脑上，一个游戏只有三样东西。', en: 'On your own machine, a game is only three things.' },
+  { t0: 14.11, t1: 19.4, cn: '内存里的数字，屏幕上的像素，网线上的封包。', en: 'Numbers in memory. Pixels on screen. Packets on the wire.' },
+  { t0: 20.21, t1: 26.0, cn: '外挂不创造力量。它只是从这三处之一伸手进去。', en: 'A cheat creates nothing. It reaches into one of these three.' },
+  { t0: 26.43, t1: 31.6, cn: '最老的一种：去读你机器里的内存。', en: 'The oldest kind: it reads the memory on your machine.' },
+  { t0: 31.59, t1: 38.0, cn: '血量、金币、坐标，在程序里只是一个整数。', en: 'Health, gold, position \u2014 in code, just an integer.' },
+  { t0: 37.98, t1: 43.4, cn: '改它，比玩它容易得多。', en: 'Rewriting it is far easier than playing it.' },
+  { t0: 43.59, t1: 48.0, cn: '它不需要理解游戏，只需要找到那个数字。', en: 'It never has to understand the game. Only find the number.' },
+  { t0: 48.32, t1: 54.2, cn: '第二种不改数据。它替你的手按鼠标。', en: 'The second kind edits nothing. It presses the mouse for you.' },
+  { t0: 54.19, t1: 59.0, cn: '鼠标、键盘、屏幕颜色，都是可读写的输入输出。', en: 'Mouse, keyboard, screen colour: all readable, all writable.' },
+  { t0: 58.94, t1: 64.0, cn: '人手的轨迹带弧度。脚本的轨迹是直线。', en: 'A hand arcs. A script draws a straight line.' },
+  { t0: 64.4, t1: 70.2, cn: '第三种更远：不在你机器上，在你和服务器之间。', en: 'The third is further out: between you and the server.' },
+  { t0: 70.21, t1: 75.8, cn: '改一个数，重放一次动作，把时间拨快一点。', en: 'Edit a value. Replay an action. Turn the clock up.' },
+  { t0: 76.05, t1: 80.0, cn: '看起来很有效。直到你遇到一台不听话的服务器。', en: 'It works \u2014 until you meet a server that doesn\u2019t listen.' },
+  { t0: 80.41, t1: 86.0, cn: '服务器从来不相信你的客户端。', en: 'The server never trusts your client.' },
+  { t0: 85.99, t1: 92.0, cn: '伤害、掉落、命中，都由它自己算。客户端只负责画。', en: 'Damage, drops, hits: all computed there. The client only draws.' },
+  { t0: 91.95, t1: 96.0, cn: '你屏幕上的 9999，在它那里从来没有发生过。', en: 'The 9999 on your screen never happened there.' },
+  { t0: 96.47, t1: 102.2, cn: '所以真正的外挂生意，对手不是玩家，是检测。', en: 'So the real enemy of the cheat trade is not the player. It\u2019s detection.' },
+  { t0: 102.14, t1: 107.6, cn: '机器最大的破绽，是它太准时。', en: 'A machine\u2019s biggest flaw: it is never late.' },
+  { t0: 107.62, t1: 112.0, cn: '行为指纹、完整性校验、设备指纹、延迟封禁。', en: 'Behaviour, integrity, device fingerprints, delayed bans.' },
+  { t0: 112.33, t1: 116.4, cn: '代价是账号、设备，以及《刑法》第二百八十五条。', en: 'The cost: your account, your device, and Article 285.' },
+  { t0: 116.44, t1: 120.0, cn: '收益是一次胜利。账单是长期的。', en: 'The payoff is one win. The bill is long.' },
+  { t0: 120.4, t1: 126.0, cn: '看懂了机制，也就看懂了它为什么活不长。', en: 'Understand the mechanism, and you understand why it dies young.' }
+];
+
+function drawSubs(t) {
+  for (let i = 0; i < CUES.length; i++) {
+    const c = CUES[i];
+    if (t < c.t0 || t > c.t1) continue;
+    const a = Math.min(1, (t - c.t0) / .35, (c.t1 - t) / .35);
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.fillStyle = C.cyan;
+    ctx.fillRect(96, 962, 2, 34);
+    T(c.cn, 118, 992, { size: 37, weight: 600, color: C.text, a: 1 });
+    T(c.en, 118, 1024, { size: 18, font: F.mono, color: 'rgba(159,179,200,0.66)', ls: 1.4 });
+    ctx.restore();
+  }
+}
+
+/* ============ 常驻界面 ============ */
+let uiVisible = true;
+let tc = '00:00';
+
+function drawHUD(t) {
+  if (!uiVisible) return;
+  ctx.save();
+  ctx.globalAlpha = .38;
+  T('外挂是怎样做出的', 72, 68, { size: 17, weight: 500, color: '#9fb3c8', ls: 2 });
+  ctx.globalAlpha = .22;
+  T('HOW A CHEAT IS MADE', 72, 92, { size: 11, font: F.mono, color: '#9fb3c8', ls: 3.2 });
+  ctx.restore();
+
+  // 时间码
+  const m = Math.floor(t / 60), s = Math.floor(t % 60);
+  tc = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  ctx.save();
+  ctx.globalAlpha = .32;
+  T(tc + ' / 02:06', W - 72, 68, { size: 15, font: F.mono, color: '#9fb3c8', align: 'right', ls: 1 });
+  ctx.restore();
+
+  // 进度
+  ctx.save();
+  ctx.globalAlpha = .9;
+  ctx.fillStyle = 'rgba(127,214,255,0.10)';
+  ctx.fillRect(0, H - 6, W, 1);
+  ctx.fillStyle = 'rgba(127,214,255,0.62)';
+  ctx.fillRect(0, H - 6, W * (t / TOTAL), 1);
+  ctx.restore();
+}
+
+/* ============ 章节 ============ */
+const CHAPTERS = [];
+/* ---------- 01 · 钩子 ---------- */
+CHAPTERS.push({
+  t0: 0, t1: 8.59,
+  draw(lt) {
+    const vx = 300, vy = 186, vw = 1320, vh = 690;
+    const cw = vw / 18, chh = vh / 9;
+
+    // 游戏视口
+    ctx.save();
+    ctx.globalAlpha *= eo((lt - 0.27) / 1.0) * .95;
+    ctx.strokeStyle = 'rgba(127,214,255,0.18)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(vx + .5, vy + .5, vw, vh);
+    for (let gy = 0; gy < 9; gy++) {
+      for (let gx = 0; gx < 18; gx++) {
+        const v = rnd(gy * 31 + gx * 7);
+        if (v < .66) continue;
+        ctx.fillStyle = 'rgba(127,214,255,' + (.006 + v * .026) + ')';
+        ctx.fillRect(vx + gx * cw + 3, vy + gy * chh + 3, cw - 6, chh - 6);
+      }
+    }
+    // 准星
+    const cx = vx + vw / 2, cy = vy + vh / 2;
+    ctx.strokeStyle = 'rgba(127,214,255,0.30)';
+    ctx.beginPath();
+    ctx.moveTo(cx - 26, cy); ctx.lineTo(cx - 6, cy);
+    ctx.moveTo(cx + 6, cy); ctx.lineTo(cx + 26, cy);
+    ctx.moveTo(cx, cy - 26); ctx.lineTo(cx, cy - 6);
+    ctx.moveTo(cx, cy + 6); ctx.lineTo(cx, cy + 26);
+    ctx.stroke();
+    ctx.restore();
+
+    // 从准星长出的红色根须
+    const gr = eo((lt - 2.63) / 2.6);
+    if (gr > 0) {
+      ctx.save();
+      const n = 13;
+      for (let i = 0; i < n; i++) {
+        const ang = (i / n) * Math.PI * 2 + rnd(i) * .42;
+        const len = (170 + rnd(i * 3.3) * 300) * gr;
+        const bend = (rnd(i * 5.7) - .5) * 90;
+        const x2 = cx + Math.cos(ang) * len;
+        const y2 = cy + Math.sin(ang) * len * .62;
+        ctx.strokeStyle = 'rgba(255,90,60,' + (.16 + .34 * gr) + ')';
+        ctx.lineWidth = 1.1;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.quadraticCurveTo(cx + Math.cos(ang) * len * .55 + bend, cy + Math.sin(ang) * len * .34 - 8, x2, y2);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,90,60,' + (.30 * gr) + ')';
+        ctx.fillRect(x2 - 1.5, y2 - 1.5, 3, 3);
+      }
+      ctx.globalAlpha *= gr * .9;
+      ctx.fillStyle = 'rgba(255,90,60,0.9)';
+      ctx.beginPath(); ctx.arc(cx, cy, 3.4, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+
+    // 大字
+    const a1 = eo((lt - 0.27) / .7);
+    const a2 = eo((lt - 1.59) / .7);
+    ctx.save();
+    ctx.globalAlpha *= a1;
+    T('外挂不在游戏外面。', W / 2, 500, { size: 88, weight: 700, color: C.text, align: 'center', rise: 1 });
+    ctx.restore();
+    ctx.save();
+    ctx.globalAlpha *= a2;
+    T('它长在数据里。', W / 2, 612, { size: 88, weight: 700, color: C.cyan, align: 'center', rise: 1 });
+    ctx.restore();
+
+    // 大字下的细分隔线
+    const aw = eo((lt - 1.87) / .9);
+    if (aw > 0) {
+      ctx.save();
+      ctx.globalAlpha *= aw * .8;
+      ctx.fillStyle = 'rgba(127,214,255,0.55)';
+      ctx.fillRect(W / 2 - 250 * aw, 654, 500 * aw, 1);
+      ctx.restore();
+    }
+  }
+});
+
+/* ---------- 02 · 三样东西 ---------- */
+CHAPTERS.push({
+  t0: 8.59, t1: 26.62,
+  draw(lt) {
+    const ta = eo((lt - 0.27) / .8);
+    ctx.save();
+    ctx.globalAlpha *= ta;
+    T('一个游戏，在你机器上', 110, 196, { size: 54, weight: 700, color: C.text });
+    T('只有三样东西。', 110, 262, { size: 54, weight: 700, color: C.cyan });
+    ctx.restore();
+
+    const rows = [
+      { y: 330, cn: '内存', en: 'MEMORY', tok: 'hp = 100', kind: 'grid' },
+      { y: 500, cn: '画面', en: 'FRAMEBUFFER', tok: 'rgb(18,42,96)', kind: 'pixels' },
+      { y: 670, cn: '网络', en: 'PACKETS', tok: 'pkt 0x2f / 24 B', kind: 'chev' }
+    ];
+    const x0 = 110, x1 = 1810;
+
+    rows.forEach((r, i) => {
+      const p = eo((lt - (3.4 + i * 2.5)) / .9);
+      if (p <= 0) return;
+      ctx.save();
+      ctx.globalAlpha *= p;
+
+      const yy = r.y + (1 - p) * 18;
+      hair(x0, yy, x1 - x0, .5);
+      hair(x0, yy + 132, x1 - x0, .18);
+
+      // 左侧记号
+      const mx = x0 + 34, my = yy + 66;
+      ctx.strokeStyle = 'rgba(127,214,255,0.72)';
+      ctx.fillStyle = 'rgba(127,214,255,0.5)';
+      ctx.lineWidth = 1.2;
+      if (r.kind === 'grid') {
+        for (let a = 0; a < 4; a++) for (let b = 0; b < 4; b++) {
+          const av = rnd(a * 9 + b * 3 + i);
+          ctx.globalAlpha = ctx.globalAlpha * 1;
+          ctx.fillStyle = 'rgba(127,214,255,' + (.18 + av * .5) + ')';
+          ctx.fillRect(mx - 14 + a * 8, my - 14 + b * 8, 5, 5);
+        }
+      } else if (r.kind === 'pixels') {
+        for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) {
+          const av = rnd(a * 7 + b * 13 + i);
+          ctx.fillStyle = 'rgba(127,214,255,' + (.14 + av * .55) + ')';
+          ctx.fillRect(mx - 13 + a * 10, my - 13 + b * 10, 8, 8);
+        }
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(mx - 16, my - 10); ctx.lineTo(mx + 2, my); ctx.lineTo(mx - 16, my + 10);
+        ctx.moveTo(mx - 4, my - 10); ctx.lineTo(mx + 14, my); ctx.lineTo(mx - 4, my + 10);
+        ctx.stroke();
+      }
+
+      // 样本带：每一层给一个可看的实物
+      const sx0 = 600, sy0 = yy + 34;
+      if (r.kind === 'grid') {
+        for (let k = 0; k < 12; k++) {
+          const v2 = Math.floor(rnd(k * 5.5 + i) * 255);
+          const hx = ('0' + v2.toString(16)).slice(-2).toUpperCase();
+          T(hx, sx0 + k * 52, sy0 + 46, {
+            size: 16, font: F.mono,
+            color: k === 9 ? C.cyan : 'rgba(159,179,200,0.30)'
+          });
+        }
+      } else if (r.kind === 'pixels') {
+        for (let k = 0; k < 12; k++) {
+          const v2 = rnd(k * 3.3 + i);
+          ctx.fillStyle = 'rgba(' + Math.floor(18 + v2 * 44) + ',' +
+            Math.floor(54 + v2 * 110) + ',' + Math.floor(110 + v2 * 120) + ',0.5)';
+          ctx.fillRect(sx0 + k * 52, sy0 + 18, 40, 38);
+        }
+      } else {
+        for (let k = 0; k < 8; k++) {
+          const bx = sx0 + k * 80;
+          ctx.fillStyle = 'rgba(127,214,255,0.26)';
+          ctx.fillRect(bx, sy0 + 40, 26, 12);
+          ctx.strokeStyle = 'rgba(127,214,255,0.30)';
+          ctx.beginPath();
+          ctx.moveTo(bx + 34, sy0 + 46);
+          ctx.lineTo(bx + 56, sy0 + 46);
+          ctx.stroke();
+        }
+      }
+
+      T(r.cn, x0 + 86, yy + 70, { size: 46, weight: 700, color: C.text });
+      T(r.en, x0 + 86, yy + 100, { size: 13, font: F.mono, color: C.cyan2, ls: 3 });
+
+      T(r.tok, x1 - 24, yy + 76, { size: 26, font: F.mono, color: 'rgba(127,214,255,0.62)', align: 'right', ls: .5 });
+
+      // 右侧渐入的细线（数据流动）
+      ctx.globalAlpha *= .55;
+      ctx.fillStyle = 'rgba(127,214,255,0.18)';
+      ctx.fillRect(x1 - 520, yy + 128, 496 * p, 1);
+      ctx.restore();
+    });
+
+    // 三处入口
+    const e1 = eo((lt - 10.96) / .9);
+    if (e1 > 0) {
+      ctx.save();
+      ctx.globalAlpha *= e1;
+      for (let i = 0; i < 3; i++) {
+        const yy = rows[i].y + 66;
+        ctx.strokeStyle = 'rgba(255,90,60,0.62)';
+        ctx.lineWidth = 1.3;
+        ctx.beginPath();
+        ctx.moveTo(1850 - 26 * e1, yy); ctx.lineTo(1850, yy);
+        ctx.moveTo(1850 - 8, yy - 7); ctx.lineTo(1850, yy); ctx.lineTo(1850 - 8, yy + 7);
+        ctx.stroke();
+      }
+      T('入口', 1850, 366, { size: 15, font: F.mono, color: C.hot, align: 'right', ls: 2, a: .8 });
+      ctx.restore();
+    }
+  }
+});
+
+/* ---------- 03 · 内存 ---------- */
+CHAPTERS.push({
+  t0: 26.62, t1: 47.30,
+  draw(lt) {
+    const px = 108, py = 292, pw = 812, ph = 596;
+    const pa = eo((lt - 0.16) / .8);
+
+    ctx.save();
+    ctx.globalAlpha *= pa;
+    panel(px, py, pw, ph);
+    tag('PROCESS MEMORY / 只读视图', px + 26, py + 38, C.cyan2, .7);
+    ctx.restore();
+
+    // 扫描高亮
+    const scanEnd = 9.2;
+    const locked = lt >= scanEnd;
+    const scanRow = Math.floor((lt * 1.7) % 11);
+    const lockRow = 5;
+    const row = locked ? lockRow : scanRow;
+
+    const rowH = 40, hexY0 = py + 84;
+
+    for (let i = 0; i < 12; i++) {
+      const yy = hexY0 + i * rowH;
+      const isRow = i === row;
+      ctx.save();
+      ctx.globalAlpha *= pa;
+      if (isRow) {
+        ctx.fillStyle = locked ? 'rgba(255,90,60,0.10)' : 'rgba(127,214,255,0.09)';
+        ctx.fillRect(px + 16, yy - 24, pw - 32, 32);
+      }
+      T('0x7FF4' + ('0' + (i * 16).toString(16)).slice(-3), px + 26, yy, {
+        size: 17, font: F.mono, color: 'rgba(127,214,255,0.42)'
+      });
+      for (let j = 0; j < 8; j++) {
+        const v = Math.floor(rnd(i * 37 + j * 11 + 3) * 255);
+        const hx = ('0' + v.toString(16)).slice(-2).toUpperCase();
+        const isCell = isRow && j === 5;
+        T(hx, px + 210 + j * 62, yy, {
+          size: 19, font: F.mono,
+          color: isCell ? (locked ? C.hot : C.cyan) : 'rgba(200,214,230,0.40)'
+        });
+      }
+      ctx.restore();
+    }
+
+    // 锁定框（对齐第 5 个字节）
+    if (locked) {
+      const yy = hexY0 + lockRow * rowH;
+      const bx = px + 210 + 5 * 62 - 7, by = yy - 25, bw = 56, bh = 35;
+      const pl = eo((lt - scanEnd) / .5);
+      ctx.save();
+      ctx.globalAlpha *= pa * pl;
+      ctx.strokeStyle = 'rgba(255,90,60,0.9)';
+      ctx.lineWidth = 1.4;
+      const s = 8;
+      ctx.beginPath();
+      ctx.moveTo(bx, by + s); ctx.lineTo(bx, by); ctx.lineTo(bx + s, by);
+      ctx.moveTo(bx + bw - s, by); ctx.lineTo(bx + bw, by); ctx.lineTo(bx + bw, by + s);
+      ctx.moveTo(bx, by + bh - s); ctx.lineTo(bx, by + bh); ctx.lineTo(bx + s, by + bh);
+      ctx.moveTo(bx + bw - s, by + bh); ctx.lineTo(bx + bw, by + bh); ctx.lineTo(bx + bw, by + bh - s);
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.save();
+      ctx.globalAlpha *= pa * pl * .8;
+      T('已定位：4 个字节，和旁边几万个长得一模一样。', px + 26, py + ph - 26, {
+        size: 19, color: 'rgba(159,179,200,0.5)'
+      });
+      ctx.restore();
+    }
+
+    // 右侧：那个整数
+    const ra = eo((lt - 3.18) / .8);
+    const cx0 = 1000;
+
+    ctx.save();
+    ctx.globalAlpha *= ra;
+    tag('HP', cx0, 372, C.cyan2, .8);
+    hair(cx0, 392, 300, .3);
+    ctx.restore();
+
+    // 数值 + 改写
+    const flip = lt >= 12.8;
+    const digits = lt < 12.8 ? '100' : (lt < 13.5 ? '99' : '9999');
+    const col = flip ? C.hot : C.text;
+    ctx.save();
+    ctx.globalAlpha *= ra;
+    if (flip) {
+      const fl = Math.max(0, 1 - Math.abs(lt - 12.89) / .55);
+      ctx.globalAlpha *= 1;
+      ctx.fillStyle = 'rgba(255,90,60,' + (.16 * fl) + ')';
+      ctx.fillRect(cx0 - 20, 408, 560, 108);
+    }
+    T(digits, cx0, 494, { size: 108, weight: 400, font: F.mono, color: col, ls: 2 });
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha *= ra;
+    T(flip ? '本地内存：已改写' : '本地内存：原值', cx0, 536, {
+      size: 18, font: F.mono, color: flip ? 'rgba(255,90,60,0.85)' : 'rgba(127,214,255,0.55)', ls: 1.5
+    });
+    T('类型 int32 · 4 字节', cx0, 580, { size: 16, font: F.mono, color: 'rgba(159,179,200,0.42)', ls: .5 });
+    T('同一段内存里，还有几万个长得一样的数。', cx0, 606, { size: 16, color: 'rgba(159,179,200,0.32)' });
+    ctx.restore();
+
+    // 读 → 写
+    const fa = eo((lt - 15.45) / .8);
+    ctx.save();
+    ctx.globalAlpha *= fa;
+    const fx = cx0, fy = 640;
+    panel(fx, fy, 240, 76, { a: .5 });
+    T('读', fx + 34, fy + 48, { size: 30, weight: 700, color: C.cyan });
+    T('READ', fx + 76, fy + 46, { size: 12, font: F.mono, color: C.cyan2, ls: 2 });
+    ctx.strokeStyle = 'rgba(255,90,60,0.75)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(fx + 262, fy + 38); ctx.lineTo(fx + 322, fy + 38);
+    ctx.moveTo(fx + 310, fy + 31); ctx.lineTo(fx + 322, fy + 38); ctx.lineTo(fx + 310, fy + 45);
+    ctx.stroke();
+    panel(fx + 340, fy, 240, 76, { a: .5, stroke: 'rgba(255,90,60,0.5)' });
+    T('写', fx + 374, fy + 48, { size: 30, weight: 700, color: C.hot });
+    T('WRITE', fx + 416, fy + 46, { size: 12, font: F.mono, color: 'rgba(255,90,60,0.7)', ls: 2 });
+    ctx.restore();
+
+    // 右上角注释
+    const na = eo((lt - 17.52) / .8);
+    ctx.save();
+    ctx.globalAlpha *= na * .8;
+    T('同一个整数，两个地方解释它。', cx0, 790, { size: 22, color: 'rgba(159,179,200,0.7)' });
+    ctx.restore();
+  }
+});
+/* ---------- 04 · 输入 ---------- */
+CHAPTERS.push({
+  t0: 47.30, t1: 64.51,
+  draw(lt) {
+    const bx = 120, by = 296, bw = 762, bh = 508;
+    const ba = eo((lt - 0.28) / .8);
+
+    ctx.save();
+    ctx.globalAlpha *= ba;
+    panel(bx, by, bw, bh, { a: .9 });
+    // 画面内容
+    for (let i = 0; i < 22; i++) {
+      const gx = bx + 20 + rnd(i * 3.7) * (bw - 60);
+      const gy = by + 20 + rnd(i * 6.1) * (bh - 60);
+      const w = 16 + rnd(i * 2.3) * 46;
+      ctx.fillStyle = 'rgba(127,214,255,' + (.03 + rnd(i * 9.1) * .07) + ')';
+      ctx.fillRect(gx, gy, w, 12 + rnd(i * 4.4) * 30);
+    }
+    ctx.restore();
+
+    const targets = [
+      { x: bx + 470, y: by + 200, lb: '键位 E' },
+      { x: bx + 610, y: by + 330, lb: '地图' },
+      { x: bx + 320, y: by + 380, lb: '背包' }
+    ];
+    const start = { x: bx + 690, y: by + 452 };
+
+    // 目标
+    targets.forEach((tg, i) => {
+      const ap = eo((lt - (1.4 + i * 2.2)) / .6);
+      if (ap <= 0) return;
+      ctx.save();
+      ctx.globalAlpha *= ap;
+      ctx.strokeStyle = 'rgba(255,90,60,0.55)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(tg.x, tg.y, 26, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(tg.x, tg.y, 3, 0, Math.PI * 2); ctx.stroke();
+      T(tg.lb, tg.x, tg.y + 46, {
+        size: 13, font: F.mono, color: 'rgba(255,90,60,0.5)', align: 'center', ls: 1.5
+      });
+      ctx.restore();
+    });
+
+    // 人手轨迹：弧线 + 过冲 + 光标
+    const humanShots = [{ s: 2.6, tg: targets[0] }, { s: 6.4, tg: targets[1] }];
+    humanShots.forEach(hs => {
+      const p = seg(lt, hs.s, hs.s + .85);
+      if (p <= 0) return;
+      const fade = 1 - seg(lt, hs.s + .9, hs.s + 2.6) * .86;
+      const dx = hs.tg.x - start.x, dy = hs.tg.y - start.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const nx = -dy / len, ny = dx / len;
+      const bulge = 132;
+      const pt = u => {
+        const s = Math.sin(Math.PI * u);
+        return {
+          x: start.x + dx * u + nx * bulge * s,
+          y: start.y + dy * u + ny * bulge * s
+        };
+      };
+      ctx.save();
+      ctx.globalAlpha *= .92 * fade;
+      ctx.strokeStyle = 'rgba(127,214,255,0.9)';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      for (let i = 0; i <= 44; i++) {
+        const u = back(i / 44) * p;
+        const q = pt(u);
+        if (i === 0) ctx.moveTo(q.x, q.y); else ctx.lineTo(q.x, q.y);
+      }
+      ctx.stroke();
+      const q = pt(back(p));
+      ctx.fillStyle = C.cyan;
+      ctx.beginPath(); ctx.arc(q.x, q.y, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha *= .3;
+      ctx.beginPath(); ctx.arc(q.x, q.y, 13, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    });
+
+    // 脚本轨迹（直线，0.06s，重复）
+    const scriptShots = [8.6, 9.2, 9.8, 10.4, 11.0, 11.6, 12.2];
+    scriptShots.forEach((s, k) => {
+      const tg = targets[k % targets.length];
+      const p = seg(lt, s, s + .1);
+      if (p <= 0) return;
+      const fade = 1 - seg(lt, s + .14, s + .9) * .88;
+      ctx.save();
+      ctx.globalAlpha *= fade * .95;
+      ctx.strokeStyle = 'rgba(255,90,60,0.9)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(start.x, start.y);
+      ctx.lineTo(lerp(start.x, tg.x, p), lerp(start.y, tg.y, p));
+      ctx.stroke();
+      ctx.fillStyle = C.hot;
+      const ex = lerp(start.x, tg.x, p), ey = lerp(start.y, tg.y, p);
+      ctx.fillRect(ex - 9, ey - 1, 18, 2);
+      ctx.fillRect(ex - 1, ey - 9, 2, 18);
+      ctx.restore();
+    });
+
+    // 右侧指标
+    const ca = eo((lt - 2.19) / .8);
+    const rx = 1010;
+    ctx.save();
+    ctx.globalAlpha *= ca * (1 - seg(lt, 8.36, 9.2) * .55);
+    T('人手', rx, 336, { size: 26, weight: 700, color: C.cyan });
+    T('0.85 s', rx, 424, { size: 64, font: F.mono, color: C.text, ls: 1 });
+    T('轨迹带弧度，落点会过冲再回调', rx, 466, { size: 17, color: 'rgba(159,179,200,0.62)' });
+    hair(rx, 502, 690, .22);
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha *= ca * eo((lt - 8.36) / .7);
+    T('脚本', rx, 596, { size: 26, weight: 700, color: C.hot });
+    T('0.06 s', rx, 684, { size: 64, font: F.mono, color: C.hot, ls: 1 });
+    T('直线，落点零误差，间隔完全一致', rx, 726, { size: 17, color: 'rgba(255,90,60,0.6)' });
+    hair(rx, 762, 690, .22);
+    ctx.restore();
+
+    // 节拍器：脚本的恒定间隔
+    const ma = eo((lt - 10.59) / .7);
+    if (ma > 0) {
+      ctx.save();
+      ctx.globalAlpha *= ma * .9;
+      const mx = rx, my = 820;
+      for (let i = 0; i < 26; i++) {
+        const on = Math.floor((lt - 10.59) * 6.2) % 26 === i;
+        ctx.fillStyle = on ? C.hot : 'rgba(255,90,60,0.28)';
+        ctx.fillRect(mx + i * 27, my - (on ? 26 : 10), 2, on ? 26 : 10);
+      }
+      T('每一次点击之间，间隔一模一样', rx, 864, { size: 19, color: 'rgba(159,179,200,0.6)' });
+      ctx.restore();
+    }
+
+    // 输入输出标注
+    const ia = eo((lt - 12.65) / .8);
+    if (ia > 0) {
+      ctx.save();
+      ctx.globalAlpha *= ia;
+      T('读屏幕', bx + 20, by - 18, { size: 15, font: F.mono, color: 'rgba(127,214,255,0.6)', ls: 2 });
+      T('注事件', bx + bw - 90, by - 18, { size: 15, font: F.mono, color: 'rgba(255,90,60,0.66)', ls: 2 });
+      ctx.restore();
+    }
+  }
+});
+
+/* ---------- 05 · 网络 ---------- */
+CHAPTERS.push({
+  t0: 64.51, t1: 80.08,
+  draw(lt) {
+    const la = eo((lt - 0.26) / .8);
+    const ly = 452;
+
+    ctx.save();
+    ctx.globalAlpha *= la;
+    panel(150, 356, 330, 192, { a: .55 });
+    T('你的机器', 176, 424, { size: 28, weight: 700, color: C.text });
+    T('CLIENT', 176, 454, { size: 12, font: F.mono, color: C.cyan2, ls: 3 });
+    T('它说的算？', 176, 502, { size: 15, color: 'rgba(159,179,200,0.5)' });
+
+    panel(1352, 356, 330, 192, { a: .55 });
+    T('服务器', 1378, 424, { size: 28, weight: 700, color: C.text });
+    T('SERVER', 1378, 454, { size: 12, font: F.mono, color: C.cyan2, ls: 3 });
+    T('它才算得算', 1378, 502, { size: 15, color: 'rgba(159,179,200,0.5)' });
+    ctx.restore();
+
+    // 链路
+    ctx.save();
+    ctx.globalAlpha *= la * .75;
+    ctx.strokeStyle = 'rgba(127,214,255,0.20)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(480, ly); ctx.lineTo(1352, ly); ctx.stroke();
+    ctx.strokeStyle = 'rgba(127,214,255,0.10)';
+    for (let x = 480; x < 1352; x += 44) {
+      ctx.beginPath(); ctx.moveTo(x, ly - 8); ctx.lineTo(x, ly + 8); ctx.stroke();
+    }
+    ctx.restore();
+
+    // 背景封包
+    for (let i = 0; i < 4; i++) {
+      const ph = ((lt * .42 + i / 4) % 1);
+      const x = lerp(480, 1352, ph);
+      ctx.save();
+      ctx.globalAlpha *= la * .55;
+      ctx.fillStyle = 'rgba(127,214,255,0.55)';
+      ctx.fillRect(x - 11, ly - 5, 22, 10);
+      ctx.restore();
+    }
+
+    // 拦截点
+    const ia = eo((lt - 3.47) / .7);
+    if (ia > 0) {
+      const dx = 916;
+      ctx.save();
+      ctx.globalAlpha *= ia;
+      ctx.fillStyle = 'rgba(255,90,60,0.14)';
+      ctx.fillRect(dx - 18, ly - 18, 36, 36);
+      ctx.strokeStyle = 'rgba(255,90,60,0.8)';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(dx, ly - 14); ctx.lineTo(dx + 14, ly); ctx.lineTo(dx, ly + 14); ctx.lineTo(dx - 14, ly);
+      ctx.closePath(); ctx.stroke();
+      ctx.restore();
+    }
+
+    // 被改写的那一个封包
+    const hs = 6.2;
+    if (lt > hs) {
+      const p1 = seg(lt, hs, hs + 1.1);
+      const p2 = seg(lt, 11.01, 12.2);
+      let hx;
+      if (lt < 11.0) hx = lerp(480, 916, eio(p1));
+      else hx = lerp(916, 1352, eio(p2));
+
+      // 载荷卡片
+      const cardA = seg(lt, 7.18, 7.8);
+      if (cardA > 0 && lt < 11.2) {
+        const cx = 760, cy = 228;
+        ctx.save();
+        ctx.globalAlpha *= ia * cardA * (1 - seg(lt, 10.86, 11.2) * .6);
+        panel(cx, cy, 320, 124, { stroke: 'rgba(255,90,60,0.45)', fill: 'rgba(24,10,10,0.55)' });
+        T('PAYLOAD', cx + 22, cy + 34, { size: 12, font: F.mono, color: 'rgba(255,90,60,0.7)', ls: 3 });
+        const flipped = lt > 9.4;
+        T('damage: ' + (flipped ? '9999' : '12'), cx + 22, cy + 82, {
+          size: 26, font: F.mono, color: flipped ? C.hot : 'rgba(200,214,230,0.75)', ls: .5
+        });
+        if (flipped) {
+          ctx.strokeStyle = 'rgba(255,90,60,0.8)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(cx + 22, cy + 90); ctx.lineTo(cx + 292, cy + 90); ctx.stroke();
+        }
+        T(flipped ? '改一个数' : '原始数据', cx + 22, cy + 108, { size: 13, color: 'rgba(159,179,200,0.45)' });
+        ctx.restore();
+      }
+
+      ctx.save();
+      ctx.globalAlpha *= la;
+      ctx.fillStyle = lt > 9.4 ? C.hot : 'rgba(200,214,230,0.8)';
+      ctx.fillRect(hx - 13, ly - 7, 26, 14);
+      ctx.restore();
+    }
+
+    // 三种手法
+    const ta = eo((lt - 6.07) / .9);
+    if (ta > 0) {
+      const words = ['篡改数据', '重放动作', '加速时间'];
+      words.forEach((w, i) => {
+        const x = 700 + i * 240;
+        ctx.save();
+        ctx.globalAlpha *= ta * .9;
+        T(w, x, 706, { size: 24, font: F.mono, color: 'rgba(255,90,60,0.78)', ls: 2 });
+        hair(x, 720, 140, .35, 'rgba(255,90,60,0.5)');
+        ctx.restore();
+      });
+    }
+  }
+});
+
+/* ---------- 06 · 服务端 ---------- */
+CHAPTERS.push({
+  t0: 80.08, t1: 97.01,
+  draw(lt) {
+    const la = eo((lt - 0.22) / .8);
+
+    // 客户端
+    ctx.save();
+    ctx.globalAlpha *= la;
+    panel(140, 268, 720, 430, { a: .8 });
+    T('你看到的', 170, 308, { size: 14, font: F.mono, color: 'rgba(127,214,255,0.55)', ls: 2 });
+    ctx.restore();
+
+    const gl = lt < 8.6 ? 1 : 1 - seg(lt, 8.6, 9.6);
+    if (gl > 0) {
+      ctx.save();
+      ctx.globalAlpha *= la * gl;
+      const gx = 200, gy = 430;
+      for (let k = 0; k < 3; k++) {
+        const sx = (rnd(Math.floor(lt * 12) + k * 7) - .5) * 26;
+        T('9999', gx + sx, gy + k * 2, {
+          size: 112, font: F.mono,
+          color: k === 0 ? C.hot : 'rgba(255,90,60,' + (.16 - k * .05) + ')', ls: 2
+        });
+      }
+      T('客户端显示：伤害 9999', 200, 520, { size: 17, font: F.mono, color: 'rgba(255,90,60,0.7)', ls: 1 });
+      ctx.restore();
+    }
+    if (gl <= 0) {
+      ctx.save();
+      ctx.globalAlpha *= la * eo((lt - 8.6) / .8);
+      T('从未发生', 200, 478, { size: 72, weight: 700, color: 'rgba(159,179,200,0.6)' });
+      T('这一帧被擦掉了', 200, 524, { size: 17, font: F.mono, color: 'rgba(159,179,200,0.4)', ls: 1 });
+      ctx.restore();
+    }
+
+    // 服务端台账
+    const sa = eo((lt - 1.23) / .9);
+    ctx.save();
+    ctx.globalAlpha *= la * sa;
+    panel(980, 268, 800, 430, { a: .8 });
+    T('它自己算的', 1010, 308, { size: 14, font: F.mono, color: 'rgba(127,214,255,0.55)', ls: 2 });
+
+    const rows = [
+      ['武器', '霰弹枪 · 距 6 m'],
+      ['命中', '1 次 · 有效'],
+      ['伤害', '12']
+    ];
+    rows.forEach((r, i) => {
+      const y = 384 + i * 68;
+      T(r[0], 1010, y, { size: 19, font: F.mono, color: 'rgba(159,179,200,0.5)' });
+      T(r[1], 1180, y, { size: 21, font: F.mono, color: i === 2 ? C.cyan : 'rgba(233,238,247,0.85)' });
+      hair(1010, y + 18, 700, .12);
+    });
+
+    T('HP 100 → 88', 1010, 610, { size: 24, font: F.mono, color: 'rgba(233,238,247,0.7)' });
+    ctx.restore();
+
+    // 判词
+    const va = eo((lt - 5.17) / .5);
+    if (va > 0) {
+      ctx.save();
+      ctx.globalAlpha *= la * va;
+      const vx = 980, vy = 632;
+      ctx.strokeStyle = 'rgba(255,90,60,0.85)';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.arc(vx + 26, vy + 26, 20, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(vx + 17, vy + 17); ctx.lineTo(vx + 35, vy + 35);
+      ctx.moveTo(vx + 35, vy + 17); ctx.lineTo(vx + 17, vy + 35);
+      ctx.stroke();
+      T('拒绝', vx + 60, vy + 36, { size: 26, weight: 700, color: C.hot });
+      T('REJECT · 上报的 9999 与本机算出的 12 不符', vx + 122, vy + 34, { size: 14, font: F.mono, color: 'rgba(255,90,60,0.6)' });
+      ctx.restore();
+    }
+
+    // 提交
+    const pm = eo((lt - 2.03) / .7);
+    if (pm > 0) {
+      ctx.save();
+      ctx.globalAlpha *= la * pm;
+      const base = ctx.globalAlpha;
+      const ay = 483, ax = 866;
+      const bad = lt > 5.2;
+      for (let k = 0; k < 3; k++) {
+        const ph = ((lt * 1.4 + k / 3) % 1);
+        ctx.globalAlpha = base * (.2 + .6 * (1 - ph));
+        ctx.strokeStyle = bad ? 'rgba(255,90,60,0.85)' : 'rgba(127,214,255,0.75)';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(ax + ph * 74, ay - 9);
+        ctx.lineTo(ax + ph * 74 + 13, ay);
+        ctx.lineTo(ax + ph * 74, ay + 9);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = base * .7;
+      T('提交', 922, 452, { size: 15, font: F.mono, color: bad ? 'rgba(255,90,60,0.7)' : 'rgba(159,179,200,0.6)', align: 'center', ls: 2 });
+      ctx.restore();
+    }
+
+    // 大字结论
+    const a1 = eo((lt - 9.41) / .8);
+    const a2 = eo((lt - 12.24) / .8);
+    ctx.save();
+    ctx.globalAlpha *= a1;
+    T('服务器从来不相信你的客户端。', W / 2, 784, { size: 52, weight: 700, color: C.text, align: 'center' });
+    ctx.restore();
+    ctx.save();
+    ctx.globalAlpha *= a2;
+    T('客户端只是显示器，不是裁判。', W / 2, 844, { size: 30, color: 'rgba(127,214,255,0.82)', align: 'center' });
+    ctx.restore();
+  }
+});
+/* ---------- 07 · 检测 ---------- */
+const HUMAN = [], BOT = [];
+for (let i = 0; i < 240; i++) {
+  HUMAN.push(clamp(520 + jitter(i * 2.3) * 165, 170, 950));
+  BOT.push(62 + rnd(i * 4.1) * 7);
+}
+
+CHAPTERS.push({
+  t0: 97.01, t1: 112.60,
+  draw(lt) {
+    const cx0 = 210, cx1 = 1700, cy0 = 286, cy1 = 780;
+    const xFor = i => cx0 + (i / 600) * (cx1 - cx0);
+    const yFor = v => cy1 - (v / 1000) * (cy1 - cy0);
+
+    const ca = eo((lt - 0.27) / .8);
+    ctx.save();
+    ctx.globalAlpha *= ca;
+
+    // 坐标轴
+    ctx.strokeStyle = 'rgba(127,214,255,0.28)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx0, cy0 - 10); ctx.lineTo(cx0, cy1); ctx.lineTo(cx1, cy1);
+    ctx.stroke();
+
+    for (let v = 200; v <= 800; v += 200) {
+      const y = yFor(v);
+      ctx.strokeStyle = 'rgba(127,214,255,0.10)';
+      ctx.beginPath(); ctx.moveTo(cx0, y); ctx.lineTo(cx1, y); ctx.stroke();
+      T(String(v), cx0 - 16, y + 6, { size: 15, font: F.mono, color: 'rgba(159,179,200,0.45)', align: 'right' });
+    }
+    for (let i = 0; i <= 600; i += 150) {
+      const x = xFor(i);
+      T(String(i), x, cy1 + 28, { size: 15, font: F.mono, color: 'rgba(159,179,200,0.40)', align: 'center' });
+    }
+    T('操作序号', cx1, cy1 + 56, { size: 14, font: F.mono, color: 'rgba(159,179,200,0.45)', align: 'right', ls: 2 });
+    T('间隔 / ms', cx0 - 16, cy0 - 26, { size: 14, font: F.mono, color: 'rgba(159,179,200,0.45)', align: 'left', ls: 2 });
+    ctx.restore();
+
+    // 散点
+    const reveal = eo(lt / 7.4);
+    const xRev = cx0 + reveal * (cx1 - cx0);
+
+    ctx.save();
+    ctx.globalAlpha *= ca;
+    for (let i = 0; i < 240; i++) {
+      const x = xFor(i * 2.5);
+      if (x > xRev) break;
+      ctx.fillStyle = 'rgba(127,214,255,0.55)';
+      ctx.fillRect(x - 1.5, yFor(HUMAN[i]) - 1.5, 3, 3);
+      ctx.fillStyle = 'rgba(255,90,60,0.75)';
+      ctx.fillRect(x - 1.5, yFor(BOT[i]) - 1.5, 3, 3);
+    }
+    // 扫描线
+    if (reveal < .999) {
+      ctx.strokeStyle = 'rgba(127,214,255,0.5)';
+      ctx.beginPath(); ctx.moveTo(xRev, cy0); ctx.lineTo(xRev, cy1); ctx.stroke();
+    }
+    ctx.restore();
+
+    // 阈值
+    const ta = eo((lt - 8.14) / .7);
+    if (ta > 0) {
+      const ty = yFor(120);
+      ctx.save();
+      ctx.globalAlpha *= ta * .9;
+      ctx.setLineDash([7, 7]);
+      ctx.strokeStyle = 'rgba(233,238,247,0.35)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(cx0, ty); ctx.lineTo(cx1, ty); ctx.stroke();
+      ctx.setLineDash([]);
+      T('阈值 120 ms', cx1 - 8, ty - 14, { size: 15, font: F.mono, color: 'rgba(233,238,247,0.55)', align: 'right' });
+      ctx.restore();
+
+      // 图例与注解
+      ctx.save();
+      ctx.globalAlpha *= ta;
+      ctx.fillStyle = C.cyan; ctx.fillRect(cx0 + 10, cy0 + 26, 7, 7);
+      T('人手：不规律，方差大', cx0 + 26, cy0 + 35, { size: 16, color: 'rgba(159,179,200,0.75)' });
+      ctx.fillStyle = C.hot; ctx.fillRect(cx0 + 246, cy0 + 26, 7, 7);
+      T('脚本：几乎恒定，方差 ≈ 0', cx0 + 262, cy0 + 35, { size: 16, color: 'rgba(255,90,60,0.8)' });
+      T('示意数据', cx1, cy0 - 26, { size: 13, font: F.mono, color: 'rgba(159,179,200,0.32)', align: 'right', ls: 2 });
+      ctx.restore();
+    }
+
+    // 四种检测
+    const da = eo((lt - 10.21) / .8);
+    if (da > 0) {
+      const items = ['行为指纹', '完整性校验', '设备指纹', '延迟封禁'];
+      const w = 300, gap = 40, sx = cx0;
+      items.forEach((it, i) => {
+        const p = eo((lt - 10.0 - i * .35) / .6);
+        if (p <= 0) return;
+        const x = sx + i * (w + gap), y = 868;
+        ctx.save();
+        ctx.globalAlpha *= da * p * .9;
+        ctx.fillStyle = 'rgba(127,214,255,0.035)';
+        ctx.fillRect(x, y, w, 54);
+        ctx.strokeStyle = 'rgba(127,214,255,0.22)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x + .5, y + .5, w - 1, 53);
+        T('0' + (i + 1), x + 16, y + 34, { size: 13, font: F.mono, color: 'rgba(127,214,255,0.45)' });
+        T(it, x + 52, y + 36, { size: 20, weight: 600, color: 'rgba(233,238,247,0.9)' });
+        ctx.restore();
+      });
+    }
+  }
+});
+
+/* ---------- 08 · 账单 ---------- */
+CHAPTERS.push({
+  t0: 112.60, t1: 120.40,
+  draw(lt) {
+    const x0 = 140, x1 = 1800;
+
+    const ta = eo((lt - 0.18) / .7);
+    ctx.save();
+    ctx.globalAlpha *= ta;
+    T('账单', x0, 296, { size: 40, weight: 700, color: C.text });
+    T('THE BILL', x0 + 108, 296, { size: 13, font: F.mono, color: C.cyan2, ls: 3 });
+    hair(x0, 318, x1 - x0, .45);
+    ctx.restore();
+
+    const rows = [
+      { k: '账号', v: '封禁，连同你所有的战绩', s: '永久', hot: false },
+      { k: '设备', v: '被标记，换号也无济于事', s: '硬件', hot: false },
+      { k: '法律责任', v: '提供侵入、非法控制计算机信息系统的程序、工具', s: '刑事', hot: true }
+    ];
+
+    rows.forEach((r, i) => {
+      const p = eo((lt - (i * 1.0 + .4)) / .8);
+      if (p <= 0) return;
+      const y = 340 + i * 120 + (1 - p) * 12;
+      ctx.save();
+      ctx.globalAlpha *= p;
+      hair(x0, y, x1 - x0, .26);
+      T(r.k, x0, y + 58, { size: 26, weight: 600, color: r.hot ? C.hot : 'rgba(233,238,247,0.88)' });
+      T(r.v, x0 + 300, y + 58, { size: 21, color: 'rgba(159,179,200,0.66)' });
+
+      const cw = 168, cx = 1548;
+      ctx.strokeStyle = r.hot ? 'rgba(255,90,60,0.55)' : 'rgba(127,214,255,0.26)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(cx + .5, y + 32.5, cw, 46);
+      T(r.s, cx + cw / 2, y + 62, {
+        size: 16, font: F.mono, align: 'center', ls: 3,
+        color: r.hot ? 'rgba(255,90,60,0.9)' : 'rgba(127,214,255,0.7)'
+      });
+      ctx.restore();
+    });
+
+    const a1 = eo((lt - 4.19) / .8);
+    ctx.save();
+    ctx.globalAlpha *= a1;
+    hair(x0, 738, x1 - x0, .55);
+    T('合计', x0, 792, { size: 20, font: F.mono, color: 'rgba(159,179,200,0.55)', ls: 3 });
+    T('不可逆', x0, 872, { size: 58, weight: 700, color: C.hot });
+    T('一次胜利换来的东西，不会因为你退游而归还。', x0 + 280, 866, {
+      size: 20, color: 'rgba(159,179,200,0.5)'
+    });
+    ctx.restore();
+  }
+});
+
+/* ---------- 09 · 收尾 ---------- */
+CHAPTERS.push({
+  t0: 120.40, t1: 126.04,
+  draw(lt) {
+    const a1 = eo((lt - 0.27) / .9);
+    const a2 = eo((lt - 1.29) / .9);
+    const a3 = eo((lt - 2.29) / .9);
+
+    ctx.save();
+    ctx.globalAlpha *= a1;
+    T('外挂不是赢在游戏里，', W / 2, 456, { size: 70, weight: 300, color: C.text, align: 'center', ls: 1 });
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha *= a2;
+    T('是赢在数据里。', W / 2, 552, { size: 70, weight: 300, color: C.cyan, align: 'center', ls: 1 });
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha *= a3;
+    T('而数据，从来不属于你。', W / 2, 640, { size: 30, color: 'rgba(159,179,200,0.6)', align: 'center' });
+    ctx.restore();
+
+    // 出处
+    const ca = eo((lt - 3.22) / .8);
+    ctx.save();
+    ctx.globalAlpha *= ca * .55;
+    hair(140, 910, 320, .5);
+    T('引用：《中华人民共和国刑法》第二百八十五条、第二百八十六条', 140, 942, {
+      size: 14, font: F.mono, color: 'rgba(159,179,200,0.55)', ls: .5
+    });
+    T('本片为机制示意与反作弊科普，不含任何操作指引。', 140, 968, {
+      size: 14, font: F.mono, color: 'rgba(159,179,200,0.42)', ls: .5
+    });
+    ctx.restore();
+
+    // 结尾压黑
+    const fade = seg(lt, 4.12, 5.50);
+    if (fade > 0) {
+      ctx.save();
+      ctx.globalAlpha *= fade * .8;
+      ctx.fillStyle = C.ink;
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
+  }
+});
+/*__CHAPTERS__*/
+
+/* ============ 主渲染 ============ */
+function render(t) {
+  t = clamp(t, 0, TOTAL);
+  ctx.globalAlpha = 1;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const dpr = cvs.width / W;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawBG(t);
+
+  let ch = null;
+  for (let i = 0; i < CHAPTERS.length; i++) {
+    const c = CHAPTERS[i];
+    if (t >= c.t0 && t < c.t1) { ch = c; break; }
+  }
+  if (!ch) ch = CHAPTERS[CHAPTERS.length - 1];
+
+  const lt = t - ch.t0;
+  const a = Math.min(1, (lt + .12) / .55, (ch.t1 - t) / .5);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ch.draw(lt, t);
+  ctx.restore();
+
+  drawSubs(t);
+  drawHUD(t);
+}
+
+/* ============ 播放控制 ============ */
+let tNow = 0, playing = false, lastNow = 0, ended = false;
+const params = new URLSearchParams(location.search);
+
+function loop(now) {
+  if (playing) {
+    if (!lastNow) lastNow = now;
+    const dt = Math.min(.08, (now - lastNow) / 1000);
+    lastNow = now;
+    const tFrom = tNow;
+    tNow += dt;
+    /* 音画同步：以音频时钟为准，偏差超过 90ms 就校正，避免长片累积漂移 */
+    if (bgmReady && bgmPending === null && !bgm.paused) {
+      const at = bgm.currentTime;
+      if (Math.abs(at - tNow) > .09) tNow = at;
+    }
+    if (tNow >= TOTAL) { tNow = TOTAL; playing = false; ended = true; bgmStop(); }
+    sfxFire(tFrom, tNow);
+    render(tNow);
+  } else {
+    lastNow = now;
+  }
+  requestAnimationFrame(loop);
+}
+
+/* ---------- 音效：全部 Web Audio 合成，不依赖外部文件 ---------- */
+let actx = null, sfxBus = null, noiseBuf = null;
+
+function sfxInit() {
+  if (actx) return;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    actx = new AC();
+    sfxBus = actx.createGain();
+    sfxBus.gain.value = bgmMuted ? 0 : .24;
+    sfxBus.connect(actx.destination);
+  } catch (e) { actx = null; }
+}
+function sfxOn() { return !!(actx && !bgmMuted); }
+function noiseBufGet() {
+  if (noiseBuf || !actx) return noiseBuf;
+  const n = Math.floor(actx.sampleRate * 1.2);
+  noiseBuf = actx.createBuffer(1, n, actx.sampleRate);
+  const d = noiseBuf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+  return noiseBuf;
+}
+function toneSfx(f, dur, amp, type) {
+  if (!sfxOn()) return;
+  const t = actx.currentTime;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type || 'triangle';
+  o.frequency.value = f;
+  g.gain.setValueAtTime(.0001, t);
+  g.gain.exponentialRampToValueAtTime(amp, t + .006);
+  g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  o.connect(g); g.connect(sfxBus);
+  o.start(t); o.stop(t + dur + .02);
+}
+function noiseSfx(dur, f0, f1, q, amp, type) {
+  if (!sfxOn()) return;
+  const buf = noiseBufGet();
+  if (!buf) return;
+  const t = actx.currentTime;
+  const src = actx.createBufferSource(); src.buffer = buf;
+  const flt = actx.createBiquadFilter();
+  flt.type = type || 'bandpass';
+  flt.Q.value = q || 1.1;
+  flt.frequency.setValueAtTime(f0, t);
+  flt.frequency.exponentialRampToValueAtTime(f1, t + dur * .8);
+  const g = actx.createGain();
+  g.gain.setValueAtTime(.0001, t);
+  g.gain.exponentialRampToValueAtTime(amp, t + Math.min(.06, dur * .3));
+  g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  src.connect(flt); flt.connect(g); g.connect(sfxBus);
+  src.start(t); src.stop(t + dur + .02);
+}
+function sfxWhoosh() {
+  noiseSfx(.34, 520, 2600, 1.1, .80);
+  if (!sfxOn()) return;
+  const t = actx.currentTime;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(120, t);
+  o.frequency.exponentialRampToValueAtTime(46, t + .22);
+  g.gain.setValueAtTime(.0001, t);
+  g.gain.exponentialRampToValueAtTime(.55, t + .012);
+  g.gain.exponentialRampToValueAtTime(.0001, t + .30);
+  o.connect(g); g.connect(sfxBus); o.start(t); o.stop(t + .32);
+}
+function sfxClick()   { noiseSfx(.05, 1400, 1400, 1.6, .70, 'highpass'); toneSfx(2100, .045, .30); }
+function sfxFast()    { noiseSfx(.035, 1900, 1900, 1.8, .45, 'highpass'); toneSfx(2600, .03, .18); }
+function sfxSoft()    { toneSfx(980, .05, .26); }
+function sfxDing()    { toneSfx(880, .5, .40); toneSfx(1320, .5, .18); }
+function sfxDeny() {
+  if (!sfxOn()) return;
+  const t = actx.currentTime;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = 'sawtooth';
+  o.frequency.setValueAtTime(300, t);
+  o.frequency.exponentialRampToValueAtTime(80, t + .3);
+  g.gain.setValueAtTime(.0001, t);
+  g.gain.exponentialRampToValueAtTime(.5, t + .02);
+  g.gain.exponentialRampToValueAtTime(.0001, t + .36);
+  o.connect(g); g.connect(sfxBus); o.start(t); o.stop(t + .38);
+  noiseSfx(.22, 800, 220, 1.4, .3, 'lowpass');
+}
+function sfxSwell() {
+  if (!sfxOn()) return;
+  const t = actx.currentTime;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = 'sine'; o.frequency.setValueAtTime(72, t);
+  g.gain.setValueAtTime(.0001, t);
+  g.gain.exponentialRampToValueAtTime(.45, t + .4);
+  g.gain.exponentialRampToValueAtTime(.0001, t + 1.5);
+  o.connect(g); g.connect(sfxBus); o.start(t); o.stop(t + 1.55);
+}
+
+function sfxPlay(k) {
+  if (k === 'whoosh') sfxWhoosh();
+  else if (k === 'click') sfxClick();
+  else if (k === 'fast') sfxFast();
+  else if (k === 'soft') sfxSoft();
+  else if (k === 'ding') sfxDing();
+  else if (k === 'deny') sfxDeny();
+  else if (k === 'swell') sfxSwell();
+}
+
+/* 音效时间点：与画面事件一一对应（切幕 = 鼓点） */
+const SFX_CUES = [
+  { t: 0.80, k: 'whoosh' },
+  { t: 8.59, k: 'whoosh' },
+  { t: 26.62, k: 'whoosh' },
+  { t: 28.85, k: 'soft' },
+  { t: 47.30, k: 'whoosh' },
+  { t: 50.75, k: 'click' },
+  { t: 54.55, k: 'click' },
+  { t: 56.00, k: 'fast' },
+  { t: 56.60, k: 'fast' },
+  { t: 57.20, k: 'fast' },
+  { t: 57.80, k: 'fast' },
+  { t: 58.40, k: 'fast' },
+  { t: 59.00, k: 'fast' },
+  { t: 59.60, k: 'fast' },
+  { t: 64.51, k: 'whoosh' },
+  { t: 80.08, k: 'whoosh' },
+  { t: 85.28, k: 'deny' },
+  { t: 97.01, k: 'whoosh' },
+  { t: 112.60, k: 'whoosh' },
+  { t: 113.00, k: 'soft' },
+  { t: 114.00, k: 'soft' },
+  { t: 115.00, k: 'soft' },
+  { t: 116.80, k: 'ding' },
+  { t: 120.40, k: 'whoosh' },
+  { t: 124.70, k: 'swell' }
+];
+function sfxFire(a, b) {
+  if (b <= a) return;
+  for (let i = 0; i < SFX_CUES.length; i++) {
+    const c = SFX_CUES[i];
+    if (c.t > a && c.t <= b) sfxPlay(c.k);
+  }
+}
+
+/* ---------- 音轨：把 bgm.mp3 / bgm.wav 放在本文件同目录 ---------- */
+const BGM_FILES = ['bgm.mp3', 'bgm.wav'];
+let bgmFile = 0, bgmInit = false, bgmReady = false, bgmMuted = false, bgmPending = null;
+const bgm = new Audio();
+bgm.preload = 'auto';
+bgm.volume = .62;
+bgm.addEventListener('loadedmetadata', () => { bgmReady = true; bgmFlush(); });
+bgm.addEventListener('canplay', () => { bgmReady = true; bgmFlush(); });
+bgm.addEventListener('error', () => {
+  if (bgmFile < BGM_FILES.length - 1) {
+    bgmFile++;
+    bgm.src = BGM_FILES[bgmFile];
+    bgm.load();
+  } else {
+    bgmReady = false;
+    bgmPending = null;
+  }
+});
+
+function bgmFlush() {
+  if (bgmPending === null || !bgmReady) return;
+  bgmAt(bgmPending);
+  bgmPending = null;
+  bgm.play().catch(() => {});
+}
+function bgmAt(t) {
+  if (!bgmReady) return;
+  try { bgm.currentTime = Math.min(t, bgm.duration || TOTAL); } catch (e) {}
+}
+function bgmStart(t) {
+  if (!bgmInit) { bgmInit = true; bgm.src = BGM_FILES[0]; bgm.load(); }
+  if (!bgmReady) { bgmPending = t; return; }
+  bgmAt(t);
+  bgm.volume = bgmMuted ? 0 : .62;
+  bgm.play().catch(() => {});
+}
+function bgmStop() { if (bgmReady) bgm.pause(); }
+function bgmToggleMute() {
+  bgmMuted = !bgmMuted;
+  bgm.volume = bgmMuted ? 0 : .62;
+  if (sfxBus) sfxBus.gain.value = bgmMuted ? 0 : .24;
+  render(tNow);
+}
+
+function play() {
+  playing = true; ended = false; lastNow = 0;
+  sfxInit();
+  if (actx && actx.state === 'suspended') actx.resume().catch(() => {});
+  gate.classList.add('out');
+  bgmStart(tNow);
+}
+function pause() { playing = false; bgmStop(); }
+function toggle() { if (ended) { tNow = 0; play(); } else if (playing) { pause(); } else { play(); } }
+function seek(dt) { tNow = clamp(tNow + dt, 0, TOTAL); ended = false; render(tNow); bgmAt(tNow); }
+function restart() { tNow = 0; ended = false; play(); render(tNow); }
+
+document.getElementById('start').addEventListener('click', () => { tNow = 0; play(); });
+
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space') { e.preventDefault(); if (!gate.classList.contains('out')) { tNow = 0; play(); return; } toggle(); }
+  else if (e.code === 'ArrowRight') { seek(2); }
+  else if (e.code === 'ArrowLeft') { seek(-2); }
+  else if (e.key === 'r' || e.key === 'R') { restart(); }
+  else if (e.key === 'h' || e.key === 'H') { uiVisible = !uiVisible; render(tNow); }
+  else if (e.key === 'm' || e.key === 'M') { bgmToggleMute(); }
+  else if (e.key === 'f' || e.key === 'F') {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen().catch(() => {});
+  }
+});
+
+let idleTimer = 0;
+window.addEventListener('mousemove', () => {
+  document.getElementById('stage').style.cursor = 'default';
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => { document.getElementById('stage').style.cursor = 'none'; }, 2000);
+  if (!uiVisible) return;
+  if (gate.classList.contains('out')) {
+    uiVisible = true;
+  }
+});
+
+window.addEventListener('resize', () => {
+  fitCanvas();
+  render(tNow);
+});
+
+// 初始
+if (params.get('rec') === '1') uiVisible = false;
+if (params.get('t')) {
+  tNow = clamp(parseFloat(params.get('t')) || 0, 0, TOTAL);
+  gate.classList.add('out');
+  render(tNow);
+}
+if (params.get('auto') === '1') {
+  tNow = 0;
+  play();
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
