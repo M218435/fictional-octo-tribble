@@ -622,6 +622,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="assets/sfx/sfx.js"></script>
 <script>
 (function () {
   "use strict";
@@ -731,53 +732,28 @@
     toast: document.getElementById("toast")
   };
 
-  /* ================= 音效（WebAudio 合成，零外部文件） ================= */
+  /* ================= 音效（本地 WAV：assets/sfx/） ================= */
   var SFX = (function () {
-    var ctx = null, on = true, out = null;
-    try { on = localStorage.getItem("rtsx.sound.v1") !== "off"; } catch (e) {}
-    function ac() {
-      if (!ctx) {
-        var C = window.AudioContext || window.webkitAudioContext;
-        if (!C) return null;
-        try { ctx = new C(); } catch (e) { return null; }
-      }
-      if (ctx.state === "suspended") { try { ctx.resume(); } catch (e) {} }
-      if (!out) {
-        out = ctx.createDynamicsCompressor();      // 限制器：音量拉满也不炸耳朵
-        out.threshold.value = -2;
-        out.knee.value = 20;
-        out.ratio.value = 12;
-        out.attack.value = 0.004;
-        out.release.value = 0.2;
-        out.connect(ctx.destination);
-      }
-      return ctx;
-    }
-    function tone(f, dur, type, gain, delay, to) {
-      if (!on) return;
-      var c = ac(); if (!c) return;
-      var t0 = c.currentTime + (delay || 0);
-      var o = c.createOscillator(), g = c.createGain();
-      o.type = type || "sine";
-      o.frequency.setValueAtTime(f, t0);
-      if (to) o.frequency.exponentialRampToValueAtTime(to, t0 + dur);
-      g.gain.setValueAtTime(0.0001, t0);
-      g.gain.exponentialRampToValueAtTime(Math.min(0.99, (gain || 0.05) * 14), t0 + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      o.connect(g); g.connect(out || c.destination);
-      o.start(t0); o.stop(t0 + dur + 0.03);
-    }
+    var K = window.RTSXSFX;
+    function on() { return K ? !K.isMuted() : false; }
+    function play(key, vol) { if (on()) K.play(key, { volume: vol == null ? 1 : vol }); }
     var api = {
-      click: function () { tone(520, 0.055, "triangle", 0.045); },
-      open:  function () { tone(420, 0.09, "sine", 0.045, 0, 620); },
-      ok:    function () { tone(660, 0.1, "sine", 0.05); tone(880, 0.12, "sine", 0.05, 0.1); },
-      bad:   function () { tone(210, 0.14, "square", 0.04, 0, 140); },
-      isOn:  function () { return on; },
-      set:   function (v) { on = v; try { localStorage.setItem("rtsx.sound.v1", v ? "on" : "off"); } catch (e) {} }
+      click: function () { play("click"); },
+      hover: function () { play("hover", 0.7); },
+      open:  function () { play("start"); },
+      ok:    function () { play("success", 0.9); },
+      bad:   function () { play("error", 0.9); },
+      back:  function () { play("back"); },
+      isOn:  on,
+      set:   function (v) {
+        if (!K) return;
+        K.mute(!v);
+        try { localStorage.setItem("rtsx.sound.v1", v ? "on" : "off"); } catch (e) {}
+      }
     };
-    window.addEventListener("storage", function (e) {
-      if (e.key === "rtsx.sound.v1") on = e.newValue !== "off";
-    });
+    try {
+      if (K && localStorage.getItem("rtsx.sound.v1") === "off") K.mute(true);
+    } catch (e) {}
     return api;
   })();
 
