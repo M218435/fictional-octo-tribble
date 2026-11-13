@@ -496,6 +496,23 @@
           <span class="go">Enter <span aria-hidden="true">→</span></span>
         </span>
       </button>
+      <button class="tile feature" type="button" data-file="games/Minecaraft/index.html" data-title="我的世界" data-blank="1"
+              data-name-zh="我的世界" data-name-en="Minecraft"
+              data-desc-zh="网页版 MC · 手机 PE 触屏，电脑 1.21.11 锁鼠标" data-desc-en="Minecraft in the browser · PE for touch, 1.21.11 for mouse">
+        <span class="ico" aria-hidden="true">
+          <svg viewBox="0 0 42 42" fill="none">
+            <path d="M21 5 37 13.5v15L21 37 5 28.5v-15z" stroke="currentColor" stroke-width="2"/>
+            <path d="M5 13.5 21 22l16-8.5M21 22v15" stroke="currentColor" stroke-width="2" opacity=".55"/>
+            <path d="M5 17.2 21 25.7l16-8.5" stroke="currentColor" stroke-width="2" opacity=".28"/>
+          </svg>
+        </span>
+        <span class="txt">
+          <span class="name" data-name>我的世界</span>
+          <span class="desc" data-desc>网页版 MC · 手机 PE 触屏，电脑 1.21.11 锁鼠标</span>
+          <span class="go">Open <span aria-hidden="true">↗</span></span>
+        </span>
+      </button>
+
       <button class="tile" type="button" data-file="games/2048.html" data-title="2048"
               data-name-zh="2048" data-name-en="2048"
               data-desc-zh="滑动合并数字，冲击 2048" data-desc-en="Slide and merge tiles to reach 2048">
@@ -596,7 +613,7 @@
         <button id="game-close" type="button">关闭</button>
       </div>
     </header>
-    <iframe id="game-frame" title="迷你游戏"></iframe>
+    <iframe id="game-frame" title="迷你游戏" allowfullscreen allow="fullscreen; pointer-lock; autoplay; gamepad; microphone"></iframe>
   </div>
 </div>
 
@@ -778,7 +795,8 @@
     "games/snake.html",
     "games/breakout.html",
     "games/memory.html",
-    "games/minesweeper.html"
+    "games/minesweeper.html",
+    "games/Minecaraft/index.html"
   ];
 
   var bootReady = false, ipReady = false, pendingEnter = null;
@@ -1042,8 +1060,20 @@
     if (!tile) return;
     SFX.open();
     var nameEl = tile.querySelector("[data-name]");
-    openGame(tile.getAttribute("data-file"), nameEl ? nameEl.textContent : "");
+    var file = tile.getAttribute("data-file");
+    if (tile.getAttribute("data-blank") === "1") {
+      openInNewWindow(file);
+      return;
+    }
+    openGame(file, nameEl ? nameEl.textContent : "");
   });
+
+  /* 需要独占窗口的游戏（大包、要全屏/锁鼠标）：直接开新窗口 */
+  function openInNewWindow(url) {
+    var w = window.open(url, "_blank");
+    if (!w) location.href = url;   // 被拦了就在当前页打开
+    else { try { w.focus(); } catch (e) {} }
+  }
 
   el.gameClose.addEventListener("click", closeGame);
   el.gameFrame.addEventListener("load", function () {
