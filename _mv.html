@@ -1,0 +1,67 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>html,body{margin:0;background:#111}
+iframe{border:0;display:block}
+pre{position:fixed;right:0;top:0;margin:0;background:#000;color:#0f0;font:12px monospace;padding:5px;z-index:9}</style>
+<iframe id="f"></iframe>
+<pre id="o"></pre>
+<script>
+var q = new URLSearchParams(location.search);
+var f = document.getElementById('f');
+f.style.width = (q.get('w') || 1200) + 'px';
+f.style.height = (q.get('h') || 800) + 'px';
+f.src = '/games/67/maze.html';
+f.onload = function(){
+  setTimeout(function(){
+    var m = f.contentWindow.__mz;
+    if (!m) { document.getElementById('o').textContent = 'no hook (webgl fail?)'; return; }
+    m.start();
+    var info = m.info();
+    var mode = q.get('mode') || 'cube';
+    var target = null;
+    if (mode === 'exit_on') {
+      for (var c2 = 0; c2 < info.cubes.length; c2++) {
+        var cb2 = info.cubes[c2];
+        m.place(cb2.x, cb2.y);
+        m.step(0.05);
+      }
+      target = { x: info.exit.x + 0.5, y: info.exit.y + 0.5 };
+    } else if (mode === 'hunter') {
+      target = info.hunters[0];
+    } else if (mode === 'exit') {
+      target = { x: info.exit.x + 0.5, y: info.exit.y + 0.5 };
+    } else {
+      var best = -1, bestD = -1;
+      for (var c = 0; c < info.cubes.length; c++) {
+        var mind = 99;
+        for (var h = 0; h < info.hunters.length; h++) {
+          mind = Math.min(mind, Math.hypot(info.cubes[c].x - info.hunters[h].x, info.cubes[c].y - info.hunters[h].y));
+        }
+        if (mind > bestD) { bestD = mind; best = c; }
+      }
+      target = info.cubes[best];
+    }
+    var dists = q.get('dist') ? [parseFloat(q.get('dist'))] : [2.5, 2];
+    var dirs = [];
+    for (var i = 0; i < dists.length; i++) {
+      dirs.push([-dists[i], 0, 0, 1], [dists[i], 0, Math.PI, 1], [0, -dists[i], Math.PI / 2, 0], [0, dists[i], -Math.PI / 2, 0]);
+    }
+    for (var k = 0; k < dirs.length; k++) {
+      var x = target.x + dirs[k][0], y = target.y + dirs[k][1];
+      var s = dirs[k][3] ? 0 : 1;               // 0: x 方向偏移，1: y 方向偏移
+      var midCell = s ? [target.x, target.y + dirs[k][1] / 2] : [target.x + dirs[k][0] / 2, target.y];
+      var row = info.map[Math.floor(y)] || [];
+      var midRow = info.map[Math.floor(midCell[1])] || [];
+      if (row[Math.floor(x)] === 0 && midRow[Math.floor(midCell[0])] === 0) {
+        m.place(x, y, dirs[k][2]);
+        document.getElementById('o').textContent = 'ok p=(' + x + ',' + y + ')';
+        return;
+      }
+    }
+    m.place(target.x, target.y, 0);
+    document.getElementById('o').textContent = 'fallback';
+  }, 800);
+};
+</script>
+</body>
+</html>

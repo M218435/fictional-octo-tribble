@@ -1,0 +1,71 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>html,body{margin:0;background:#111}iframe{width:390px;height:844px;border:0}
+pre{position:fixed;left:0;top:0;margin:0;background:#000;color:#0f0;font:15px/1.7 monospace;padding:12px;width:740px;white-space:pre-wrap;z-index:99}</style>
+<iframe id="f" src="/games/67/maze.html"></iframe>
+<pre id="o">…</pre>
+<script>
+var f = document.getElementById('f'), o = document.getElementById('o'), log = [];
+function M(){ return f.contentWindow.__mz; }
+(async function(){
+  await new Promise(function(r){ f.onload = function(){ setTimeout(r, 900); }; });
+  var m = M();
+  if (!m) { o.textContent = 'no hook'; return; }
+  var i0 = m.info();
+  var open = 0, walls = 0;
+  for (var y = 0; y < i0.map.length; y++) for (var x = 0; x < i0.map[y].length; x++) (i0.map[y][x] ? walls++ : open++);
+  log.push('1 空地=' + open + ' 墙=' + walls + ' 方块=' + i0.total + ' 追兵=' + i0.hunters.length);
+  log.push('2 出口=(' + i0.exit.x + ',' + i0.exit.y + ')');
+
+  m.start();
+  log.push('3 state=' + m.info().state);
+
+  var a = m.info();
+  m.keys.f = true;
+  for (var i = 0; i < 24; i++) m.step(0.05);
+  m.keys.f = false;
+  var b = m.info();
+  log.push('4 前进: (' + a.px.toFixed(2) + ',' + a.py.toFixed(2) + ') → (' + b.px.toFixed(2) + ',' + b.py.toFixed(2) +
+           ') 墙内=' + (b.map[Math.floor(b.py)][Math.floor(b.px)] === 1));
+
+  var c = m.info();
+  m.place(c.px, c.py, Math.PI);
+  m.keys.f = true;
+  for (var j = 0; j < 20; j++) m.step(0.05);
+  m.keys.f = false;
+  var d = m.info();
+  log.push('5 撞墙: px ' + c.px.toFixed(2) + ' → ' + d.px.toFixed(2) + ' 未穿墙=' + (d.map[Math.floor(d.py)][Math.floor(d.px)] === 0));
+
+  var inf = m.info();
+  for (var k = 0; k < inf.cubes.length; k++) {
+    var cb = m.info().cubes[k];
+    if (cb.got) continue;
+    m.place(cb.x, cb.y);
+    m.step(0.05);
+  }
+  log.push('6 收集=' + m.info().collected + '/' + m.info().total);
+
+  var ex = m.info().exit;
+  m.place(ex.x + 0.5, ex.y + 0.5);
+  m.step(0.05);
+  log.push('7 站上出口 state=' + m.info().state);
+
+  m.start();
+  var h0 = m.info();
+  m.place(1.5, 1.5, 0);
+  var before = m.info();
+  for (var q = 0; q < 120; q++) m.step(0.05);
+  var after = m.info();
+  var inWall = 0;
+  for (var w = 0; w < after.hunters.length; w++) {
+    var hx = Math.floor(after.hunters[w].x), hy = Math.floor(after.hunters[w].y);
+    if (!after.map[hy] || after.map[hy][hx] === 1) inWall++;
+  }
+  var dh0 = Math.hypot(before.hunters[0].x - before.px, before.hunters[0].y - before.py);
+  var dh1 = Math.hypot(after.hunters[0].x - after.px, after.hunters[0].y - after.py);
+  log.push('8 追兵6s: ' + Math.round(dh0 * 10) / 10 + ' → ' + Math.round(dh1 * 10) / 10 + ' 格  穿墙=' + inWall + ' state=' + after.state);
+  o.textContent = log.join('\n');
+})().catch(function(e){ o.textContent = 'ERR ' + e.message + '\n' + log.join('\n'); });
+</script>
+</body>
+</html>

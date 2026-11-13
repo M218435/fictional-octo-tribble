@@ -480,6 +480,22 @@
         </span>
       </button>
 
+      <button class="tile feature" type="button" data-file="TextGame/下载.htm" data-title="67-3A大作"
+              data-name-zh="67-3A大作" data-name-en="67 · 3A Blockbuster"
+              data-desc-zh="第一人称 3D 大作 · 手机横屏即玩，电脑锁鼠标" data-desc-en="First-person 3D shooter · landscape on phone, mouse-lock on desktop">
+        <span class="ico" aria-hidden="true">
+          <svg viewBox="0 0 42 42" fill="none">
+            <circle cx="21" cy="21" r="12.5" stroke="currentColor" stroke-width="2"/>
+            <circle cx="21" cy="21" r="3.2" fill="currentColor" opacity=".9"/>
+            <path d="M21 3.5v6.5M21 32v6.5M3.5 21h6.5M32 21h6.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <span class="txt">
+          <span class="name" data-name>67-3A大作</span>
+          <span class="desc" data-desc>第一人称 3D 大作 · 手机横屏即玩，电脑锁鼠标</span>
+          <span class="go">Enter <span aria-hidden="true">→</span></span>
+        </span>
+      </button>
       <button class="tile" type="button" data-file="games/2048.html" data-title="2048"
               data-name-zh="2048" data-name-en="2048"
               data-desc-zh="滑动合并数字，冲击 2048" data-desc-en="Slide and merge tiles to reach 2048">
@@ -545,6 +561,23 @@
         </span>
         <span class="name" data-name>记忆翻牌</span>
         <span class="desc" data-desc>翻出 8 对图案，步数越少越好</span>
+        <span class="go">Play <span aria-hidden="true">→</span></span>
+      </button>
+
+      <button class="tile" type="button" data-file="games/minesweeper.html" data-title="扫雷"
+              data-name-zh="扫雷" data-name-en="Minesweeper"
+              data-desc-zh="点开安全格，插旗标雷，别踩爆" data-desc-en="Open safe tiles, flag the mines, don't blow up">
+        <span class="ico" aria-hidden="true">
+          <svg viewBox="0 0 42 42" fill="none">
+            <rect x="3.5" y="3.5" width="35" height="35" rx="5" stroke="currentColor" stroke-width="2" opacity=".5"/>
+            <path d="M15 32V11" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+            <path d="M16 12h11.5l-2.8 4.2 2.8 4.2H16z" fill="currentColor"/>
+            <circle cx="27.5" cy="28.5" r="3.6" fill="currentColor" opacity=".55"/>
+            <path d="M27.5 21.5v14M20.5 28.5h14" stroke="currentColor" stroke-width="1.4" opacity=".28"/>
+          </svg>
+        </span>
+        <span class="name" data-name>扫雷</span>
+        <span class="desc" data-desc>点开安全格，插旗标雷，别踩爆</span>
         <span class="go">Play <span aria-hidden="true">→</span></span>
       </button>
     </div>
@@ -744,7 +777,8 @@
     "games/2048.html",
     "games/snake.html",
     "games/breakout.html",
-    "games/memory.html"
+    "games/memory.html",
+    "games/minesweeper.html"
   ];
 
   var bootReady = false, ipReady = false, pendingEnter = null;
@@ -764,6 +798,18 @@
   }
   function gate(fn) { pendingEnter = fn; checkEnter(); }
 
+  /* 3A 大作有 1.4MB，不塞进大厅进度条，等大厅出来再在后台悄悄预热 */
+  var WARM = ["TextGame/下载.htm"];
+  function warmHeavy() {
+    if (!window.fetch) return;
+    var go = function () {
+      WARM.forEach(function (u) {
+        fetch(u, { credentials: "same-origin" }).catch(function () {});
+      });
+    };
+    if (window.requestIdleCallback) requestIdleCallback(go, { timeout: 4000 });
+    else setTimeout(go, 1500);
+  }
   function preload() {
     var t0 = Date.now(), done = 0, total = ASSETS.length || 1, settled = false;
 
@@ -773,6 +819,7 @@
       setProgress(1);
       bootReady = true;
       checkEnter();
+      warmHeavy();
     }
 
     setProgress(0);

@@ -1,0 +1,38 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>html,body{margin:0;background:#111}iframe{width:390px;height:640px;border:0}
+pre{position:fixed;left:0;top:0;margin:0;background:#000;color:#0f0;font:15px/1.65 monospace;padding:12px;width:740px;white-space:pre-wrap;z-index:99}</style>
+<iframe id="f" src="/games/67/maze.html"></iframe>
+<pre id="o">…</pre>
+<script>
+var f = document.getElementById('f'), o = document.getElementById('o'), L = [];
+(async function(){
+  await new Promise(function(r){ f.onload = function(){ setTimeout(r, 900); }; });
+  var m = f.contentWindow.__mz;
+  if (!m) { o.textContent = 'no hook'; return; }
+  var i0 = m.info();
+  var row = i0.map[1] || [];
+  L.push('start cell (1,1)=' + row[1] + '  player=(' + i0.px + ',' + i0.py + ')');
+  m.start();
+  var i1 = m.info();
+  L.push('after start: player=(' + i1.px.toFixed(2) + ',' + i1.py.toFixed(2) + ') state=' + i1.state +
+         ' hunter0=(' + i1.hunters[0].x.toFixed(2) + ',' + i1.hunters[0].y.toFixed(2) + ')');
+  m.place(1.5, 1.5, 0);
+  var i2 = m.info();
+  L.push('placed: player=(' + i2.px + ',' + i2.py + ') cellIsWall=' + i2.map[1][1] +
+         ' dist=' + Math.hypot(i2.hunters[0].x - 1.5, i2.hunters[0].y - 1.5).toFixed(2));
+  for (var s = 0; s < 12; s++) {
+    m.step(0.05);
+    var i3 = m.info();
+    L.push('t=' + ((s + 1) * 0.05).toFixed(2) + ' h0=(' + i3.hunters[0].x.toFixed(2) + ',' + i3.hunters[0].y.toFixed(2) +
+           ') d=' + Math.hypot(i3.hunters[0].x - 1.5, i3.hunters[0].y - 1.5).toFixed(2));
+  }
+  for (var s2 = 0; s2 < 108; s2++) m.step(0.05);
+  var i4 = m.info();
+  L.push('6s: h0=(' + i4.hunters[0].x.toFixed(2) + ',' + i4.hunters[0].y.toFixed(2) + ') d=' +
+         Math.hypot(i4.hunters[0].x - 1.5, i4.hunters[0].y - 1.5).toFixed(2) + ' state=' + i4.state);
+  o.textContent = L.join('\n');
+})().catch(function(e){ o.textContent = 'ERR ' + e.message + '\n' + L.join('\n'); });
+</script>
+</body>
+</html>

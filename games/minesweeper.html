@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>扫雷 · RTSX</title>
+<style>
+  :root{
+    --bg:#F4F1EA; --ink:#191817; --ink-2:#5F5B53; --ink-3:#938E85;
+    --line:#E4E0D7; --brand:#D97757; --btn:#2A2724;
+    --cell:#FDFBF7; --open:#EFEBE2; --open2:#E7E2D8;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased;
+    display:flex;align-items:center;justify-content:center;
+    min-height:100vh;min-height:100dvh;
+    padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom));
+    overflow:auto;
+    touch-action:manipulation;
+  }
+  .app{width:min(440px,94vw);display:flex;flex-direction:column;gap:12px;}
+
+  .top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+  .lead{display:flex;align-items:center;gap:8px;}
+  .back{border:0;background:none;font:inherit;font-size:12px;color:var(--ink-3);cursor:pointer;padding:4px 0;}
+  .back:hover{color:var(--ink-2);}
+  .snd{
+    border:1px solid var(--line);background:#fff;border-radius:8px;
+    padding:3px 7px;font:inherit;font-size:10px;letter-spacing:.12em;
+    color:var(--ink-3);cursor:pointer;
+  }
+  .snd.off{opacity:.5;text-decoration:line-through;}
+
+  .scores{display:flex;gap:6px;}
+  .scorebox{min-width:64px;padding:5px 10px;border-radius:10px;background:#fff;border:1px solid var(--line);text-align:center;}
+  .scorebox label{display:block;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);}
+  .scorebox b{display:block;font-size:15px;font-weight:600;line-height:1.35;font-variant-numeric:tabular-nums;}
+
+  .levels{display:flex;gap:6px;}
+  .lv{
+    flex:1;height:32px;border:1px solid var(--line);background:#fff;border-radius:9px;
+    font:inherit;font-size:11.5px;color:var(--ink-2);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:5px;
+  }
+  .lv b{font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink);}
+  .lv.on{background:#2A2724;border-color:#2A2724;color:#F4F1EA;}
+  .lv.on b{color:#F4F1EA;}
+
+  .board{
+    background:#fff;border:1px solid var(--line);border-radius:14px;
+    padding:8px;box-shadow:0 1px 2px rgba(25,24,23,.05);
+  }
+  .grid{
+    display:grid;gap:3px;width:100%;aspect-ratio:1/1;--fs:15px;
+  }
+  .cell{
+    border:1px solid #EAE5DB;background:var(--cell);border-radius:6px;
+    display:flex;align-items:center;justify-content:center;
+    font:inherit;font-size:var(--fs);line-height:1;font-weight:500;
+    color:var(--ink-3);cursor:pointer;padding:0;min-width:0;min-height:0;
+    transition:background .12s ease, transform .08s ease;
+    touch-action:none;user-select:none;-webkit-user-select:none;
+  }
+  .cell:active{transform:scale(.96);}
+  .cell.open{background:var(--open);border-color:#E2DCD1;cursor:default;transform:none;}
+  .cell.open.blank{color:transparent;}
+  .cell.flag{background:#FBF2EC;border-color:#EBDCCF;color:var(--brand);}
+  .cell.mine{background:#F6D9CF;border-color:#E7BBA9;color:#A83D22;}
+  .cell.wrong{background:#F2E7E2;border-color:#E3D2C9;color:#B08A78;text-decoration:line-through;}
+  .cell.boom{background:#D9603F;border-color:#C4502F;color:#FFF6F1;}
+  .cell.hint{animation:pop .3s ease;}
+  @keyframes pop{0%{transform:scale(.9);}60%{transform:scale(1.04);}100%{transform:scale(1);}}
+  .cell.n1{color:#3E6FA8;} .cell.n2{color:#4E7F5A;} .cell.n3{color:#B07A34;}
+  .cell.n4{color:#7A4E8C;} .cell.n5{color:#A24B3A;} .cell.n6,.cell.n7,.cell.n8{color:#6B4A3A;}
+
+  .bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+  .hint{margin:0;font-size:11.5px;color:var(--ink-3);}
+  .actions{display:flex;gap:8px;}
+  .btn{
+    height:38px;padding:0 18px;border:0;border-radius:10px;background:var(--btn);color:#fff;
+    font:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;
+  }
+  .btn:hover{background:#000;}
+  .btn.ghost{background:#fff;color:var(--ink-2);border:1px solid var(--line);}
+  .btn.ghost:hover{background:#FAF7F1;color:var(--ink);}
+  .btn.mode.on{background:var(--brand);}
+
+  .overlay{
+    position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(244,241,234,.9);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);
+    padding:24px;z-index:5;
+  }
+  .overlay.show{display:flex;animation:fade .25s ease both;}
+  @keyframes fade{from{opacity:0;}to{opacity:1;}}
+  .panel{
+    width:100%;max-width:300px;background:#fff;border:1px solid var(--line);border-radius:14px;
+    padding:26px 22px 22px;text-align:center;box-shadow:0 20px 50px -24px rgba(25,24,23,.35);
+  }
+  .panel h2{margin:0 0 8px;font-size:19px;font-weight:600;font-family:Georgia,"Songti SC",serif;}
+  .panel p{margin:0 0 18px;font-size:13px;color:var(--ink-2);line-height:1.6;}
+
+  @media (max-width:420px){
+    body{padding:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom));}
+    .app{gap:9px;}
+    .grid{gap:2px;}
+    .board{padding:6px;}
+    .scores{gap:5px;}
+    .scorebox{min-width:58px;padding:4px 8px;}
+    .lv{height:30px;font-size:11px;}
+    .bar{gap:8px;}
+    .hint{order:2;flex:1 1 100%;font-size:11px;line-height:1.5;}
+    .actions{order:1;width:100%;gap:8px;}
+    .actions .btn{flex:1 1 0;padding:0 10px;font-size:12.5px;}
+  }
+  @media (max-height:620px){
+    .hint{display:none;}
+    .app{gap:8px;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div class="lead">
+      <button class="back" id="back" type="button">← 返回</button>
+      <button class="snd" id="snd" type="button">SFX</button>
+    </div>
+    <div class="scores">
+      <div class="scorebox"><label>剩余雷</label><b id="left">10</b></div>
+      <div class="scorebox"><label>用时</label><b id="time">0:00</b></div>
+      <div class="scorebox"><label>最佳</label><b id="best">—</b></div>
+    </div>
+  </div>
+
+  <div class="levels" id="levels">
+    <button class="lv on" type="button" data-lv="easy">入门 <b>9×9</b></button>
+    <button class="lv" type="button" data-lv="mid">中级 <b>12×12</b></button>
+    <button class="lv" type="button" data-lv="hard">高级 <b>16×16</b></button>
+  </div>
+
+  <div class="board"><div class="grid" id="grid"></div></div>
+
+  <div class="bar">
+    <p class="hint" id="hint">左键翻开 · 右键插旗 · 手机长按插旗</p>
+    <div class="actions">
+      <button class="btn ghost mode" id="mode" type="button">🚩 插旗</button>
+      <button class="btn" id="restart" type="button">重开</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="panel">
+    <h2 id="ov-title">通关</h2>
+    <p id="ov-text"></p>
+    <button class="btn" id="ov-btn" type="button">再来一局</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- 音效：WebAudio 合成，零外部文件 ---------- */
+  var SFX = (function(){
+    var ctx = null, on = true, out = null;
+    try { on = localStorage.getItem("rtsx.sound.v1") !== "off"; } catch(e) {}
+    function ac(){
+      if (!ctx) {
+        var C = window.AudioContext || window.webkitAudioContext;
+        if (!C) return null;
+        try { ctx = new C(); } catch(e) { return null; }
+      }
+      if (ctx.state === "suspended") { try { ctx.resume(); } catch(e) {} }
+      if (!out) {
+        out = ctx.createDynamicsCompressor();      // 限制器：音量拉满也不炸耳朵
+        out.threshold.value = -2;
+        out.knee.value = 20;
+        out.ratio.value = 12;
+        out.attack.value = 0.004;
+        out.release.value = 0.2;
+        out.connect(ctx.destination);
+      }
+      return ctx;
+    }
+    function tone(f, dur, type, gain, delay, to){
+      if (!on) return;
+      var c = ac(); if (!c) return;
+      var t0 = c.currentTime + (delay || 0);
+      var o = c.createOscillator(), g = c.createGain();
+      o.type = type || "sine";
+      o.frequency.setValueAtTime(f, t0);
+      if (to) o.frequency.exponentialRampToValueAtTime(to, t0 + dur);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(Math.min(0.99, (gain || 0.05) * 14), t0 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      o.connect(g); g.connect(out || c.destination);
+      o.start(t0); o.stop(t0 + dur + 0.03);
+    }
+    var api = {
+      click: function(){ tone(520, 0.05, "triangle", 0.04, 0, 600); },
+      flag:  function(){ tone(700, 0.07, "sine", 0.05, 0, 820); },
+      unflag:function(){ tone(430, 0.06, "sine", 0.04, 0, 350); },
+      boom:  function(){ tone(180, 0.34, "square", 0.04, 0, 80); tone(96, 0.42, "sine", 0.05, 0.04, 52); },
+      win:   function(){ tone(660, 0.1, "sine", 0.05); tone(880, 0.12, "sine", 0.05, 0.1); tone(1240, 0.18, "sine", 0.045, 0.2); },
+      isOn:  function(){ return on; },
+      set:   function(v){ on = v; try { localStorage.setItem("rtsx.sound.v1", v ? "on" : "off"); } catch(e) {} }
+    };
+    window.addEventListener("storage", function(e){ if (e.key === "rtsx.sound.v1") on = e.newValue !== "off"; });
+    return api;
+  })();
+
+  var sndBtn = document.getElementById("snd");
+  function paintSnd(){ if (sndBtn) sndBtn.classList.toggle("off", !SFX.isOn()); }
+  paintSnd();
+  if (sndBtn) sndBtn.addEventListener("click", function(){
+    SFX.set(!SFX.isOn()); paintSnd(); if (SFX.isOn()) SFX.click();
+  });
+  window.addEventListener("storage", paintSnd);
+
+  /* ---------- 难度 ---------- */
+  var LEVELS = {
+    easy: { n: 9,  mines: 10 },
+    mid:  { n: 12, mines: 24 },
+    hard: { n: 16, mines: 40 }
+  };
+  var BEST_KEY = "rtsx.mines.best";
+  var grid = document.getElementById("grid");
+  var leftEl = document.getElementById("left");
+  var timeEl = document.getElementById("time");
+  var bestEl = document.getElementById("best");
+  var overlay = document.getElementById("overlay");
+  var modeBtn = document.getElementById("mode");
+  var hintEl = document.getElementById("hint");
+
+  var lv = "easy", n = 9, mineCount = 10;
+  var cells = [], flags = 0, opened = 0, state = "ready";
+  var timerId = null, startedAt = 0, elapsed = 0;
+  var flagMode = false, seeded = false;
+
+  var isTouch = (window.matchMedia && window.matchMedia("(pointer: coarse)").matches) ||
+                ("ontouchstart" in window);
+  if (isTouch) hintEl.textContent = "点按翻开 · 长按插旗（也可开插旗模式）";
+
+  function readBest(){
+    try {
+      var raw = localStorage.getItem(BEST_KEY);
+      var o = raw ? JSON.parse(raw) : {};
+      return (o && typeof o === "object") ? o : {};
+    } catch(e) { return {}; }
+  }
+  function paintBest(){
+    var b = readBest()[lv];
+    bestEl.textContent = b ? fmt(b) : "—";
+  }
+  function saveBest(sec){
+    var o = readBest();
+    if (!o[lv] || sec < o[lv]) { o[lv] = sec; try { localStorage.setItem(BEST_KEY, JSON.stringify(o)); } catch(e) {} }
+    paintBest();
+  }
+  function fmt(s){
+    var m = Math.floor(s / 60);
+    return m + ":" + String(s % 60 < 10 ? "0" + (s % 60) : s % 60);
+  }
+
+  function stopClock(){
+    if (timerId) { clearInterval(timerId); timerId = null; }
+  }
+  function startClock(){
+    if (timerId) return;
+    startedAt = Date.now() - elapsed * 1000;
+    timerId = setInterval(function(){
+      elapsed = Math.floor((Date.now() - startedAt) / 1000);
+      timeEl.textContent = fmt(elapsed);
+    }, 500);
+  }
+
+  /* ---------- 建盘 ---------- */
+  function reset(keepLevel){
+    stopClock();
+    if (!keepLevel) { /* 难度保持当前 */ }
+    var cfg = LEVELS[lv];
+    n = cfg.n; mineCount = cfg.mines;
+    flags = 0; opened = 0; state = "ready"; elapsed = 0; seeded = false;
+    cells = [];
+    for (var i = 0; i < n * n; i++) {
+      cells.push({ mine: false, adj: 0, open: false, flag: false, el: null });
+    }
+    leftEl.textContent = String(mineCount);
+    timeEl.textContent = "0:00";
+    overlay.classList.remove("show");
+    paintBest();
+
+    grid.style.gridTemplateColumns = "repeat(" + n + ",1fr)";
+    grid.innerHTML = "";
+    var frag = document.createDocumentFragment();
+    for (var k = 0; k < cells.length; k++) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "cell";
+      b.setAttribute("data-i", k);
+      b.setAttribute("aria-label", "格子 " + (k + 1));
+      cells[k].el = b;
+      frag.appendChild(b);
+    }
+    grid.appendChild(frag);
+    sizeFont();
+  }
+
+  function sizeFont(){
+    var c = grid.querySelector(".cell");
+    if (!c) return;
+    var w = c.getBoundingClientRect().width;
+    if (!w) return;
+    grid.style.setProperty("--fs", Math.max(8, Math.round(w * 0.58)) + "px");
+  }
+  window.addEventListener("resize", function(){ sizeFont(); });
+
+  /* ---------- 布雷（首点安全：第一次点开的那格和周围八格都不放雷） ---------- */
+  function seed(safeIdx){
+    var safe = {};
+    safe[safeIdx] = true;
+    var sx = safeIdx % n, sy = Math.floor(safeIdx / n);
+    for (var dy = -1; dy <= 1; dy++) {
+      for (var dx = -1; dx <= 1; dx++) {
+        var x = sx + dx, y = sy + dy;
+        if (x >= 0 && y >= 0 && x < n && y < n) safe[y * n + x] = true;
+      }
+    }
+    var usable = [];
+    for (var i = 0; i < cells.length; i++) if (!safe[i]) usable.push(i);
+    if (usable.length < mineCount) {          // 雷太多就只保证本格安全
+      usable = [];
+      for (var j = 0; j < cells.length; j++) if (j !== safeIdx) usable.push(j);
+    }
+    // 洗牌取雷
+    for (var t = usable.length - 1; t > 0; t--) {
+      var r = Math.floor(Math.random() * (t + 1));
+      var tmp = usable[t]; usable[t] = usable[r]; usable[r] = tmp;
+    }
+    for (var m = 0; m < mineCount && m < usable.length; m++) cells[usable[m]].mine = true;
+
+    for (var q = 0; q < cells.length; q++) {
+      if (cells[q].mine) continue;
+      var qx = q % n, qy = Math.floor(q / n), cnt = 0;
+      for (var b = -1; b <= 1; b++) {
+        for (var a = -1; a <= 1; a++) {
+          if (!a && !b) continue;
+          var ax = qx + a, ay = qy + b;
+          if (ax < 0 || ay < 0 || ax >= n || ay >= n) continue;
+          if (cells[ay * n + ax].mine) cnt++;
+        }
+      }
+      cells[q].adj = cnt;
+    }
+    seeded = true;
+  }
+
+  /* ---------- 渲染 ---------- */
+  function paint(i, cls){
+    var c = cells[i];
+    if (!c || !c.el) return;
+    var el = c.el;
+    el.className = "cell" + (cls ? " " + cls : "");
+    if (c.open) {
+      el.classList.add("open");
+      if (c.adj > 0) { el.textContent = String(c.adj); el.classList.add("n" + c.adj); }
+      else { el.textContent = ""; el.classList.add("blank"); }
+    } else if (c.flag) {
+      el.classList.add("flag");
+      el.textContent = "⚑";
+    } else {
+      el.textContent = "";
+    }
+  }
+  function repaintAll(){
+    for (var i = 0; i < cells.length; i++) paint(i);
+  }
+
+  /* ---------- 翻开 ---------- */
+  function openCell(i){
+    var c = cells[i];
+    if (!c || c.open || c.flag) return;
+    if (state === "over" || state === "won") return;
+
+    if (!seeded) {
+      seed(i);
+      startClock();
+      state = "run";
+    }
+    if (c.mine) { boom(i); return; }
+
+    var stack = [i];
+    var touched = 0;
+    while (stack.length) {
+      var k = stack.pop();
+      var cc = cells[k];
+      if (cc.open || cc.flag) continue;
+      if (cc.mine) continue;
+      cc.open = true;
+      opened++;
+      touched++;
+      if (cc.adj === 0) {
+        var kx = k % n, ky = Math.floor(k / n);
+        for (var b = -1; b <= 1; b++) {
+          for (var a = -1; a <= 1; a++) {
+            if (!a && !b) continue;
+            var ax = kx + a, ay = ky + b;
+            if (ax < 0 || ay < 0 || ax >= n || ay >= n) continue;
+            var idx = ay * n + ax;
+            if (!cells[idx].open && !cells[idx].flag && !cells[idx].mine) stack.push(idx);
+          }
+        }
+      }
+    }
+    if (touched > 0) SFX.click();
+    for (var p = 0; p < cells.length; p++) if (cells[p].open) paint(p);
+    checkWin();
+  }
+
+  function toggleFlag(i){
+    var c = cells[i];
+    if (!c || c.open) return;
+    if (state === "over" || state === "won") return;
+    c.flag = !c.flag;
+    flags += c.flag ? 1 : -1;
+    leftEl.textContent = String(Math.max(0, mineCount - flags));
+    if (c.flag) { SFX.flag(); c.el.classList.add("hint"); setTimeout(function(){ c.el.classList.remove("hint"); }, 300); }
+    else SFX.unflag();
+    paint(i);
+  }
+
+  function boom(i){
+    state = "over";
+    stopClock();
+    cells[i].open = true;
+    cells[i].el.className = "cell boom";
+    cells[i].el.textContent = "✳";
+    for (var k = 0; k < cells.length; k++) {
+      var c = cells[k];
+      if (c.mine && k !== i) { c.el.className = "cell mine"; c.el.textContent = "✳"; }
+      else if (c.flag && !c.mine) { c.el.className = "cell wrong"; c.el.textContent = "⚑"; }
+    }
+    SFX.boom();
+    showOverlay("踩雷了", "这一局挖开 " + opened + " 格，用时 " + fmt(elapsed) + "。", "再来一局");
+  }
+
+  function checkWin(){
+    if (opened >= cells.length - mineCount) {
+      state = "won";
+      stopClock();
+      for (var k = 0; k < cells.length; k++) {
+        var c = cells[k];
+        if (c.mine && !c.flag) { c.flag = true; paint(k); }
+      }
+      flags = mineCount;
+      leftEl.textContent = "0";
+      SFX.win();
+      saveBest(elapsed);
+      showOverlay("清完了", "全部 " + (cells.length - mineCount) + " 格安全区，用时 " + fmt(elapsed) + "。", "再来一局");
+    }
+  }
+
+  function showOverlay(title, text, btn){
+    document.getElementById("ov-title").textContent = title;
+    document.getElementById("ov-text").textContent = text;
+    document.getElementById("ov-btn").textContent = btn;
+    overlay.classList.add("show");
+  }
+
+  /* ---------- 交互：左键翻开 / 右键插旗 / 长按插旗 ---------- */
+  var pressTimer = null, pressIdx = -1, longDone = false;
+
+  grid.addEventListener("contextmenu", function(e){ e.preventDefault(); });
+
+  grid.addEventListener("pointerdown", function(e){
+    var el = e.target && e.target.closest ? e.target.closest(".cell") : null;
+    if (!el) return;
+    pressIdx = parseInt(el.getAttribute("data-i"), 10);
+    longDone = false;
+    if (e.pointerType === "mouse" && e.button === 2) { toggleFlag(pressIdx); longDone = true; return; }
+    if (flagMode) { longDone = true; return; }
+    pressTimer = setTimeout(function(){
+      pressTimer = null;
+      longDone = true;
+      toggleFlag(pressIdx);
+    }, isTouch ? 340 : 480);
+  });
+
+  function clearPress(){ if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } }
+  grid.addEventListener("pointerup", function(e){
+    var el = e.target && e.target.closest ? e.target.closest(".cell") : null;
+    var idx = el ? parseInt(el.getAttribute("data-i"), 10) : pressIdx;
+    clearPress();
+    if (idx < 0) return;
+    if (longDone) { longDone = false; return; }
+    if (flagMode) { toggleFlag(idx); return; }
+    if (e.button === 2) return;
+    openCell(idx);
+  });
+  grid.addEventListener("pointercancel", function(){ clearPress(); longDone = false; });
+  grid.addEventListener("pointerleave", function(){ clearPress(); });
+
+  modeBtn.addEventListener("click", function(){
+    flagMode = !flagMode;
+    modeBtn.classList.toggle("on", flagMode);
+    modeBtn.textContent = flagMode ? "🚩 插旗中" : "🚩 插旗";
+    SFX.click();
+  });
+
+  document.getElementById("levels").addEventListener("click", function(e){
+    var b = e.target.closest ? e.target.closest(".lv") : null;
+    if (!b) return;
+    var v = b.getAttribute("data-lv");
+    if (!v || v === lv) return;
+    lv = v;
+    Array.prototype.forEach.call(document.querySelectorAll(".lv"), function(x){
+      x.classList.toggle("on", x === b);
+    });
+    SFX.click();
+    reset(true);
+  });
+
+  document.getElementById("restart").addEventListener("click", function(){ SFX.click(); reset(true); });
+  document.getElementById("ov-btn").addEventListener("click", function(){ SFX.click(); reset(true); });
+  document.getElementById("back").addEventListener("click", function(){
+    if (window.parent !== window) window.parent.postMessage("rtsx-close", "*");
+    else location.href = "../index.html";
+  });
+
+  reset(false);
+
+  /* 调试钩子：只有 ?dbg=1 才挂出来 */
+  if (/[?&]dbg=1/.test(location.search)) {
+    window.__ms = {
+      info: function(){
+        return { lv: lv, n: n, mines: mineCount, flags: flags, opened: opened,
+                 state: state, elapsed: elapsed, seeded: seeded,
+                 cells: cells.map(function(c){ return { m: c.mine, a: c.adj, o: c.open, f: c.flag }; }) };
+      },
+      open: function(i){ openCell(i); },
+      flag: function(i){ toggleFlag(i); },
+      reset: function(v){ if (v) lv = v; reset(true); },
+      setLevel: function(v){ lv = v; reset(true); },
+      gridSize: function(){ var r = grid.getBoundingClientRect(); return { w: r.width, h: r.height }; },
+      cellSize: function(){ var c = grid.querySelector(".cell"); return c ? c.getBoundingClientRect().width : 0; }
+    };
+  }
+})();
+</script>
+</body>
+</html>

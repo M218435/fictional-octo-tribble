@@ -7,10 +7,10 @@
 <style>
   :root{
     --ink:#F4EDE3; --dim:rgba(244,237,227,.62); --dim2:rgba(244,237,227,.38);
-    --line:rgba(244,237,227,.14); --clay:#D97757; --good:#9FD3AE;
+    --line:rgba(244,237,227,.14); --clay:#D97757;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  html,body{height:100%;margin:0;overflow:hidden;background:#0B0908;}
+  html,body{height:100%;margin:0;overflow:hidden;background:#0E0B09;}
   body{
     color:var(--ink);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
@@ -18,7 +18,11 @@
     user-select:none;-webkit-user-select:none;
     touch-action:manipulation;
   }
-  #cv{position:absolute;inset:0;width:100%;height:100%;display:block;}
+  #cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:none;}
+  .vig{
+    position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(ellipse 68% 58% at 50% 50%,rgba(0,0,0,0) 42%,rgba(0,0,0,.52) 100%);
+  }
 
   .hud{
     position:absolute;top:calc(14px + env(safe-area-inset-top));left:16px;right:16px;
@@ -34,6 +38,12 @@
   }
   .pill b{font-size:15px;color:var(--ink);font-variant-numeric:tabular-nums;}
   .pill .of{color:var(--dim2);font-size:11px;}
+
+  .cross{
+    position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;
+    border-radius:50%;background:rgba(255,240,225,.85);
+    box-shadow:0 0 0 1px rgba(0,0,0,.45);pointer-events:none;
+  }
 
   .ctl{
     position:absolute;left:16px;bottom:calc(14px + env(safe-area-inset-bottom));
@@ -53,7 +63,14 @@
     font-size:11px;letter-spacing:.04em;color:rgba(244,237,227,.42);
   }
 
-  /* 摇杆：屏幕正下方居中 */
+  .lockhint{
+    position:absolute;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%);
+    padding:8px 16px;border-radius:999px;
+    background:rgba(20,17,14,.7);border:1px solid var(--line);
+    font-size:12px;color:var(--dim);white-space:nowrap;pointer-events:none;
+  }
+
+  /* 摇杆：屏幕正下方居中，只负责移动（视角靠滑动/鼠标） */
   .stick{
     position:absolute;left:50%;bottom:calc(72px + env(safe-area-inset-bottom));
     width:136px;height:136px;margin-left:-68px;border-radius:50%;
@@ -86,14 +103,14 @@
 
   .overlay{
     position:absolute;inset:0;display:none;align-items:center;justify-content:center;
-    background:rgba(9,7,6,.82);
+    background:rgba(9,7,6,.84);
     backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
     padding:24px;z-index:5;
   }
   .overlay.show{display:flex;animation:fade .28s ease both;}
   @keyframes fade{from{opacity:0;}to{opacity:1;}}
   .panel{
-    width:100%;max-width:340px;background:#1A1613;border:1px solid rgba(244,237,227,.16);border-radius:16px;
+    width:100%;max-width:346px;background:#1A1613;border:1px solid rgba(244,237,227,.16);border-radius:16px;
     padding:26px 24px 22px;text-align:center;
     box-shadow:0 30px 70px -40px #000;
   }
@@ -101,9 +118,9 @@
     font-size:10.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--clay);margin-bottom:10px;
   }
   .panel h2{
-    margin:0 0 10px;font-family:Georgia,"Songti SC",serif;font-size:23px;font-weight:600;letter-spacing:.01em;
+    margin:0 0 10px;font-family:Georgia,"Songti SC",serif;font-size:23px;font-weight:600;
   }
-  .panel p{margin:0 0 18px;font-size:12.5px;line-height:1.8;color:var(--dim);}
+  .panel p{margin:0 0 16px;font-size:12.5px;line-height:1.8;color:var(--dim);}
   .panel .keys{font-size:11px;color:var(--dim2);line-height:1.9;margin-bottom:18px;}
   .btn{
     height:42px;padding:0 24px;border:0;border-radius:10px;background:#D97757;color:#fff;
@@ -116,6 +133,7 @@
 </head>
 <body>
 <canvas id="cv"></canvas>
+<div class="vig"></div>
 
 <div class="hud">
   <div class="pill"><span>收集</span><b id="count">0</b><span class="of">/ 5</span></div>
@@ -123,11 +141,14 @@
   <div class="pill"><span>追兵</span><b id="hunters">2</b></div>
 </div>
 
+<div class="cross"></div>
+
 <div class="ctl">
   <button id="back" type="button">← 专辑</button>
   <button class="snd" id="snd" type="button">SFX</button>
 </div>
-<div class="tip">WASD / 方向键 · Shift 加速</div>
+<div class="tip">WASD 移动 · 鼠标转视角 · Shift 冲刺</div>
+<div class="lockhint" id="lockhint">点击画面锁定鼠标</div>
 
 <div class="stick" id="stick"><div class="knob" id="knob"></div></div>
 <div class="warn" id="warn"></div>
@@ -136,8 +157,8 @@
   <div class="panel">
     <div class="tag">第一人称 · 追逐</div>
     <h2 id="ovTitle">67 迷宫追逐战</h2>
-    <p id="ovText">迷宫里有 5 个 67 方块，把它们全部捡起，出口才会亮。两个影子会一直寻路追你，被贴上就出局。</p>
-    <div class="keys">W / ↑ 前进　S / ↓ 后退　A D / ← → 转身　Shift 冲刺<br>手机：下方摇杆推上走、推左右转身</div>
+    <p id="ovText">真 3D 的立体迷宫。捡齐 5 个 67 方块，出口的门才会亮；两个影子一直在寻路追你，被贴上就出局。</p>
+    <div class="keys" id="ovKeys">电脑：点击画面锁定鼠标，移动鼠标上下左右转视角<br>WASD 走动，Shift 冲刺，ESC 松开鼠标<br>手机：手指在画面上滑动转视角，下方摇杆移动</div>
     <button class="btn" id="ovBtn" type="button">进入迷宫</button>
   </div>
 </div>
@@ -158,7 +179,7 @@
       }
       if (ctx.state === "suspended") { try { ctx.resume(); } catch(e) {} }
       if (!out) {
-        out = ctx.createDynamicsCompressor();      // 限制器：音量拉满也不炸耳朵
+        out = ctx.createDynamicsCompressor();
         out.threshold.value = -2;
         out.knee.value = 20;
         out.ratio.value = 12;
@@ -184,8 +205,7 @@
     }
     var api = {
       click: function(){ tone(520, 0.055, "triangle", 0.045); },
-      pick:  function(n){ tone(760, 0.1, "sine", 0.05); tone(1140, 0.12, "sine", 0.045, 0.09); },
-      hit:   function(){ tone(150, 0.18, "square", 0.045, 0, 90); },
+      pick:  function(){ tone(760, 0.1, "sine", 0.05); tone(1140, 0.12, "sine", 0.045, 0.09); },
       warn:  function(){ tone(180, 0.12, "sine", 0.03, 0, 140); },
       win:   function(){ tone(660, 0.12, "sine", 0.05); tone(880, 0.14, "sine", 0.05, 0.12); tone(1180, 0.2, "sine", 0.045, 0.26); },
       lose:  function(){ tone(320, 0.2, "square", 0.04, 0, 120); tone(160, 0.3, "sine", 0.045, 0.18, 80); },
@@ -204,35 +224,255 @@
   });
   window.addEventListener("storage", paintSnd);
 
-  /* ---------------- 画布 ---------------- */
-  var cv = document.getElementById("cv"), ctx = cv.getContext("2d");
-  var cw = 480, ch = 300, PROJ = 300, horizon = 138;
-  var HFOV = 74 * Math.PI / 180, tanH = Math.tan(HFOV / 2);
-  var ceilGrad = null, floorGrad = null;
-
-  function resize(){
-    var vw = Math.max(1, window.innerWidth), vh = Math.max(1, window.innerHeight);
-    cw = 480;
-    ch = Math.round(480 * vh / vw);
-    ch = Math.max(240, Math.min(1100, ch));
-    cv.width = cw; cv.height = ch;
-    tanH = Math.tan(HFOV / 2);
-    PROJ = Math.min(ch, cw * 0.95);
-    horizon = Math.round(ch * 0.46);
-    ceilGrad = ctx.createLinearGradient(0, 0, 0, horizon);
-    ceilGrad.addColorStop(0, "#100D0A");
-    ceilGrad.addColorStop(1, "#322A21");
-    floorGrad = ctx.createLinearGradient(0, horizon, 0, ch);
-    floorGrad.addColorStop(0, "#241D16");
-    floorGrad.addColorStop(1, "#3A2F23");
-    ctx.imageSmoothingEnabled = true;
+  /* ---------------- WebGL ---------------- */
+  var cv = document.getElementById("cv");
+  var gl = cv.getContext("webgl", { antialias: true, alpha: false }) ||
+           cv.getContext("experimental-webgl", { antialias: true, alpha: false });
+  if (!gl) {
+    document.body.innerHTML = '<div style="padding:28px;color:#eee;font:14px/1.9 sans-serif">' +
+      '这台设备的浏览器没有开启 WebGL，3D 迷宫跑不起来。<br>换 Chrome / Edge / Safari 再试一次。</div>';
+    return;
   }
-  window.addEventListener("resize", resize);
-  resize();
+
+  function compile(type, src){
+    var s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  var VS = [
+    "attribute vec3 aPos; attribute vec3 aNrm; attribute vec3 aCol; attribute vec2 aUV;",
+    "uniform mat4 uMVP; uniform mat4 uModel; uniform vec3 uCam;",
+    "varying vec3 vN; varying vec3 vC; varying vec2 vUV; varying float vD;",
+    "void main(){",
+    "  vec4 wp = uModel * vec4(aPos, 1.0);",
+    "  vN = normalize((uModel * vec4(aNrm, 0.0)).xyz);",
+    "  vC = aCol; vUV = aUV; vD = length(wp.xyz - uCam);",
+    "  gl_Position = uMVP * wp;",
+    "}"
+  ].join("\n");
+  var FS = [
+    "precision mediump float;",
+    "varying vec3 vN; varying vec3 vC; varying vec2 vUV; varying float vD;",
+    "uniform vec3 uTint; uniform float uUseTex; uniform sampler2D uTex;",
+    "uniform vec3 uLight; uniform vec3 uFog; uniform float uFogNear; uniform float uFogFar;",
+    "void main(){",
+    "  vec3 base = vC;",
+    "  if (uUseTex > 0.5) base = texture2D(uTex, vUV).rgb * vC;",
+    "  float dl = max(0.0, dot(normalize(vN), uLight));",
+    "  vec3 lit = base * (0.50 + 0.62 * dl) * uTint;",
+    "  float f = clamp((vD - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);",
+    "  f = f * f;",
+    "  gl_FragColor = vec4(mix(lit, uFog, f), 1.0);",
+    "}"
+  ].join("\n");
+
+  var prog = gl.createProgram();
+  gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
+  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+  gl.useProgram(prog);
+
+  var A = {
+    pos: gl.getAttribLocation(prog, "aPos"),
+    nrm: gl.getAttribLocation(prog, "aNrm"),
+    col: gl.getAttribLocation(prog, "aCol"),
+    uv:  gl.getAttribLocation(prog, "aUV")
+  };
+  var U = {
+    mvp: gl.getUniformLocation(prog, "uMVP"),
+    model: gl.getUniformLocation(prog, "uModel"),
+    cam: gl.getUniformLocation(prog, "uCam"),
+    tint: gl.getUniformLocation(prog, "uTint"),
+    useTex: gl.getUniformLocation(prog, "uUseTex"),
+    tex: gl.getUniformLocation(prog, "uTex"),
+    light: gl.getUniformLocation(prog, "uLight"),
+    fog: gl.getUniformLocation(prog, "uFog"),
+    fogNear: gl.getUniformLocation(prog, "uFogNear"),
+    fogFar: gl.getUniformLocation(prog, "uFogFar")
+  };
+  gl.enableVertexAttribArray(A.pos);
+  gl.enableVertexAttribArray(A.nrm);
+  gl.enableVertexAttribArray(A.col);
+  gl.enableVertexAttribArray(A.uv);
+
+  gl.enable(gl.DEPTH_TEST);
+  gl.disable(gl.CULL_FACE);
+  gl.clearColor(0.06, 0.05, 0.04, 1);
+
+  var STRIDE = 11;                      // pos3 nrm3 col3 uv2
+  function bindBuf(buf){
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.vertexAttribPointer(A.pos, 3, gl.FLOAT, false, STRIDE * 4, 0);
+    gl.vertexAttribPointer(A.nrm, 3, gl.FLOAT, false, STRIDE * 4, 12);
+    gl.vertexAttribPointer(A.col, 3, gl.FLOAT, false, STRIDE * 4, 24);
+    gl.vertexAttribPointer(A.uv,  2, gl.FLOAT, false, STRIDE * 4, 36);
+  }
+  function makeBuf(arr){
+    var b = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, b);
+    gl.bufferData(gl.ARRAY_BUFFER, arr, gl.STATIC_DRAW);
+    return b;
+  }
+
+  /* 几何写入：四点多边形 → 两个三角；uv 顺序与顶点一致 */
+  function quad(list, p0, p1, p2, p3, n, col, uv){
+    var pts = [p0, p1, p2, p0, p2, p3];
+    var uvs = [uv[0], uv[1], uv[2], uv[0], uv[2], uv[3]];
+    for (var i = 0; i < 6; i++) {
+      var p = pts[i], t = uvs[i];
+      list.push(p[0], p[1], p[2], n[0], n[1], n[2], col[0], col[1], col[2], t[0], t[1]);
+    }
+  }
+
+  var UVC = [[0,1],[1,1],[1,0],[0,0]];
+
+  /* 按“从外面看”的朝向摆一个面：U = 视线右方向，V = 视线上方向（视线 = -法线） */
+  function faceQuad(list, cx, cy, cz, n, hu, hv, col){
+    var U, V;
+    if (Math.abs(n[1]) > 0.9) {         // 顶/底面：视线竖直，另取一组正交基
+      U = [1, 0, 0];
+      V = [0, 0, -n[1]];
+    } else {
+      U = [-n[2], 0, n[0]];             // (0,1,0) × (-n)
+      V = [0, 1, 0];
+    }
+    function pt(su, sv){
+      return [ cx + U[0] * su * hu + V[0] * sv * hv,
+               cy + U[1] * su * hu + V[1] * sv * hv,
+               cz + U[2] * su * hu + V[2] * sv * hv ];
+    }
+    quad(list, pt(-1,-1), pt(1,-1), pt(1,1), pt(-1,1), n, col, UVC);
+  }
+
+  /* 单位立方体（中心在原点，边长 1） */
+  var cubeArr = [];
+  var WHITE = [1,1,1];
+  var H = 0.5;
+  faceQuad(cubeArr, 0,  0,  H, [0,0,1],  H, H, WHITE);
+  faceQuad(cubeArr, 0,  0, -H, [0,0,-1], H, H, WHITE);
+  faceQuad(cubeArr,  H, 0,  0, [1,0,0],  H, H, WHITE);
+  faceQuad(cubeArr, -H, 0,  0, [-1,0,0], H, H, WHITE);
+  faceQuad(cubeArr, 0,  H,  0, [0,1,0],  H, H, WHITE);
+  faceQuad(cubeArr, 0, -H,  0, [0,-1,0], H, H, WHITE);
+  var cubeBuf = makeBuf(new Float32Array(cubeArr));
+
+  /* 门：竖着的平面（1×1，中心在底边中点，法线 +z）；背面另画一次 */
+  var quadArr = [];
+  (function(){
+    var U = [-1, 0, 0], V = [0, 1, 0];
+    function pt(su, sv){ return [ U[0] * su * 0.5, sv * 0.5 + 0.5, 0 ]; }
+    quad(quadArr, pt(-1,-1), pt(1,-1), pt(1,1), pt(-1,1), [0,0,1], [1,1,1], UVC);
+  })();
+  var quadBuf = makeBuf(new Float32Array(quadArr));
+
+  /* 贴图 */
+  function makeTex(paint, w, h, repeat){
+    var c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    paint(c.getContext("2d"), w, h);
+    var t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    var wrap = repeat ? gl.REPEAT : gl.CLAMP_TO_EDGE;
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    return t;
+  }
+  var texCube = makeTex(function(g, w, h){
+    var grd = g.createLinearGradient(0, 0, w, h);
+    grd.addColorStop(0, "#E4916B"); grd.addColorStop(1, "#B85F3C");
+    g.fillStyle = grd; g.fillRect(0, 0, w, h);
+    g.strokeStyle = "rgba(255,247,235,.55)"; g.lineWidth = w * 0.045;
+    g.strokeRect(w * 0.075, w * 0.075, w * 0.85, w * 0.85);
+    g.fillStyle = "#FBF3E7";
+    g.font = "bold " + Math.round(w * 0.46) + "px Georgia, serif";
+    g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillText("67", w / 2, h / 2 + h * 0.03);
+  }, 128, 128);
+
+  var texDoor = makeTex(function(g, w, h){
+    g.fillStyle = "#E9DECB"; g.fillRect(0, 0, w, h);
+    g.fillStyle = "#CBBBA1"; g.fillRect(0, 0, w * 0.06, h);
+    g.fillRect(w * 0.88, 0, w * 0.06, h);
+    g.fillStyle = "#D97757"; g.fillRect(0, 0, w, h * 0.06);
+    g.fillStyle = "#2A2320";
+    g.font = "bold " + Math.round(w * 0.42) + "px Georgia, serif";
+    g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillText("67", w / 2, h * 0.46);
+    g.fillStyle = "#8A7A64";
+    g.font = Math.round(w * 0.1) + "px sans-serif";
+    g.fillText("EXIT", w / 2, h * 0.72);
+    g.fillStyle = "#2A2320"; g.fillRect(w * 0.72, h * 0.78, w * 0.1, h * 0.05);
+  }, 128, 256);
+
+  /* 墙面 / 地面的颗粒贴图：程序化生成，仍然零外部资源 */
+  var texWall = makeTex(function(g, w, h){
+    g.fillStyle = "#E4DFD8"; g.fillRect(0, 0, w, h);
+    for (var i = 0; i < 9000; i++) {
+      var v = 168 + Math.floor(Math.random() * 76);
+      g.fillStyle = "rgba(" + v + "," + v + "," + v + ",0.34)";
+      g.fillRect(Math.random() * w, Math.random() * h, 1 + Math.random() * 1.4, 1 + Math.random() * 1.4);
+    }
+    g.strokeStyle = "rgba(118,104,92,.07)"; g.lineWidth = 1;
+    for (var yy = h / 4; yy < h; yy += h / 4) {
+      g.beginPath(); g.moveTo(0, yy); g.lineTo(w, yy); g.stroke();
+    }
+
+  }, 256, 256, true);
+
+  /* ---------------- 矩阵 ---------------- */
+  function m4ident(){
+    return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
+  }
+  function m4mul(a, b){
+    var o = new Float32Array(16);
+    for (var c = 0; c < 4; c++) {
+      for (var r = 0; r < 4; r++) {
+        o[c * 4 + r] = a[0 * 4 + r] * b[c * 4 + 0] + a[1 * 4 + r] * b[c * 4 + 1] +
+                       a[2 * 4 + r] * b[c * 4 + 2] + a[3 * 4 + r] * b[c * 4 + 3];
+      }
+    }
+    return o;
+  }
+  function persp(fovy, aspect, near, far){
+    var f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far);
+    return new Float32Array([
+      f / aspect, 0, 0, 0,
+      0, f, 0, 0,
+      0, 0, (far + near) * nf, -1,
+      0, 0, 2 * far * near * nf, 0
+    ]);
+  }
+  function viewMat(eye, r, u, f){
+    // 列主序：三列依次是相机的右 / 上 / 前向基，第四列是平移
+    return new Float32Array([
+      r[0], u[0], -f[0], 0,
+      r[1], u[1], -f[1], 0,
+      r[2], u[2], -f[2], 0,
+      -(r[0]*eye[0] + r[1]*eye[1] + r[2]*eye[2]),
+      -(u[0]*eye[0] + u[1]*eye[1] + u[2]*eye[2]),
+       (f[0]*eye[0] + f[1]*eye[1] + f[2]*eye[2]),
+      1
+    ]);
+  }
+  function trs(x, y, z, ry, sx, sy, sz){
+    var c = Math.cos(ry), s = Math.sin(ry);
+    return new Float32Array([
+      c * sx, 0, -s * sx, 0,
+      0, sy, 0, 0,
+      s * sz, 0, c * sz, 0,
+      x, y, z, 1
+    ]);
+  }
 
   /* ---------------- 迷宫 ---------------- */
-  var MW = 15, MH = 15;
-  var map = [];
+  var MW = 15, MH = 15, map = [];
   function genMaze(){
     map = [];
     for (var y = 0; y < MH; y++) {
@@ -254,7 +494,6 @@
       map[cy + d[1]][cx + d[0]] = 0;
       stack.push([cx + d[0], cy + d[1]]);
     }
-    // 打通一些死胡同的墙，跑起来更连贯
     for (var k = 0; k < 10; k++) {
       var sx = 1 + Math.floor(Math.random() * (MW - 2));
       var sy = 1 + Math.floor(Math.random() * (MH - 2));
@@ -266,6 +505,7 @@
     var dist = [];
     for (var i = 0; i < MW * MH; i++) dist.push(1e9);
     var q = [[fx, fy]];
+    if (fx < 0 || fy < 0 || fx >= MW || fy >= MH || map[fy][fx] === 1) return dist;
     dist[fy * MW + fx] = 0;
     while (q.length) {
       var c = q.shift(), cx = c[0], cy = c[1], dv = dist[cy * MW + cx];
@@ -287,12 +527,58 @@
     return map[iy][ix] === 1;
   }
 
+  /* ---------------- 关卡几何（墙 / 地 / 顶） ---------------- */
+  var staticBuf = null, staticCount = 0;
+  /* 世界坐标推 uv：墙/地/顶共用一张可平铺的颗粒图 */
+  function uvOf(p){ return [[ (p[0] + p[2]) * 1.55, (p[2] - p[0]) * 1.55 + p[1] * 1.9 ]]; }
+  function quadW(list, p0, p1, p2, p3, n, col){
+    quad(list, p0, p1, p2, p3, n, col,
+         [uvOf(p0)[0], uvOf(p1)[0], uvOf(p2)[0], uvOf(p3)[0]]);
+  }
+  function buildLevel(){
+    var list = [];
+    var wallCol = [0.72, 0.47, 0.34];
+    var floorA = [0.168, 0.126, 0.095], floorB = [0.208, 0.158, 0.120];
+    var ceilCol = [0.300, 0.246, 0.202];
+
+    function hash(x, y){
+      var h = (x * 73856093) ^ (y * 19349663);
+      h = (h ^ (h >>> 13)) * 1274126177;
+      return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+    }
+
+    for (var y = 0; y < MH; y++) {
+      for (var x = 0; x < MW; x++) {
+        if (map[y][x] === 1) {
+          var t = 0.86 + hash(x, y) * 0.26;
+          var sides = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+          for (var s = 0; s < 4; s++) {
+            var nx = x + sides[s][0], ny = y + sides[s][1];
+            if (nx < 0 || ny < 0 || nx >= MW || ny >= MH) continue;
+            if (map[ny][nx] === 1) continue;
+            var shade = (s === 0 || s === 1) ? 0.80 : 1.0;
+            var col = [wallCol[0] * t * shade, wallCol[1] * t * shade, wallCol[2] * t * shade];
+            if (s === 0)      quadW(list, [x+1,0,y], [x+1,0,y+1], [x+1,1,y+1], [x+1,1,y], [1,0,0], col, UVC);
+            else if (s === 1) quadW(list, [x,0,y+1], [x,0,y], [x,1,y], [x,1,y+1], [-1,0,0], col, UVC);
+            else if (s === 2) quadW(list, [x+1,0,y+1], [x,0,y+1], [x,1,y+1], [x+1,1,y+1], [0,0,1], col, UVC);
+            else              quadW(list, [x,0,y], [x+1,0,y], [x+1,1,y], [x,1,y], [0,0,-1], col, UVC);
+          }
+        } else {
+          var fc = ((x + y) % 2 === 0) ? floorA : floorB;
+          quadW(list, [x,0,y], [x,0,y+1], [x+1,0,y+1], [x+1,0,y], [0,1,0], fc, UVC);
+          quadW(list, [x,1,y+1], [x,1,y], [x+1,1,y], [x+1,1,y+1], [0,-1,0], ceilCol, UVC);
+        }
+      }
+    }
+    if (staticBuf) gl.deleteBuffer(staticBuf);
+    staticBuf = makeBuf(new Float32Array(list));
+    staticCount = list.length / STRIDE;
+  }
+
   /* ---------------- 状态 ---------------- */
-  var px = 1.5, py = 1.5, yaw = 0;
-  var dirX = 1, dirY = 0, planeX = 0, planeY = 1;
-  var cubes = [], hunters = [], exitCell = { x: MW - 2, y: MH - 2 };
-  var collected = 0, state = "ready", paused = false;
-  var elapsed = 0, field = [], fieldTimer = 0, warnTimer = 0, walkPhase = 0;
+  var px = 1.5, py = 1.5, yaw = 0, pitch = 0;
+  var cubes = [], hunters = [], exitCell = { x: MW - 2, y: MH - 2 }, exitFace = 0;
+  var collected = 0, state = "ready", elapsed = 0, walkPhase = 0, field = [], fieldTimer = 0, warnTimer = 0;
 
   var countEl = document.getElementById("count");
   var clockEl = document.getElementById("clock");
@@ -302,19 +588,28 @@
   var ovTitle = document.getElementById("ovTitle");
   var ovText = document.getElementById("ovText");
   var ovBtn = document.getElementById("ovBtn");
+  var lockHint = document.getElementById("lockhint");
 
   function openCells(){
     var list = [];
-    for (var y = 1; y < MH - 1; y++) for (var x = 1; x < MW - 1; x++) if (map[y][x] === 0) list.push({ x: x, y: y });
+    for (var y = 1; y < MH - 1; y++) {
+      for (var x = 1; x < MW - 1; x++) if (map[y][x] === 0) list.push({ x: x, y: y });
+    }
     return list;
   }
 
   function setup(){
     genMaze();
-    px = 1.5; py = 1.5; yaw = 0; collected = 0; elapsed = 0; fieldTimer = 0;
+    buildLevel();
+    px = 1.5; py = 1.5; yaw = 0; pitch = 0;
+    // 出生就面朝一条通道，别一睁眼顶着墙
+    var look = [[1, 0, Math.PI / 2], [0, 1, 0], [0, -1, Math.PI], [-1, 0, -Math.PI / 2]];
+    for (var li = 0; li < look.length; li++) {
+      if (map[1 + look[li][1]][1 + look[li][0]] === 0) { yaw = look[li][2]; break; }
+    }
+    collected = 0; elapsed = 0; fieldTimer = 0; walkPhase = 0;
     var dist = cellDist(1, 1);
 
-    // 出口：离起点最远的格子
     var far = { x: 1, y: 1, d: 0 };
     var opens = openCells();
     for (var i = 0; i < opens.length; i++) {
@@ -323,18 +618,29 @@
     }
     exitCell = { x: far.x, y: far.y };
 
-    // 5 个 67 方块：离起点够远，且彼此不重叠
+    // 门朝玩家来的那条通道立着，走过去是正面而不是一条缝
+    exitFace = 0;
+    var around = [[1, 0, Math.PI / 2], [-1, 0, -Math.PI / 2], [0, 1, 0], [0, -1, Math.PI]];
+    var bestDir = null, bestD = 1e9;
+    for (var f = 0; f < around.length; f++) {
+      var ax = exitCell.x + around[f][0], ay = exitCell.y + around[f][1];
+      if (ax < 0 || ay < 0 || ax >= MW || ay >= MH) continue;
+      if (map[ay][ax] !== 0) continue;
+      var dv = dist[ay * MW + ax];
+      if (dv < bestD) { bestD = dv; bestDir = around[f]; }
+    }
+    if (bestDir) exitFace = bestDir[2];
+
     cubes = [];
     var pool = opens.filter(function(c){
       return dist[c.y * MW + c.x] >= 5 && !(c.x === exitCell.x && c.y === exitCell.y);
     });
     for (var n = 0; n < 5 && pool.length; n++) {
       var pick = Math.floor(Math.random() * pool.length);
-      cubes.push({ x: pool[pick].x + 0.5, y: pool[pick].y + 0.5, got: false });
+      cubes.push({ x: pool[pick].x + 0.5, y: pool[pick].y + 0.5, got: false, spin: Math.random() * 6.28 });
       pool.splice(pick, 1);
     }
 
-    // 2 个追兵：离玩家很远
     hunters = [];
     var farPool = opens.filter(function(c){ return dist[c.y * MW + c.x] >= 8; });
     if (!farPool.length) farPool = opens.slice();
@@ -342,7 +648,7 @@
       var hp = Math.floor(Math.random() * farPool.length);
       var cell = farPool[hp];
       farPool.splice(hp, 1);
-      hunters.push({ x: cell.x + 0.5, y: cell.y + 0.5, speed: 1.35 });
+      hunters.push({ x: cell.x + 0.5, y: cell.y + 0.5, speed: 1.32 });
     }
 
     field = cellDist(1, 1);
@@ -350,24 +656,21 @@
     huntersEl.textContent = String(hunters.length);
     clockEl.textContent = "0:00";
     warnEl.style.opacity = "0";
-    updateDir();
-  }
-
-  function updateDir(){
-    dirX = Math.cos(yaw); dirY = Math.sin(yaw);
-    planeX = -dirY; planeY = dirX;
   }
 
   /* ---------------- 输入 ---------------- */
-  var keys = { f: false, b: false, l: false, r: false, s: false };
+  var isTouch = (window.matchMedia && window.matchMedia("(pointer: coarse)").matches) ||
+                ("ontouchstart" in window);
+  var keys = { f: false, b: false, l: false, r: false, sprint: false, tl: false, tr: false };
   var KMAP = {
     w: "f", W: "f", ArrowUp: "f",
     s: "b", S: "b", ArrowDown: "b",
     a: "l", A: "l", ArrowLeft: "l",
-    d: "r", D: "r", ArrowRight: "r"
+    d: "r", D: "r", ArrowRight: "r",
+    q: "tl", Q: "tl", e: "tr", E: "tr"
   };
   document.addEventListener("keydown", function(e){
-    if (e.key === "Shift") { keys.s = true; return; }
+    if (e.key === "Shift") { keys.sprint = true; return; }
     var k = KMAP[e.key];
     if (!k) return;
     e.preventDefault();
@@ -375,33 +678,70 @@
     if (state === "ready") start();
   });
   document.addEventListener("keyup", function(e){
-    if (e.key === "Shift") { keys.s = false; return; }
+    if (e.key === "Shift") { keys.sprint = false; return; }
     var k = KMAP[e.key];
     if (k) { keys[k] = false; e.preventDefault(); }
   });
   window.addEventListener("blur", function(){
-    keys.f = keys.b = keys.l = keys.r = keys.s = false;
-    joy.turn = 0; joy.fwd = 0;
+    keys.f = keys.b = keys.l = keys.r = keys.sprint = keys.tl = keys.tr = false;
+    joy.fwd = 0; joy.strafe = 0;
   });
 
-  // 桌面上拖拽也能转身
-  var dragX = null;
+  /* 鼠标锁定：点画面进锁定，ESC 解锁 */
+  var locked = false;
+  cv.addEventListener("click", function(){
+    if (isTouch) return;
+    if (!locked && cv.requestPointerLock) {
+      try {
+        var p = cv.requestPointerLock();
+        if (p && p.catch) p.catch(function(){});
+      } catch (err) {}
+    }
+    if (state === "ready") start();
+  });
+  document.addEventListener("pointerlockchange", function(){
+    locked = document.pointerLockElement === cv;
+    if (lockHint) lockHint.style.display = locked ? "none" : "";
+    if (locked && state === "ready") start();
+  });
+  document.addEventListener("pointerlockerror", function(){ locked = false; });
+  document.addEventListener("mousemove", function(e){
+    if (!locked) return;
+    yaw += e.movementX * 0.0024;
+    pitch -= e.movementY * 0.0022;
+    clampPitch();
+  });
+
+  /* 没锁定时（含手机手指）：在画面上滑动就能转视角，上下左右都在 */
+  var lookId = null, lookX = 0, lookY = 0;
   cv.addEventListener("pointerdown", function(e){
-    if (e.pointerType === "touch") return;
-    dragX = e.clientX;
+    if (locked) return;
+    lookId = e.pointerId; lookX = e.clientX; lookY = e.clientY;
+    try { cv.setPointerCapture(lookId); } catch (err) {}
     if (state === "ready") start();
   });
   cv.addEventListener("pointermove", function(e){
-    if (dragX === null) return;
-    yaw += (e.clientX - dragX) * 0.0055;
-    dragX = e.clientX;
-    updateDir();
+    if (locked || lookId === null || e.pointerId !== lookId) return;
+    yaw += (e.clientX - lookX) * 0.0052;
+    pitch -= (e.clientY - lookY) * 0.0045;
+    clampPitch();
+    lookX = e.clientX; lookY = e.clientY;
   });
-  cv.addEventListener("pointerup", function(){ dragX = null; });
-  cv.addEventListener("pointercancel", function(){ dragX = null; });
+  function endLook(e){
+    if (lookId === null || (e && e.pointerId !== lookId)) return;
+    lookId = null;
+  }
+  cv.addEventListener("pointerup", endLook);
+  cv.addEventListener("pointercancel", endLook);
+  cv.addEventListener("lostpointercapture", endLook);
 
-  /* 摇杆：推上走、推左右转身 */
-  var joy = { turn: 0, fwd: 0 };
+  function clampPitch(){
+    if (pitch > 1.15) pitch = 1.15;
+    if (pitch < -1.15) pitch = -1.15;
+  }
+
+  /* 摇杆：只负责移动（前后 + 左右平移） */
+  var joy = { fwd: 0, strafe: 0 };
   function mountStick(handler){
     var base = document.getElementById("stick"), knob = document.getElementById("knob");
     if (!base || !knob) return;
@@ -436,9 +776,8 @@
     base.addEventListener("lostpointercapture", up);
   }
   mountStick(function(dx, dy){
-    joy.turn = Math.abs(dx) > 0.16 ? dx : 0;
+    joy.strafe = Math.abs(dx) > 0.16 ? dx : 0;
     joy.fwd = Math.abs(dy) > 0.14 ? -dy : 0;
-    if (state === "ready" && (joy.fwd > 0 || joy.turn !== 0)) start();
   });
 
   /* ---------------- 玩法 ---------------- */
@@ -447,6 +786,7 @@
     if (state !== "ready") setup();
     state = "run";
     overlay.classList.remove("show");
+    lockHint.style.display = (isTouch || locked) ? "none" : "";
     SFX.click();
   }
 
@@ -455,6 +795,7 @@
     ovText.textContent = text;
     ovBtn.textContent = btn;
     overlay.classList.add("show");
+    lockHint.style.display = "none";
   }
 
   function fmt(t){
@@ -463,46 +804,47 @@
   }
 
   function canMove(nx, ny){
-    var r = 0.3;
+    var r = 0.28;
     return !solid(nx - r, ny) && !solid(nx + r, ny) && !solid(nx, ny - r) && !solid(nx, ny + r);
   }
 
   function update(dt){
     elapsed += dt;
 
-    // 转身
-    var turn = (keys.r ? 1 : 0) - (keys.l ? 1 : 0) + joy.turn;
-    if (turn) { yaw += turn * 2.35 * dt; updateDir(); }
+    var turn = (keys.tr ? 1 : 0) - (keys.tl ? 1 : 0);
+    if (turn) yaw += turn * 2.2 * dt;
 
-    // 前进后退
     var fwd = (keys.f ? 1 : 0) - (keys.b ? 1 : 0) + joy.fwd;
-    if (fwd > 1) fwd = 1;
-    if (fwd < -1) fwd = -1;
-    if (Math.abs(fwd) > 0.05) {
-      var speed = (keys.s ? 3.25 : 2.25) * fwd;
-      var nx = px + dirX * speed * dt, ny = py + dirY * speed * dt;
+    var strafe = (keys.r ? 1 : 0) - (keys.l ? 1 : 0) + joy.strafe;
+    fwd = Math.max(-1, Math.min(1, fwd));
+    strafe = Math.max(-1, Math.min(1, strafe));
+
+    if (Math.abs(fwd) > 0.03 || Math.abs(strafe) > 0.03) {
+      var speed = keys.sprint ? 3.15 : 2.2;
+      var sy = Math.sin(yaw), cy = Math.cos(yaw);
+      var vx = (sy * fwd + cy * strafe) * speed;
+      var vy = (cy * fwd - sy * strafe) * speed;
+      var nx = px + vx * dt, ny = py + vy * dt;
       if (canMove(nx, py)) px = nx;
       if (canMove(px, ny)) py = ny;
-      walkPhase += Math.abs(speed) * dt * 3.2;
+      walkPhase += (Math.abs(fwd) + Math.abs(strafe)) * speed * dt * 3.4;
     }
 
     // 收集
     for (var i = 0; i < cubes.length; i++) {
       var c = cubes[i];
       if (c.got) continue;
-      if (Math.hypot(c.x - px, c.y - py) < 0.62) {
+      if (Math.hypot(c.x - px, c.y - py) < 0.72) {
         c.got = true;
         collected++;
         countEl.textContent = String(collected);
-        SFX.pick(collected);
+        SFX.pick();
         hunters.forEach(function(h){ h.speed += 0.13; });
-        if (collected >= cubes.length) {
-          huntersEl.textContent = String(hunters.length) + " · 出口已开";
-        }
+        if (collected >= cubes.length) huntersEl.textContent = String(hunters.length) + " · 出口开了";
       }
     }
 
-    // 追兵寻路（每 0.22 秒重算一次距离场）
+    // 追兵
     fieldTimer -= dt;
     if (fieldTimer <= 0) {
       field = cellDist(Math.floor(px), Math.floor(py));
@@ -524,36 +866,46 @@
       if (best) {
         var ddx = best[0] - hh.x, ddy = best[1] - hh.y;
         var len = Math.hypot(ddx, ddy) || 1;
-        hh.x += ddx / len * hh.speed * dt;
-        hh.y += ddy / len * hh.speed * dt;
+        var sx2 = ddx / len * hh.speed * dt, sy2 = ddy / len * hh.speed * dt;
+        if (!solid(hh.x + sx2, hh.y)) hh.x += sx2;    // 逐轴走，别贴着墙角斜穿进墙里
+        if (!solid(hh.x, hh.y + sy2)) hh.y += sy2;
+        if (solid(hh.x, hh.y)) {                       // 万一挤进墙：找相邻空地退回格心
+          var back = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+          for (var bk = 0; bk < back.length; bk++) {
+            var bx = Math.floor(hh.x) + back[bk][0], by = Math.floor(hh.y) + back[bk][1];
+            if (bx >= 0 && by >= 0 && bx < MW && by < MH && map[by][bx] === 0) {
+              hh.x = bx + 0.5; hh.y = by + 0.5; break;
+            }
+          }
+        }
       }
-      var dist2p = Math.hypot(hh.x - px, hh.y - py);
-      if (dist2p < nearest) nearest = dist2p;
-      if (dist2p < 0.55) {
+      var d2 = Math.hypot(hh.x - px, hh.y - py);
+      if (d2 < nearest) nearest = d2;
+      if (d2 < 0.6) {
         state = "over";
         SFX.lose();
         warnEl.style.opacity = "0";
+        if (document.exitPointerLock) document.exitPointerLock();
         showOverlay("被追上了", "这次收集了 " + collected + " 个 67，用了 " + fmt(elapsed) + "。", "再来一局");
         return;
       }
     }
 
-    // 心跳与红边
     warnTimer -= dt;
-    if (nearest < 3.2) {
-      warnEl.style.opacity = String(Math.min(0.85, (3.2 - nearest) / 3.2 * 0.95));
-      if (warnTimer <= 0) { SFX.warn(); warnTimer = nearest < 1.6 ? 0.45 : 0.85; }
+    if (nearest < 3.4) {
+      warnEl.style.opacity = String(Math.min(0.85, (3.4 - nearest) / 3.4 * 0.95));
+      if (warnTimer <= 0) { SFX.warn(); warnTimer = nearest < 1.8 ? 0.45 : 0.85; }
     } else {
       warnEl.style.opacity = "0";
       warnTimer = 0;
     }
 
-    // 出口
     if (collected >= cubes.length) {
       var ex = exitCell.x + 0.5, ey = exitCell.y + 0.5;
-      if (Math.hypot(ex - px, ey - py) < 0.7) {
+      if (Math.hypot(ex - px, ey - py) < 0.85) {
         state = "won";
         SFX.win();
+        if (document.exitPointerLock) document.exitPointerLock();
         showOverlay("逃出来了", "5 个 67 全部到手，用时 " + fmt(elapsed) + "。", "再来一局");
         return;
       }
@@ -563,195 +915,111 @@
   }
 
   /* ---------------- 渲染 ---------------- */
-  function castDist(angle){
-    var rx = Math.cos(angle), ry = Math.sin(angle);
-    var mx = Math.floor(px), my = Math.floor(py);
-    var ddx = rx === 0 ? 1e30 : Math.abs(1 / rx);
-    var ddy = ry === 0 ? 1e30 : Math.abs(1 / ry);
-    var sx, sy, sdx, sdy;
-    if (rx < 0) { sx = -1; sdx = (px - mx) * ddx; } else { sx = 1; sdx = (mx + 1 - px) * ddx; }
-    if (ry < 0) { sy = -1; sdy = (py - my) * ddy; } else { sy = 1; sdy = (my + 1 - py) * ddy; }
-    var side = 0, guard = 0;
-    while (guard++ < 260) {
-      if (sdx < sdy) { sdx += ddx; mx += sx; side = 0; } else { sdy += ddy; my += sy; side = 1; }
-      if (mx < 0 || my < 0 || mx >= MW || my >= MH || map[my][mx] === 1) break;
-    }
-    return side === 0 ? Math.max(0.0001, sdx - ddx) : Math.max(0.0001, sdy - ddy);
+  var dpr = Math.min(2, window.devicePixelRatio || 1);
+  function resize(){
+    var w = window.innerWidth, h = window.innerHeight;
+    cv.width = Math.round(w * dpr);
+    cv.height = Math.round(h * dpr);
   }
+  window.addEventListener("resize", resize);
+  resize();
 
-  function drawCubes(x, base, h, w, alpha){
-    ctx.globalAlpha = alpha;
-    var g = ctx.createLinearGradient(x - w / 2, base - h, x + w / 2, base);
-    g.addColorStop(0, "#E4916B");
-    g.addColorStop(1, "#B85F3C");
-    ctx.fillStyle = g;
-    ctx.fillRect(x - w / 2, base - h, w, h);
-    ctx.fillStyle = "rgba(0,0,0,.22)";
-    ctx.fillRect(x - w / 2, base - h, w * 0.16, h);
-    ctx.fillStyle = "#FBF3E7";
-    ctx.font = "700 " + Math.max(8, Math.round(w * 0.5)) + "px Georgia, serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("67", x, base - h * 0.48);
-    // 落地阴影
-    ctx.globalAlpha = alpha * 0.35;
-    ctx.fillStyle = "#000";
-    ctx.beginPath();
-    ctx.ellipse(x, base, w * 0.42, Math.max(2, w * 0.12), 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-  }
+  var LIGHT = (function(){ var v = [0.34, 0.90, 0.26], l = Math.hypot(v[0], v[1], v[2]); return [v[0]/l, v[1]/l, v[2]/l]; })();
+  var FOG = [0.055, 0.045, 0.036];
 
-  function render(){
-    var W = cw, H = ch;
-    ctx.fillStyle = ceilGrad;
-    ctx.fillRect(0, 0, W, horizon);
-    ctx.fillStyle = floorGrad;
-    ctx.fillRect(0, horizon, W, H - horizon);
+  function draw(t){
+    var W = cv.width, H = cv.height;
+    gl.viewport(0, 0, W, H);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    var COL = 2;
-    var fogR = 13, fogG = 10, fogB = 8;
-    for (var x = 0; x < W; x += COL) {
-      var camX = (2 * (x + COL / 2) / W - 1) * tanH;
-      var rx = dirX + planeX * camX, ry = dirY + planeY * camX;
+    var aspect = W / H;
+    var hfov = 78 * Math.PI / 180;
+    var vfov = 2 * Math.atan(Math.tan(hfov / 2) / aspect);
+    if (vfov > 1.62) vfov = 1.62;
+    var proj = persp(vfov, aspect, 0.05, 60);
 
-      var mx = Math.floor(px), my = Math.floor(py);
-      var ddx = rx === 0 ? 1e30 : Math.abs(1 / rx);
-      var ddy = ry === 0 ? 1e30 : Math.abs(1 / ry);
-      var sx, sy, sdx, sdy;
-      if (rx < 0) { sx = -1; sdx = (px - mx) * ddx; } else { sx = 1; sdx = (mx + 1 - px) * ddx; }
-      if (ry < 0) { sy = -1; sdy = (py - my) * ddy; } else { sy = 1; sdy = (my + 1 - py) * ddy; }
+    var cp = Math.cos(pitch), sp = Math.sin(pitch);
+    var f = [Math.sin(yaw) * cp, sp, Math.cos(yaw) * cp];
+    var r = [Math.cos(yaw), 0, -Math.sin(yaw)];
+    var u = [f[1] * r[2] - f[2] * r[1], f[2] * r[0] - f[0] * r[2], f[0] * r[1] - f[1] * r[0]];
+    var bob = Math.sin(walkPhase) * 0.022;
+    var eye = [px, 0.58 + bob, py];
+    var view = viewMat(eye, r, u, f);
+    var mvp = m4mul(proj, view);
 
-      var side = 0, guard = 0, hit = false;
-      while (guard++ < 260) {
-        if (sdx < sdy) { sdx += ddx; mx += sx; side = 0; } else { sdy += ddy; my += sy; side = 1; }
-        if (mx < 0 || my < 0 || mx >= MW || my >= MH || map[my][mx] === 1) { hit = true; break; }
-      }
-      if (!hit) continue;
-      var dist = side === 0 ? Math.max(0.05, sdx - ddx) : Math.max(0.05, sdy - ddy);
+    gl.useProgram(prog);
+    gl.uniformMatrix4fv(U.mvp, false, mvp);
+    gl.uniformMatrix4fv(U.model, false, m4ident());
+    gl.uniform3fv(U.cam, eye);
+    gl.uniform3fv(U.light, LIGHT);
+    gl.uniform3fv(U.fog, FOG);
+    gl.uniform1f(U.fogNear, 1.6);
+    gl.uniform1f(U.fogFar, 11.5);
+    gl.uniform1i(U.tex, 0);
+    gl.uniform3f(U.tint, 1, 1, 1);
+    gl.uniform1f(U.useTex, 0);
 
-      var hh = PROJ / dist;
-      var top = horizon - hh / 2;
-      var shade = Math.max(0.16, Math.min(1, 1 - dist / 13));
-      var br = side === 0 ? 104 : 126, bg = side === 0 ? 70 : 88, bb = side === 0 ? 50 : 63;
-      var r = Math.round(br * shade + fogR * (1 - shade));
-      var g2 = Math.round(bg * shade + fogG * (1 - shade));
-      var b2 = Math.round(bb * shade + fogB * (1 - shade));
-      ctx.fillStyle = "rgb(" + r + "," + g2 + "," + b2 + ")";
-      ctx.fillRect(x, top, COL, hh);
+    // 墙、地、顶（带颗粒贴图）
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texWall);
+    gl.uniform1f(U.useTex, 1);
+    gl.uniform3f(U.tint, 1.22, 1.18, 1.12);
+    bindBuf(staticBuf);
+    gl.drawArrays(gl.TRIANGLES, 0, staticCount);
 
-      // 墙面顶部的亮边，让空间更清楚
-      if (hh > 26) {
-        ctx.fillStyle = "rgba(255,224,196," + (0.07 * shade).toFixed(3) + ")";
-        ctx.fillRect(x, top, COL, Math.max(1, hh * 0.028));
-      }
-    }
-
-    /* 精灵：方块 / 追兵 / 出口 */
-    var items = [];
+    // 67 方块
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texCube);
+    gl.uniform1f(U.useTex, 1);
+    bindBuf(cubeBuf);
     for (var i = 0; i < cubes.length; i++) {
-      if (cubes[i].got) continue;
-      items.push({ kind: "cube", x: cubes[i].x, y: cubes[i].y });
+      var c = cubes[i];
+      if (c.got) continue;
+      var bobY = Math.sin(t * 0.002 + c.spin) * 0.05;
+      var s = 0.42;
+      gl.uniformMatrix4fv(U.model, false, trs(c.x, 0.34 + bobY, c.y, t * 0.0011 + c.spin, s, s, s));
+      gl.uniform3f(U.tint, 1.28, 1.2, 1.12);
+      gl.drawArrays(gl.TRIANGLES, 0, 36);
     }
+
+    // 追兵：身体 + 头 + 两只眼睛
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.uniform1f(U.useTex, 0);
     for (var h = 0; h < hunters.length; h++) {
-      items.push({ kind: "hunter", x: hunters[h].x, y: hunters[h].y });
-    }
-    items.push({ kind: "exit", x: exitCell.x + 0.5, y: exitCell.y + 0.5 });
-
-    for (var n = 0; n < items.length; n++) {
-      var it = items[n];
-      var dx = it.x - px, dy = it.y - py;
-      it.d = Math.hypot(dx, dy);
-    }
-    items.sort(function(a, b){ return b.d - a.d; });
-
-    for (var s = 0; s < items.length; s++) {
-      var it2 = items[s];
-      var ang = Math.atan2(it2.y - py, it2.x - px) - yaw;
-      while (ang > Math.PI) ang -= Math.PI * 2;
-      while (ang < -Math.PI) ang += Math.PI * 2;
-      if (Math.abs(ang) > HFOV / 2 + 0.3) continue;
-      if (castDist(Math.atan2(it2.y - py, it2.x - px)) < it2.d - 0.35) continue;   // 被墙挡住
-
-      var sx2 = W / 2 + Math.tan(ang) * (W / 2) / tanH;
-      var d = it2.d;
-      var floorY = horizon + (PROJ * 0.5) / d;
-      var fade = d > 9 ? Math.max(0.18, 1 - (d - 9) / 7) : 1;   // 近处保持完全不透明，避免透出后面精灵的残影
-
-      if (it2.kind === "cube") {
-        var chh = PROJ * 0.46 / d, cww = chh;
-        drawCubes(sx2, floorY - PROJ * 0.12 / d, chh, cww, fade);
-      } else if (it2.kind === "hunter") {
-        var hhh = Math.max(6, PROJ * 1.12 / d), hww = Math.max(4, PROJ * 0.74 / d);
-        var top2 = floorY - hhh;
-        var headR = hww * 0.44;
-        ctx.globalAlpha = fade;
-        ctx.fillStyle = "rgba(0,0,0,.5)";
-        ctx.beginPath();
-        ctx.ellipse(sx2, floorY, hww * 0.62, Math.max(2, hww * 0.18), 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        var hg = ctx.createLinearGradient(sx2, top2, sx2, floorY);
-        hg.addColorStop(0, "#93412A");
-        hg.addColorStop(0.5, "#5E2416");
-        hg.addColorStop(1, "#240D07");
-        ctx.fillStyle = hg;
-        ctx.strokeStyle = "rgba(255,124,82,.45)";
-        ctx.lineWidth = Math.max(1, hww * 0.045);
-
-        // 影子一样的轮廓：梯形身体 + 圆头
-        ctx.beginPath();
-        ctx.moveTo(sx2 - hww * 0.34, floorY);
-        ctx.lineTo(sx2 - hww * 0.26, top2 + headR * 1.35);
-        ctx.lineTo(sx2 + hww * 0.26, top2 + headR * 1.35);
-        ctx.lineTo(sx2 + hww * 0.34, floorY);
-        ctx.closePath();
-        ctx.fill(); ctx.stroke();
-
-        ctx.beginPath();
-        ctx.arc(sx2, top2 + headR, headR, 0, Math.PI * 2);
-        ctx.fill(); ctx.stroke();
-
-        // 眼睛
-        var es = Math.max(1.6, headR * 0.3);
-        ctx.fillStyle = "#FFD9A0";
-        ctx.beginPath(); ctx.arc(sx2 - headR * 0.42, top2 + headR * 0.95, es, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(sx2 + headR * 0.42, top2 + headR * 0.95, es, 0, Math.PI * 2); ctx.fill();
-
-        ctx.fillStyle = "rgba(255,150,110,.75)";
-        ctx.font = "700 " + Math.max(7, Math.round(hww * 0.3)) + "px Georgia, serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText("67", sx2, top2 + hhh * 0.66);
-        ctx.globalAlpha = 1;
-      } else {
-        var active = collected >= cubes.length;
-        var eh = Math.max(6, PROJ * 1.35 / d), ew = Math.max(3, PROJ * 0.55 / d);
-        var eTop = floorY - eh;
-        ctx.globalAlpha = Math.min(1, fade + 0.25);
-        if (active) { ctx.shadowColor = "rgba(159,211,174,.9)"; ctx.shadowBlur = 18; }
-        var eg = ctx.createLinearGradient(sx2, eTop, sx2, floorY);
-        if (active) { eg.addColorStop(0, "#EAF7EE"); eg.addColorStop(1, "#9FD3AE"); }
-        else { eg.addColorStop(0, "rgba(120,110,96,.7)"); eg.addColorStop(1, "rgba(60,52,44,.7)"); }
-        ctx.fillStyle = eg;
-        ctx.fillRect(sx2 - ew / 2, eTop, ew, eh);
-        ctx.shadowBlur = 0;
-        if (active) {
-          ctx.fillStyle = "rgba(255,255,255,.85)";
-          ctx.font = "700 " + Math.max(8, Math.round(ew * 0.8)) + "px Georgia, serif";
-          ctx.textAlign = "center"; ctx.textBaseline = "middle";
-          ctx.fillText("67", sx2, eTop + eh * 0.5);
-        }
-        ctx.globalAlpha = 1;
+      var hh = hunters[h];
+      var face = Math.atan2(px - hh.x, py - hh.y);
+      gl.uniformMatrix4fv(U.model, false, trs(hh.x, 0.34, hh.y, face, 0.5, 0.66, 0.5));
+      gl.uniform3f(U.tint, 0.52, 0.18, 0.10);
+      gl.drawArrays(gl.TRIANGLES, 0, 36);
+      gl.uniformMatrix4fv(U.model, false, trs(hh.x, 0.86, hh.y, face, 0.42, 0.4, 0.42));
+      gl.uniform3f(U.tint, 0.60, 0.22, 0.12);
+      gl.drawArrays(gl.TRIANGLES, 0, 36);
+      var fx = Math.sin(face), fz = Math.cos(face);
+      var rx2 = Math.cos(face), rz2 = -Math.sin(face);
+      gl.uniform3f(U.tint, 1.7, 1.2, 0.75);
+      for (var e2 = -1; e2 <= 1; e2 += 2) {
+        var ox = hh.x + fx * 0.17 + rx2 * 0.09 * e2;
+        var oz = hh.y + fz * 0.17 + rz2 * 0.09 * e2;
+        gl.uniformMatrix4fv(U.model, false, trs(ox, 0.88, oz, face, 0.075, 0.07, 0.075));
+        gl.drawArrays(gl.TRIANGLES, 0, 36);
       }
     }
 
-    // 轻微的呼吸式暗角
-    var vig = ctx.createRadialGradient(W / 2, H * 0.5, Math.min(W, H) * 0.35, W / 2, H * 0.5, Math.max(W, H) * 0.72);
-    vig.addColorStop(0, "rgba(0,0,0,0)");
-    vig.addColorStop(1, "rgba(0,0,0,.5)");
-    ctx.fillStyle = vig;
-    ctx.fillRect(0, 0, W, H);
+    // 出口的门（正反两面各画一张，绕过去看也不镜像）
+    var open = collected >= cubes.length;
+    gl.bindTexture(gl.TEXTURE_2D, texDoor);
+    gl.uniform1f(U.useTex, 1);
+    bindBuf(quadBuf);
+    var doorTintFront = open ? [1.45, 1.42, 1.34] : [0.66, 0.62, 0.58];
+    var dcx = exitCell.x + 0.5, dcz = exitCell.y + 0.5;
+    gl.uniform3f(U.tint, doorTintFront[0], doorTintFront[1], doorTintFront[2]);
+    gl.uniformMatrix4fv(U.model, false, trs(dcx, 0, dcz, exitFace, 0.66, 0.86, 1));
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.uniformMatrix4fv(U.model, false,
+      trs(dcx - Math.sin(exitFace) * 0.012, 0, dcz - Math.cos(exitFace) * 0.012, exitFace + Math.PI, 0.66, 0.86, 1));
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.uniform3f(U.tint, 1, 1, 1);
+
   }
 
   /* ---------------- 主循环 ---------------- */
@@ -761,7 +1029,7 @@
     var dt = Math.min(0.05, (t - last) / 1000);
     last = t;
     if (state === "run") update(dt);
-    render();
+    draw(t);
     requestAnimationFrame(frame);
   }
 
@@ -770,12 +1038,45 @@
     start();
   });
   document.getElementById("back").addEventListener("click", function(){
+    if (document.exitPointerLock) document.exitPointerLock();
     if (window.parent !== window) window.parent.postMessage("rtsx-close", "*");
     else location.href = "index.html";
   });
 
   setup();
+  if (isTouch) {
+    lockHint.style.display = "none";
+    document.getElementById("ovKeys").innerHTML = "手指在画面上滑动：上下左右转视角<br>下方居中摇杆：推着走，推到底就是跑";
+  }
   requestAnimationFrame(frame);
+
+  /* 调试钩子：只有 ?dbg=1 才挂到 window 上，正常访问不留痕迹 */
+  if (/[?&]dbg=1/.test(location.search)) window.__mz = {
+    info: function(){
+      return { state: state, px: px, py: py, yaw: yaw, pitch: pitch, collected: collected,
+               exit: exitCell, cubes: cubes.map(function(c){ return {x:c.x,y:c.y,got:c.got}; }),
+               hunters: hunters.map(function(h){ return {x:h.x,y:h.y,speed:h.speed}; }) };
+    },
+    step: function(dt){ update(dt); },
+    draw: function(t){ draw(t || 0); },
+    start: start,
+    setup: setup,
+    place: function(x, y, ya, pi){ px = x; py = y; if (ya != null) yaw = ya; if (pi != null) pitch = pi; },
+    keys: keys,
+    map: function(){ return map; },
+    park: function(){ hunters.forEach(function(h){ h.x = -99; h.y = -99; }); },
+    joy: joy,
+    gl: function(){ return { err: gl.getError(), lost: gl.isContextLost(), w: cv.width, h: cv.height }; },
+    pixels: function(){
+      draw(1900);                      // 同一次 JS tick 里先画再读，避免合成后缓冲被清空
+      var w = cv.width, h = cv.height;
+      var buf = new Uint8Array(w * h * 4);
+      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+      var sum = 0, nz = 0;
+      for (var i = 0; i < buf.length; i += 4) { var v = buf[i] + buf[i+1] + buf[i+2]; sum += v; if (v > 24) nz++; }
+      return { avg: sum / (buf.length / 4) / 3, lit: nz / (buf.length / 4) };
+    }
+  };
 })();
 </script>
 </body>
