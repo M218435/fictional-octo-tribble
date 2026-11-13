@@ -18,7 +18,8 @@
     user-select:none;-webkit-user-select:none;
     touch-action:manipulation;
   }
-  #cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:none;}
+  #cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:default;}
+  html.locked #cv{cursor:none;}
   .vig{
     position:absolute;inset:0;pointer-events:none;
     background:radial-gradient(ellipse 68% 58% at 50% 50%,rgba(0,0,0,0) 42%,rgba(0,0,0,.52) 100%);
@@ -70,10 +71,10 @@
     font-size:12px;color:var(--dim);white-space:nowrap;pointer-events:none;
   }
 
-  /* 摇杆：屏幕正下方居中，只负责移动（视角靠滑动/鼠标） */
+  /* 摇杆：左下角拇指位，只负责移动（视角靠右半屏滑动/鼠标） */
   .stick{
-    position:absolute;left:50%;bottom:calc(72px + env(safe-area-inset-bottom));
-    width:136px;height:136px;margin-left:-68px;border-radius:50%;
+    position:absolute;left:calc(18px + env(safe-area-inset-left));bottom:calc(26px + env(safe-area-inset-bottom));
+    width:132px;height:132px;border-radius:50%;
     display:none;touch-action:none;z-index:2;
     background:radial-gradient(circle at 50% 42%,rgba(60,52,44,.72) 0%,rgba(34,29,24,.72) 70%,rgba(24,20,17,.78) 100%);
     border:1px solid rgba(244,237,227,.18);
@@ -93,6 +94,18 @@
   @media (pointer:coarse), (max-width:640px){
     .stick{display:block;}
     .tip{display:none;}
+    /* 手机：返回/SFX 让到右上角，左下角整块留给摇杆 */
+    .ctl{
+      left:auto;right:calc(12px + env(safe-area-inset-right));bottom:auto;
+      top:calc(56px + env(safe-area-inset-top));gap:8px;
+    }
+    .ctl button{padding:7px 12px;font-size:11.5px;min-height:34px;}
+    .lockhint{display:none;}
+  }
+  @media (max-height:460px){
+    .stick{width:112px;height:112px;left:calc(12px + env(safe-area-inset-left));bottom:calc(14px + env(safe-area-inset-bottom));}
+    .stick::after{width:74px;height:74px;margin:-37px 0 0 -37px;}
+    .stick .knob{width:48px;height:48px;}
   }
 
   .warn{
@@ -158,7 +171,7 @@
     <div class="tag">第一人称 · 追逐</div>
     <h2 id="ovTitle">67 迷宫追逐战</h2>
     <p id="ovText">真 3D 的立体迷宫。捡齐 5 个 67 方块，出口的门才会亮；两个影子一直在寻路追你，被贴上就出局。</p>
-    <div class="keys" id="ovKeys">电脑：点击画面锁定鼠标，移动鼠标上下左右转视角<br>WASD 走动，Shift 冲刺，ESC 松开鼠标<br>手机：手指在画面上滑动转视角，下方摇杆移动</div>
+    <div class="keys" id="ovKeys">电脑：点击画面锁定鼠标，移动鼠标上下左右转视角<br>WASD 走动，Shift 冲刺，ESC 松鼠标＝暂停（点画面继续）<br>手机：右半屏滑动转视角，左下角摇杆移动</div>
     <button class="btn" id="ovBtn" type="button">进入迷宫</button>
   </div>
 </div>
@@ -690,6 +703,7 @@
   /* 鼠标锁定：点画面进锁定，ESC 解锁 */
   var locked = false;
   cv.addEventListener("click", function(){
+    setSoftPause(false);
     if (isTouch) return;
     if (!locked && cv.requestPointerLock) {
       try {
@@ -699,10 +713,23 @@
     }
     if (state === "ready") start();
   });
+  /* 软暂停：电脑上一松鼠标（ESC）就冻住世界，免得你去看菜单时被追兵贴脸 */
+  var softPaused = false;
+  function setSoftPause(on){
+    on = !!on;
+    if (softPaused === on) return;
+    softPaused = on;
+    if (lockHint){
+      lockHint.textContent = on ? "已暂停 · 点击画面继续" : "点击画面锁定鼠标";
+      lockHint.style.display = (on && !locked && !isTouch) ? "" : lockHint.style.display;
+    }
+  }
   document.addEventListener("pointerlockchange", function(){
     locked = document.pointerLockElement === cv;
-    if (lockHint) lockHint.style.display = locked ? "none" : "";
-    if (locked && state === "ready") start();
+    document.documentElement.classList.toggle("locked", locked);
+    if (lockHint) lockHint.style.display = (locked || isTouch) ? "none" : "";
+    if (locked) { setSoftPause(false); if (state === "ready") start(); }
+    else if (state === "run" && !isTouch) { setSoftPause(true); if (lockHint) lockHint.style.display = ""; }
   });
   document.addEventListener("pointerlockerror", function(){ locked = false; });
   document.addEventListener("mousemove", function(e){
@@ -716,6 +743,7 @@
   var lookId = null, lookX = 0, lookY = 0;
   cv.addEventListener("pointerdown", function(e){
     if (locked) return;
+    setSoftPause(false);
     lookId = e.pointerId; lookX = e.clientX; lookY = e.clientY;
     try { cv.setPointerCapture(lookId); } catch (err) {}
     if (state === "ready") start();
@@ -785,6 +813,7 @@
     if (state === "run") return;
     if (state !== "ready") setup();
     state = "run";
+    setSoftPause(false);
     overlay.classList.remove("show");
     lockHint.style.display = (isTouch || locked) ? "none" : "";
     SFX.click();
@@ -1028,7 +1057,7 @@
     if (!last) last = t;
     var dt = Math.min(0.05, (t - last) / 1000);
     last = t;
-    if (state === "run") update(dt);
+    if (state === "run" && !softPaused) update(dt);
     draw(t);
     requestAnimationFrame(frame);
   }
@@ -1046,7 +1075,7 @@
   setup();
   if (isTouch) {
     lockHint.style.display = "none";
-    document.getElementById("ovKeys").innerHTML = "手指在画面上滑动：上下左右转视角<br>下方居中摇杆：推着走，推到底就是跑";
+    document.getElementById("ovKeys").innerHTML = "右半屏手指滑动：上下左右转视角<br>左下角摇杆：推着走，推到底就是跑";
   }
   requestAnimationFrame(frame);
 
@@ -1066,6 +1095,8 @@
     map: function(){ return map; },
     park: function(){ hunters.forEach(function(h){ h.x = -99; h.y = -99; }); },
     joy: joy,
+    pause: function(v){ setSoftPause(v); },
+    paused: function(){ return softPaused; },
     gl: function(){ return { err: gl.getError(), lost: gl.isContextLost(), w: cv.width, h: cv.height }; },
     pixels: function(){
       draw(1900);                      // 同一次 JS tick 里先画再读，避免合成后缓冲被清空
