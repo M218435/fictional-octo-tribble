@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<link rel="icon" type="image/png" href="../../icon.png">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#080b10">
+<title>音效库 · RTSX</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{
+    background:radial-gradient(ellipse at 50% 0%,#101a1e,#05070a 60%);
+    color:#dff6f0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    min-height:100vh;padding:26px 18px 60px;
+  }
+  .wrap{max-width:980px;margin:0 auto;}
+  header{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap;
+    border-bottom:1px solid rgba(120,232,190,.14);padding-bottom:16px;}
+  h1{font-size:24px;font-weight:800;letter-spacing:.03em;
+    background:linear-gradient(90deg,#9dffe8,#c9fff5 50%,#ffa8ea);
+    -webkit-background-clip:text;background-clip:text;color:transparent;}
+  header p{margin-top:8px;font-size:12.5px;color:rgba(160,200,198,.72);letter-spacing:.04em;}
+  .tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .switch,.vol{display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(170,210,206,.8);
+    background:linear-gradient(180deg,rgba(24,46,46,.8),rgba(10,18,20,.85));
+    border:1px solid rgba(120,232,190,.2);border-radius:10px;padding:8px 12px;}
+  .switch input,.vol input{accent-color:#5fe3c0;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px;margin-top:22px;}
+  .card{
+    border-radius:14px;padding:14px 15px 13px;
+    background:linear-gradient(180deg,rgba(18,34,34,.82),rgba(8,14,16,.9));
+    border:1px solid rgba(120,232,190,.16);
+    box-shadow:0 10px 26px rgba(0,0,0,.35),inset 0 1px 0 rgba(180,255,235,.08);
+  }
+  .card h2{font-size:14px;font-weight:700;color:#a9f2df;display:flex;justify-content:space-between;align-items:center;}
+  .card h2 b{font-size:10px;font-weight:600;letter-spacing:.1em;color:rgba(150,196,192,.55);}
+  .rows{margin-top:10px;display:flex;flex-direction:column;gap:6px;}
+  .row{
+    display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:9px;
+    background:linear-gradient(180deg,rgba(10,22,24,.9),rgba(6,12,14,.9));
+    border:1px solid rgba(120,232,190,.08);
+  }
+  .row.on{border-color:rgba(120,232,190,.55);box-shadow:0 0 14px rgba(70,230,190,.16);}
+  .row input{accent-color:#5fe3c0;}
+  .row span{flex:1;font-size:12px;color:rgba(190,222,218,.92);}
+  .row em{font-style:normal;font-size:10.5px;color:rgba(150,190,188,.55);font-variant-numeric:tabular-nums;}
+  .row button{
+    border:1px solid rgba(120,232,190,.32);background:linear-gradient(180deg,rgba(30,66,60,.9),rgba(10,24,24,.9));
+    color:#b9ffe9;border-radius:8px;padding:5px 10px;font-size:11.5px;font-family:inherit;cursor:pointer;
+  }
+  .row button:active{transform:translateY(1px);}
+  .row button.now{background:linear-gradient(180deg,rgba(66,26,52,.9),rgba(22,10,18,.9));
+    border-color:rgba(255,120,200,.4);color:#ffd8f2;}
+  .foot{margin-top:26px;display:grid;gap:10px;grid-template-columns:1fr;}
+  .code{
+    border-radius:12px;padding:14px 16px;font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:11.5px;line-height:1.85;color:rgba(190,230,226,.9);
+    background:linear-gradient(180deg,rgba(8,18,20,.92),rgba(4,10,12,.95));
+    border:1px solid rgba(120,232,190,.14);white-space:pre-wrap;
+  }
+  .note{font-size:12px;line-height:1.8;color:rgba(150,190,188,.66);}
+  .back{color:#9fe8dc;text-decoration:none;font-size:12.5px;
+    border:1px solid rgba(120,232,190,.28);border-radius:10px;padding:8px 12px;
+    background:linear-gradient(180deg,rgba(24,44,44,.86),rgba(12,20,22,.9));}
+  @media (max-width:520px){h1{font-size:19px;} .grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>音效库 · 离线选择</h1>
+      <p>29 个本地 WAV，全部在 assets/sfx/ 里，断网也能响。点右侧播放试听，勾选即固定该音效。</p>
+    </div>
+    <div class="tools">
+      <label class="switch"><input type="checkbox" id="mute"> 静音</label>
+      <label class="vol">音量 <input type="range" id="vol" min="0" max="1" step="0.02" value="0.9"></label>
+      <a class="back" href="../../index.html">← 回主界面</a>
+    </div>
+  </header>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="foot">
+    <div class="code">// 页面只要引一行，离线可用（相对路径按所在目录调整）
+&lt;script src="../../assets/sfx/sfx.js"&gt;&lt;/script&gt;
+
+RTSXSFX.play("click");                 // 同类随机挑一个
+RTSXSFX.play("score", { volume: .85 });
+RTSXSFX.setPreference("click", "ui-click-2.wav");   // 固定选择，会记住
+RTSXSFX.setPreference("click", null);               // 恢复随机
+
+/* 想要"某个按钮固定某音效"： */
+&lt;button data-sfx="start"&gt;开始&lt;/button&gt;</div>
+    <div class="note">音效全部由 <code>tools/gen-sfx.js</code> 程序合成后写成 16-bit PCM WAV，没有外部素材、没有版权问题；重新生成就运行 <code>node gen-sfx.js</code>。清单见 <code>manifest.json</code>。</div>
+  </div>
+</div>
+
+<script src="sfx.js"></script>
+<script>
+(function(){
+  "use strict";
+  var grid = document.getElementById("grid");
+  var muteBox = document.getElementById("mute");
+  var volBox = document.getElementById("vol");
+
+  muteBox.checked = RTSXSFX.isMuted();
+  volBox.value = String(RTSXSFX.getVolume());
+
+  muteBox.addEventListener("change", function(){
+    RTSXSFX.mute(muteBox.checked);
+    if (!muteBox.checked) RTSXSFX.play("toggle");
+  });
+  volBox.addEventListener("input", function(){
+    RTSXSFX.setVolume(parseFloat(volBox.value));
+  });
+  volBox.addEventListener("change", function(){
+    RTSXSFX.play("click");
+  });
+
+  function render(){
+    var cat = RTSXSFX.catalog();
+    var html = "";
+    cat.forEach(function(g){
+      html += '<div class="card"><h2>' + g.label + '<b>' + g.key + ' · ' + g.files.length + '</b></h2><div class="rows">';
+      g.files.forEach(function(f){
+        html += '<div class="row' + (f.chosen ? ' on' : '') + '" data-group="' + g.key + '" data-file="' + f.file + '">' +
+                '<input type="radio" name="g-' + g.key + '" ' + (f.chosen ? 'checked' : '') + '>' +
+                '<span>' + f.file + '</span><em>' + f.ms + 'ms</em>' +
+                '<button type="button" data-try="1">▶ 试听</button></div>';
+      });
+      html += '</div><div class="rows"><div class="row" data-group="' + g.key + '" data-file="">' +
+              '<input type="radio" name="g-' + g.key + '" ' + (g.files.some(function(f){return f.chosen;}) ? '' : 'checked') + '>' +
+              '<span>随机（每次从上面几个里挑）</span><em>auto</em></div></div></div>';
+    });
+    grid.innerHTML = html;
+    RTSXSFX.bind(grid);
+  }
+
+  grid.addEventListener("click", function(e){
+    var btn = e.target.closest("button[data-try]");
+    var row = e.target.closest(".row");
+    if (!row) return;
+    var group = row.getAttribute("data-group");
+    var file = row.getAttribute("data-file");
+    if (btn) {
+      if (file) {
+        // 试听指定文件：临时直接播（不改偏好）
+        var a = new Audio(RTSXSFX.base + file);
+        a.volume = RTSXSFX.getVolume();
+        a.play().catch(function(){});
+        row.querySelector("button").classList.add("now");
+        setTimeout(function(){ row.querySelector("button").classList.remove("now"); }, 320);
+      } else {
+        RTSXSFX.setPreference(group, null);
+        render();
+        RTSXSFX.play(group);
+      }
+      return;
+    }
+    var radio = row.querySelector("input[type=radio]");
+    if (radio) radio.checked = true;
+    if (file) {
+      RTSXSFX.setPreference(group, file);
+      var a2 = new Audio(RTSXSFX.base + file);
+      a2.volume = RTSXSFX.getVolume();
+      a2.play().catch(function(){});
+    } else {
+      RTSXSFX.setPreference(group, null);
+      RTSXSFX.play(group);
+    }
+    render();
+  });
+
+  render();
+
+  // 页面内所有试听按钮也要响
+  document.addEventListener("click", function(e){
+    var t = e.target;
+    if (t && t.closest && t.closest(".back")) RTSXSFX.play("back");
+  });
+})();
+</script>
+</body>
+</html>

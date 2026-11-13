@@ -156,51 +156,29 @@
 
   </div>
 
+<script src="../../assets/sfx/sfx.js"></script>
 <script>
 (function(){
   var SFX = (function(){
-    var ctx = null, on = true, out = null;
-    try { on = localStorage.getItem("rtsx.sound.v1") !== "off"; } catch(e) {}
-    function ac(){
-      if (!ctx) {
-        var C = window.AudioContext || window.webkitAudioContext;
-        if (!C) return null;
-        try { ctx = new C(); } catch(e) { return null; }
+    var K = window.RTSXSFX;
+    function isOn(){ return K ? !K.isMuted() : false; }
+    return {
+      click: function(){ if (isOn()) K.play("click"); },
+      hover: function(){ if (isOn()) K.play("hover", { volume: 0.7 }); },
+      back:  function(){ if (isOn()) K.play("back"); },
+      isOn:  isOn,
+      set:   function(v){
+        if (!K) return;
+        K.mute(!v);
+        try { localStorage.setItem("rtsx.sound.v1", v ? "on" : "off"); } catch(e) {}
       }
-      if (ctx.state === "suspended") { try { ctx.resume(); } catch(e) {} }
-      if (!out) {
-        out = ctx.createDynamicsCompressor();      // 限制器：音量拉满也不炸耳朵
-        out.threshold.value = -2;
-        out.knee.value = 20;
-        out.ratio.value = 12;
-        out.attack.value = 0.004;
-        out.release.value = 0.2;
-        out.connect(ctx.destination);
-      }
-      return ctx;
-    }
-    function tone(f, dur, type, gain, delay, to){
-      if (!on) return;
-      var c = ac(); if (!c) return;
-      var t0 = c.currentTime + (delay || 0);
-      var o = c.createOscillator(), g = c.createGain();
-      o.type = type || "sine";
-      o.frequency.setValueAtTime(f, t0);
-      if (to) o.frequency.exponentialRampToValueAtTime(to, t0 + dur);
-      g.gain.setValueAtTime(0.0001, t0);
-      g.gain.exponentialRampToValueAtTime(Math.min(0.99, (gain || 0.05) * 14), t0 + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      o.connect(g); g.connect(out || c.destination);
-      o.start(t0); o.stop(t0 + dur + 0.03);
-    }
-    var api = {
-      click: function(){ tone(520, 0.055, "triangle", 0.045); },
-      isOn:  function(){ return on; },
-      set:   function(v){ on = v; try { localStorage.setItem("rtsx.sound.v1", v ? "on" : "off"); } catch(e) {} }
     };
-    window.addEventListener("storage", function(e){ if (e.key === "rtsx.sound.v1") on = e.newValue !== "off"; });
-    return api;
   })();
+
+  // 兼容旧开关值
+  try {
+    if (window.RTSXSFX && localStorage.getItem("rtsx.sound.v1") === "off") RTSXSFX.mute(true);
+  } catch(e) {}
 
   var sndBtn = document.getElementById("snd");
   function paintSnd(){ if (sndBtn) sndBtn.classList.toggle("off", !SFX.isOn()); }
@@ -212,6 +190,7 @@
 
   [].forEach.call(document.querySelectorAll("a.card"), function(a){
     a.addEventListener("click", function(){ SFX.click(); });
+    a.addEventListener("pointerenter", function(){ SFX.hover(); });
   });
 
   document.getElementById("back").addEventListener("click", function(){
