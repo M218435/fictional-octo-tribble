@@ -1,152 +1,155 @@
 {
-  "generatedAt": "2026-11-13T12:00:12.699Z",
+  "version": 2,
+  "sampleRate": 48000,
+  "channels": 2,
+  "generatedAt": "2026-11-13T12:42:22.057Z",
   "total": 29,
-  "bytes": 774352,
+  "bytes": 2009596,
   "files": [
     {
       "name": "ui-click-1.wav",
-      "bytes": 7542,
-      "ms": 85
+      "bytes": 19244,
+      "ms": 100
     },
     {
       "name": "ui-click-2.wav",
-      "bytes": 7542,
-      "ms": 85
+      "bytes": 19244,
+      "ms": 100
     },
     {
       "name": "ui-click-3.wav",
-      "bytes": 7542,
-      "ms": 85
+      "bytes": 19244,
+      "ms": 100
     },
     {
       "name": "ui-hover-1.wav",
-      "bytes": 11510,
-      "ms": 130
+      "bytes": 30764,
+      "ms": 160
     },
     {
       "name": "ui-hover-2.wav",
-      "bytes": 11510,
-      "ms": 130
+      "bytes": 30764,
+      "ms": 160
     },
     {
       "name": "ui-back-1.wav",
-      "bytes": 16802,
-      "ms": 190
+      "bytes": 46124,
+      "ms": 240
     },
     {
       "name": "ui-back-2.wav",
-      "bytes": 16802,
-      "ms": 190
+      "bytes": 46124,
+      "ms": 240
     },
     {
       "name": "score-1.wav",
-      "bytes": 29150,
-      "ms": 330
+      "bytes": 80684,
+      "ms": 420
     },
     {
       "name": "score-2.wav",
-      "bytes": 29150,
-      "ms": 330
+      "bytes": 80684,
+      "ms": 420
     },
     {
       "name": "score-3.wav",
-      "bytes": 29150,
-      "ms": 330
+      "bytes": 80684,
+      "ms": 420
     },
     {
       "name": "catch-1.wav",
-      "bytes": 26504,
-      "ms": 300
+      "bytes": 69164,
+      "ms": 360
     },
     {
       "name": "catch-2.wav",
-      "bytes": 26504,
-      "ms": 300
+      "bytes": 69164,
+      "ms": 360
     },
     {
       "name": "catch-3.wav",
-      "bytes": 26504,
-      "ms": 300
+      "bytes": 69164,
+      "ms": 360
     },
     {
       "name": "error-1.wav",
-      "bytes": 31796,
-      "ms": 360
+      "bytes": 80684,
+      "ms": 420
     },
     {
       "name": "error-2.wav",
-      "bytes": 31796,
-      "ms": 360
+      "bytes": 80684,
+      "ms": 420
     },
     {
       "name": "land-1.wav",
-      "bytes": 22976,
-      "ms": 260
+      "bytes": 57644,
+      "ms": 300
     },
     {
       "name": "land-2.wav",
-      "bytes": 22976,
-      "ms": 260
+      "bytes": 57644,
+      "ms": 300
     },
     {
       "name": "land-3.wav",
-      "bytes": 22976,
-      "ms": 260
+      "bytes": 57644,
+      "ms": 300
     },
     {
       "name": "glitch-1.wav",
-      "bytes": 30032,
-      "ms": 340
+      "bytes": 73004,
+      "ms": 380
     },
     {
       "name": "glitch-2.wav",
-      "bytes": 30032,
-      "ms": 340
+      "bytes": 73004,
+      "ms": 380
     },
     {
       "name": "glitch-3.wav",
-      "bytes": 30032,
-      "ms": 340
+      "bytes": 73004,
+      "ms": 380
     },
     {
       "name": "warn-1.wav",
-      "bytes": 37088,
-      "ms": 420
+      "bytes": 88364,
+      "ms": 460
     },
     {
       "name": "warn-2.wav",
-      "bytes": 37088,
-      "ms": 420
+      "bytes": 88364,
+      "ms": 460
     },
     {
       "name": "start-1.wav",
-      "bytes": 48554,
-      "ms": 550
+      "bytes": 119084,
+      "ms": 620
     },
     {
       "name": "start-2.wav",
-      "bytes": 48554,
-      "ms": 550
+      "bytes": 119084,
+      "ms": 620
     },
     {
       "name": "success-1.wav",
-      "bytes": 54728,
-      "ms": 620
+      "bytes": 157484,
+      "ms": 820
     },
     {
       "name": "success-2.wav",
-      "bytes": 54728,
-      "ms": 620
+      "bytes": 157484,
+      "ms": 820
     },
     {
       "name": "toggle-1.wav",
-      "bytes": 12392,
-      "ms": 140
+      "bytes": 32684,
+      "ms": 170
     },
     {
       "name": "toggle-2.wav",
-      "bytes": 12392,
-      "ms": 140
+      "bytes": 32684,
+      "ms": 170
     }
   ]
 }

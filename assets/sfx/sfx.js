@@ -51,18 +51,25 @@
   };
 
   var DURATION = {
-    "ui-click-1.wav": 85, "ui-click-2.wav": 85, "ui-click-3.wav": 85,
-    "ui-hover-1.wav": 130, "ui-hover-2.wav": 130,
-    "ui-back-1.wav": 190, "ui-back-2.wav": 190,
-    "score-1.wav": 330, "score-2.wav": 330, "score-3.wav": 330,
-    "catch-1.wav": 300, "catch-2.wav": 300, "catch-3.wav": 300,
-    "error-1.wav": 360, "error-2.wav": 360,
-    "land-1.wav": 260, "land-2.wav": 260, "land-3.wav": 260,
-    "glitch-1.wav": 340, "glitch-2.wav": 340, "glitch-3.wav": 340,
-    "warn-1.wav": 420, "warn-2.wav": 420,
-    "start-1.wav": 550, "start-2.wav": 550,
-    "success-1.wav": 620, "success-2.wav": 620,
-    "toggle-1.wav": 140, "toggle-2.wav": 140
+    "ui-click-1.wav": 100, "ui-click-2.wav": 100, "ui-click-3.wav": 100,
+    "ui-hover-1.wav": 160, "ui-hover-2.wav": 160,
+    "ui-back-1.wav": 240, "ui-back-2.wav": 240,
+    "score-1.wav": 420, "score-2.wav": 420, "score-3.wav": 420,
+    "catch-1.wav": 360, "catch-2.wav": 360, "catch-3.wav": 360,
+    "error-1.wav": 420, "error-2.wav": 420,
+    "land-1.wav": 300, "land-2.wav": 300, "land-3.wav": 300,
+    "glitch-1.wav": 380, "glitch-2.wav": 380, "glitch-3.wav": 380,
+    "warn-1.wav": 460, "warn-2.wav": 460,
+    "start-1.wav": 620, "start-2.wav": 620,
+    "success-1.wav": 820, "success-2.wav": 820,
+    "toggle-1.wav": 170, "toggle-2.wav": 170
+  };
+
+  // 各类音效的默认响度（打击类压低，提示类适中）
+  var GAIN = {
+    click: 0.72, hover: 0.5, back: 0.72, toggle: 0.6,
+    score: 0.85, catch: 0.85, success: 0.85, start: 0.8,
+    error: 0.7, warn: 0.75, land: 0.7, glitch: 0.6
   };
 
   /* ---------- 状态 ---------- */
@@ -70,7 +77,7 @@
   var PREF_KEY = "rtsx.sfx.pref";
   var VOL_KEY = "rtsx.sfx.vol";
 
-  var muted = false, master = 0.9;
+  var muted = false, master = 0.75;
   var prefs = {};
   var lastPick = {};
   var pools = {};        // file -> [HTMLAudioElement, ...]
@@ -139,7 +146,8 @@
     if (muted) return file;
     var o = opts || {};
     var el = freeElement(file);
-    var vol = Math.max(0, Math.min(1, master * (o.volume == null ? 1 : o.volume)));
+    var g = (GAIN[group] == null ? 0.8 : GAIN[group]);
+    var vol = Math.max(0, Math.min(1, master * g * (o.volume == null ? 1 : o.volume)));
     if (liveCount > 3) vol *= 0.6;
     try {
       el.volume = vol;

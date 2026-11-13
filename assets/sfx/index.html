@@ -135,6 +135,16 @@ RTSXSFX.setPreference("click", null);               // 恢复随机
     });
     grid.innerHTML = html;
     RTSXSFX.bind(grid);
+
+    // 重建 DOM 后按偏好显式同步勾选状态，避免属性被浏览器忽略导致"看起来没选中"
+    [].forEach.call(grid.querySelectorAll(".row"), function(row){
+      var gk = row.getAttribute("data-group"), fn = row.getAttribute("data-file");
+      var pref = RTSXSFX.getPreference(gk);
+      var on = pref ? (fn === pref) : !fn;
+      var input = row.querySelector("input[type=radio]");
+      if (input) input.checked = !!on;
+      row.classList.toggle("on", !!(on && pref));
+    });
   }
 
   grid.addEventListener("click", function(e){

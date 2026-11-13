@@ -1,243 +1,357 @@
 /**
- * RTSX 音效生成器（离线、无版权素材）
- * 用程序合成 16-bit PCM WAV，直接产出 assets/sfx/*.wav
+ * RTSX 音效生成器 v2
+ * 48kHz 立体声 16-bit PCM，程序合成；加入柔化包络、低通、类混响尾音、软限幅
  * 运行： node gen-sfx.js
  */
 const fs = require("fs");
 const path = require("path");
 
-const SR = 44100;
+const SR = 48000;
 const OUT = path.join(__dirname, "..");
 const FILES = [];
 
-function buf(dur) { return new Float32Array(Math.max(1, Math.round(dur * SR))); }
-function idx(t) { return Math.round(t * SR); }
+/* ---------- 基础 ---------- */
+function make(dur) {
+  const n = Math.round(dur * SR);
+  return { n: n, L: new Float32Array(n), R: new Float32Array(n) };
+}
+function t2i(t) { return Math.round(t * SR); }
 
-function sine(b, o) {
-  const start = idx(o.start || 0);
-  const dur = o.dur || 0.2;
-  const n = idx(dur);
-  const f0 = o.freq || 440, f1 = o.sweepTo || f0;
-  const amp = o.amp == null ? 0.6 : o.amp;
-  const decay = o.decay == null ? 3 : o.decay;
-  const attack = o.attack == null ? 0.004 : o.attack;
-  let ph = 0;
+function mixStereo(buf, i, v, pan) {
+  if (i < 0 || i >= buf.n) return;
+  const p = pan || 0;                 // -1..1
+  const l = Math.sqrt((1 - p) * 0.5) * 1.414;
+  const r = Math.sqrt((1 + p) * 0.5) * 1.414;
+  buf.L[i] += v * l * 0.5;
+  buf.R[i] += v * r * 0.5;
+}
+
+/* 正弦层：可扫频 + 软攻击 + 双指数尾巴 */
+function tone(buf, o) {
+  const start = t2i(o.start || 0);
+  const n = t2i(o.dur || 0.2);
+  const f0 = o.freq || 440;
+  const f1 = o.to == null ? f0 : o.to;
+  const amp = o.amp == null ? 0.5 : o.amp;
+  const atk = t2i(o.attack == null ? 0.006 : o.attack);
+  const d1 = o.decay == null ? 12 : o.decay;      // 主衰减速度
+  const d2 = o.tail == null ? 2.4 : o.tail;       // 尾巴衰减
+  let ph = (o.phase || 0) * Math.PI * 2;
   for (let i = 0; i < n; i++) {
     const k = i / n;
-    const f = f0 + (f1 - f0) * k;
+    const f = f0 + (f1 - f0) * Math.pow(k, o.curve == null ? 1 : o.curve);
     ph += (2 * Math.PI * f) / SR;
     let e;
-    if (i < idx(attack)) e = i / Math.max(1, idx(attack));
-    else e = Math.exp(-decay * (k - attack / dur));
-    const s = Math.sin(ph) * amp * e;
-    const j = start + i;
-    if (j < b.length) b[j] += s;
+    if (i < atk) { const a = i / Math.max(1, atk); e = a * a * (3 - 2 * a); }
+    else {
+      const kk = (i - atk) / Math.max(1, n - atk);
+      e = 0.55 * Math.exp(-d1 * kk) + 0.45 * Math.exp(-d2 * kk);
+    }
+    mixStereo(buf, start + i, Math.sin(ph) * amp * e, o.pan || 0);
   }
 }
 
-function noise(b, o) {
-  const start = idx(o.start || 0);
-  const n = idx(o.dur || 0.2);
-  const amp = o.amp == null ? 0.4 : o.amp;
-  const decay = o.decay == null ? 4 : o.decay;
-  const lp = o.lowpass == null ? 0.35 : o.lowpass;   // 0..1 越小越闷
-  let z = 0;
+/* 噪声层：低通+高通近似带通，适合"气声/摩擦" */
+function noise(buf, o) {
+  const start = t2i(o.start || 0);
+  const n = t2i(o.dur || 0.15);
+  const amp = o.amp == null ? 0.3 : o.amp;
+  const lp = o.lp == null ? 0.25 : o.lp;     // 低通系数（越小越闷）
+  const hpA = o.hp == null ? 0 : o.hp;       // 高通系数
+  const decay = o.decay == null ? 10 : o.decay;
+  let z = 0, hz = 0;
   for (let i = 0; i < n; i++) {
     const k = i / n;
     const raw = Math.random() * 2 - 1;
     z += lp * (raw - z);
+    hz += hpA * (z - hz);
+    const sig = z - hz;
     const e = Math.exp(-decay * k);
-    const j = start + i;
-    if (j < b.length) b[j] += z * amp * e;
+    mixStereo(buf, start + i, sig * amp * e, o.pan || 0);
   }
 }
 
-function bell(b, o) {
-  // 基频 + 泛音，做"叮"的金属感
-  const parts = o.parts || [1, 2.01, 3.02, 4.98];
-  const amps = o.amps || [1, 0.45, 0.28, 0.14];
-  const base = o.freq || 880;
-  const start = o.start || 0;
-  const decay = o.decay == null ? 2.2 : o.decay;
+/* 金属/木质混合：非谐泛音，听起来不"电子" */
+function chime(buf, o) {
+  const base = o.freq || 660;
+  const parts = o.parts || [1, 2.32, 3.71, 5.1];
+  const amps = o.amps || [1, 0.42, 0.24, 0.12];
+  const decay = o.decay == null ? 9 : o.decay;
+  const dur = o.dur || 0.34;
   const amp = o.amp == null ? 0.5 : o.amp;
   parts.forEach((m, i) => {
-    sine(b, { freq: base * m, amp: amp * amps[i], start, dur: o.dur || 0.4, decay: decay * (1 + i * 0.6) });
+    tone(buf, {
+      freq: base * m, amp: amp * amps[i], dur: dur * (1 - i * 0.08),
+      start: o.start || 0, decay: decay * (1 + i * 1.15), tail: 3.2,
+      attack: 0.004, pan: (o.pan || 0) + (i - 1.5) * 0.06
+    });
   });
 }
 
-function hp(b, cutoff) {
-  // 简单一阶高通，让噪声更像"气声"
-  let z = 0;
-  const a = Math.min(0.99, cutoff / SR * 2 * Math.PI);
-  for (let i = 0; i < b.length; i++) {
-    z += a * (b[i] - z);
-    b[i] -= z;
-  }
+/* 类混响：几组短延迟反馈，给尾音一点空间感（不适合做大厅，只做"房间"） */
+function room(buf, mix) {
+  const taps = [
+    { d: 0.0091, g: 0.42 }, { d: 0.0137, g: 0.36 },
+    { d: 0.0193, g: 0.30 }, { d: 0.0267, g: 0.22 }
+  ];
+  const chans = [buf.L, buf.R];
+  chans.forEach((ch, ci) => {
+    const src = Float32Array.from(ch);
+    const acc = new Float32Array(buf.n);
+    taps.forEach((t, ti) => {
+      const del = t2i(t.d * (ci ? 1.12 : 1.0)) + ti;
+      const g = t.g * (mix == null ? 1 : mix);
+      let prev = 0;
+      for (let i = del; i < buf.n; i++) {
+        let v = src[i - del];
+        prev += 0.35 * (v - prev);          // 让尾音偏暗
+        acc[i] += prev * g;
+      }
+    });
+    // 湿声叠加
+    for (let i = 0; i < buf.n; i++) ch[i] += acc[i] * 0.55;
+  });
 }
 
-function normalize(b, peak) {
+/* 软化：低通去除毛刺，然后软限幅 */
+function smooth(buf, cutoff) {
+  const a = Math.min(0.95, (cutoff || 5200) / SR * 2 * Math.PI);
+  [buf.L, buf.R].forEach(ch => {
+    let z = 0;
+    for (let i = 0; i < buf.n; i++) { z += a * (ch[i] - z); ch[i] = z; }
+  });
+}
+
+function limit(buf, peak) {
+  const p = peak || 0.72;
   let mx = 0;
-  for (let i = 0; i < b.length; i++) mx = Math.max(mx, Math.abs(b[i]));
-  if (mx < 1e-6) return;
-  const g = peak / mx;
-  for (let i = 0; i < b.length; i++) b[i] *= g;
+  [buf.L, buf.R].forEach(ch => { for (let i = 0; i < ch.length; i++) mx = Math.max(mx, Math.abs(ch[i])); });
+  if (mx < 1e-7) return;
+  const g = p / mx;
+  [buf.L, buf.R].forEach(ch => {
+    for (let i = 0; i < ch.length; i++) {
+      const x = ch[i] * g;
+      ch[i] = Math.tanh(x * 1.05) * 0.96;   // 软限幅，去掉硬削的刺耳
+    }
+  });
 }
 
-function fadeEdges(b, ms) {
-  const n = Math.min(idx(ms / 1000), (b.length / 2) | 0);
+/* 只软化尾部，起音保留冲击感；顺带去掉直流偏置 */
+function fade(buf, ms) {
+  const n = Math.min(t2i(ms / 1000), Math.floor(buf.n / 2));
   for (let i = 0; i < n; i++) {
     const k = i / n;
-    b[i] *= k;
-    b[b.length - 1 - i] *= k;
+    buf.L[buf.n - 1 - i] *= k; buf.R[buf.n - 1 - i] *= k;
   }
+  [buf.L, buf.R].forEach(ch => {
+    let m = 0;
+    for (let i = 0; i < ch.length; i++) m += ch[i];
+    m /= ch.length;
+    for (let i = 0; i < ch.length; i++) ch[i] -= m;
+  });
 }
 
-function save(name, b, peak) {
-  normalize(b, peak || 0.9);
-  fadeEdges(b, 4);
-  const n = b.length;
-  const data = Buffer.alloc(44 + n * 2);
+function save(name, buf, peak) {
+  // 先软限幅到 1.0，再统一峰值到 0.8；各类响度由 sfx.js 的 GAIN 控制
+  limit(buf, 1.0);
+  (function () {
+    let pk = 0;
+    [buf.L, buf.R].forEach(ch => { for (let i = 0; i < ch.length; i++) pk = Math.max(pk, Math.abs(ch[i])); });
+    if (pk > 1e-6) {
+      const g = 0.8 / pk;
+      [buf.L, buf.R].forEach(ch => { for (let i = 0; i < ch.length; i++) ch[i] *= g; });
+    }
+  })();
+  fade(buf, 6);
+  const n = buf.n;
+  const data = Buffer.alloc(44 + n * 4);
   data.write("RIFF", 0);
-  data.writeUInt32LE(36 + n * 2, 4);
+  data.writeUInt32LE(36 + n * 4, 4);
   data.write("WAVE", 8);
   data.write("fmt ", 12);
   data.writeUInt32LE(16, 16);
   data.writeUInt16LE(1, 20);
-  data.writeUInt16LE(1, 22);
+  data.writeUInt16LE(2, 22);          // 双声道
   data.writeUInt32LE(SR, 24);
-  data.writeUInt32LE(SR * 2, 28);
-  data.writeUInt16LE(2, 32);
+  data.writeUInt32LE(SR * 4, 28);
+  data.writeUInt16LE(4, 32);
   data.writeUInt16LE(16, 34);
   data.write("data", 36);
-  data.writeUInt32LE(n * 2, 40);
+  data.writeUInt32LE(n * 4, 40);
   for (let i = 0; i < n; i++) {
-    let v = Math.max(-1, Math.min(1, b[i])) * 32767;
-    data.writeInt16LE(v < 0 ? v - 0.5 | 0 : v + 0.5 | 0, 44 + i * 2);
+    let l = Math.max(-1, Math.min(1, buf.L[i])) * 32767;
+    let r = Math.max(-1, Math.min(1, buf.R[i])) * 32767;
+    data.writeInt16LE(l < 0 ? l - 0.5 | 0 : l + 0.5 | 0, 44 + i * 4);
+    data.writeInt16LE(r < 0 ? r - 0.5 | 0 : r + 0.5 | 0, 46 + i * 4);
   }
-  const file = path.join(OUT, name + ".wav");
-  fs.writeFileSync(file, data);
+  fs.writeFileSync(path.join(OUT, name + ".wav"), data);
   FILES.push({ name: name + ".wav", bytes: data.length, ms: Math.round(n / SR * 1000) });
 }
 
-/* ---------------- 逐个音效 ---------------- */
-
-// UI 点击：干脆的短促 tick
-[1250, 980, 1560].forEach((f, i) => {
-  const b = buf(0.085);
-  sine(b, { freq: f, amp: 0.55, decay: 7, attack: 0.002 });
-  sine(b, { freq: f * 1.9, amp: 0.18, decay: 10 });
-  noise(b, { amp: 0.12, dur: 0.03, decay: 8, lowpass: 0.9 });
-  save("ui-click-" + (i + 1), b, 0.82);
+/* ======================================================================
+   1. 点击：木质轻叩（低频body + 高频柔tick + 一点气），不刺耳
+   ====================================================================== */
+[
+  { f: 1180, body: 210, pan: -0.1 },
+  { f: 980, body: 176, pan: 0.12 },
+  { f: 1420, body: 240, pan: 0.0 }
+].forEach((v, i) => {
+  const b = make(0.10);
+  tone(b, { freq: v.body, amp: 0.30, dur: 0.085, decay: 26, tail: 6, attack: 0.004, pan: v.pan });
+  tone(b, { freq: v.f, amp: 0.34, dur: 0.055, decay: 40, tail: 9, attack: 0.002, pan: v.pan + 0.04 });
+  noise(b, { amp: 0.10, dur: 0.035, decay: 30, lp: 0.6, hp: 0.02, pan: v.pan });
+  room(b, 0.35);
+  smooth(b, 6000);
+  save("ui-click-" + (i + 1), b, 0.62);
 });
 
-// UI 悬停：极轻的软 blip
-[620, 720].forEach((f, i) => {
-  const b = buf(0.13);
-  sine(b, { freq: f, amp: 0.22, decay: 5, attack: 0.006, sweepTo: f * 1.08 });
-  save("ui-hover-" + (i + 1), b, 0.6);
+/* 2. 悬停：一声很轻的呼吸 */
+[
+  { f: 540, pan: -0.15 },
+  { f: 620, pan: 0.15 }
+].forEach((v, i) => {
+  const b = make(0.16);
+  tone(b, { freq: v.f, to: v.f * 1.09, amp: 0.18, dur: 0.15, decay: 22, tail: 6, attack: 0.012, pan: v.pan, curve: 2 });
+  noise(b, { amp: 0.05, dur: 0.12, decay: 16, lp: 0.14, hp: 0.01, pan: v.pan });
+  room(b, 0.5);
+  smooth(b, 4200);
+  save("ui-hover-" + (i + 1), b, 0.36);
 });
 
-// 返回：下滑
-[900, 1100].forEach((f, i) => {
-  const b = buf(0.19);
-  sine(b, { freq: f, sweepTo: f * 0.45, amp: 0.4, decay: 4, attack: 0.005 });
-  noise(b, { amp: 0.06, dur: 0.08, decay: 6, lowpass: 0.5 });
-  save("ui-back-" + (i + 1), b, 0.78);
+/* 3. 返回：往下走的气声 */
+[
+  { f: 760, pan: 0.1 },
+  { f: 900, pan: -0.1 }
+].forEach((v, i) => {
+  const b = make(0.24);
+  tone(b, { freq: v.f, to: v.f * 0.46, amp: 0.26, dur: 0.22, decay: 14, tail: 4, attack: 0.008, pan: v.pan, curve: 1.6 });
+  noise(b, { amp: 0.16, dur: 0.2, decay: 12, lp: 0.2, hp: 0.005, pan: v.pan });
+  room(b, 0.45);
+  smooth(b, 4800);
+  save("ui-back-" + (i + 1), b, 0.5);
 });
 
-// 得分：明亮叮声
-[1046, 1318, 1568].forEach((f, i) => {
-  const b = buf(0.33);
-  bell(b, { freq: f, amp: 0.55, dur: 0.3, decay: 2.4, parts: [1, 2.01, 3.05], amps: [1, 0.4, 0.2] });
-  save("score-" + (i + 1), b, 0.86);
+/* 4. 得分：温暖的三音叮（弱不谐和，带房间尾音） */
+[784, 988, 1174].forEach((f, i) => {
+  const b = make(0.42);
+  chime(b, { freq: f, amp: 0.42, dur: 0.30, decay: 11, parts: [1, 2.18, 3.44, 5.2], amps: [1, 0.36, 0.18, 0.08] });
+  tone(b, { freq: f * 0.5, amp: 0.10, dur: 0.34, decay: 16, tail: 5, attack: 0.01 });
+  room(b, 0.7);
+  smooth(b, 5200);
+  save("score-" + (i + 1), b, 0.58);
 });
 
-// 收下/接住：带一点闪光的拨弦
-[440, 523, 622].forEach((f, i) => {
-  const b = buf(0.30);
-  sine(b, { freq: f, amp: 0.5, decay: 3.4, attack: 0.003, sweepTo: f * 1.12 });
-  sine(b, { freq: f * 2.4, amp: 0.16, decay: 6 });
-  noise(b, { amp: 0.10, dur: 0.07, decay: 7, lowpass: 0.95 });
-  save("catch-" + (i + 1), b, 0.88);
+/* 5. 接住：温润的拨弦 + 细碎亮片 */
+[392, 466, 554].forEach((f, i) => {
+  const b = make(0.36);
+  tone(b, { freq: f, to: f * 1.05, amp: 0.40, dur: 0.3, decay: 13, tail: 4, attack: 0.006, curve: 2 });
+  tone(b, { freq: f * 2.02, amp: 0.14, dur: 0.2, decay: 20, tail: 6, attack: 0.004, pan: 0.2 });
+  noise(b, { amp: 0.09, dur: 0.12, decay: 14, lp: 0.5, hp: 0.02, pan: -0.2 });
+  chime(b, { freq: f * 3.1, amp: 0.10, dur: 0.1, start: 0.05, decay: 26, parts: [1, 1.9], amps: [1, 0.3] });
+  room(b, 0.55);
+  smooth(b, 6000);
+  save("catch-" + (i + 1), b, 0.6);
 });
 
-// 错误 / 拒绝：低频嗡
-[150, 128].forEach((f, i) => {
-  const b = buf(0.36);
-  sine(b, { freq: f, amp: 0.5, decay: 2.6, attack: 0.006, sweepTo: f * 1.35 });
-  sine(b, { freq: f * 0.5, amp: 0.25, decay: 2.0 });
-  noise(b, { amp: 0.08, dur: 0.2, decay: 3, lowpass: 0.18 });
-  save("error-" + (i + 1), b, 0.9);
+/* 6. 错误：闷住的低音 + 一点干涩，不做电子蜂鸣 */
+[
+  { f: 132, lp: 0.06, pan: -0.08 },
+  { f: 108, lp: 0.05, pan: 0.08 }
+].forEach((v, i) => {
+  const b = make(0.42);
+  tone(b, { freq: v.f, to: v.f * 1.14, amp: 0.36, dur: 0.4, decay: 11, tail: 3.4, attack: 0.014, pan: v.pan, curve: 1.4 });
+  tone(b, { freq: v.f * 2.3, amp: 0.10, dur: 0.24, decay: 18, tail: 5, attack: 0.01 });
+  noise(b, { amp: 0.14, dur: 0.32, decay: 10, lp: v.lp, hp: 0.004, pan: v.pan });
+  room(b, 0.4);
+  smooth(b, 3000);
+  save("error-" + (i + 1), b, 0.5);
 });
 
-// 落地：闷重撞击
+/* 7. 落地：闷重，低频下沉 */
 [0, 1, 2].forEach((i) => {
-  const b = buf(0.26);
-  sine(b, { freq: 68 + i * 9, amp: 0.5, decay: 3.2, attack: 0.005 });
-  sine(b, { freq: 130 + i * 14, amp: 0.22, decay: 5 });
-  noise(b, { amp: 0.34, dur: 0.07, decay: 6, lowpass: 0.22 });
-  save("land-" + (i + 1), b, 0.9);
+  const b = make(0.30);
+  const f = 54 + i * 7;
+  tone(b, { freq: f, to: f * 0.82, amp: 0.42, dur: 0.29, decay: 15, tail: 3.2, attack: 0.008, curve: 1.2 });
+  tone(b, { freq: f * 2.6, amp: 0.16, dur: 0.16, decay: 22, tail: 4, attack: 0.006 });
+  noise(b, { amp: 0.30, dur: 0.10, decay: 18, lp: 0.09, hp: 0.002, pan: (i - 1) * 0.15 });
+  room(b, 0.45);
+  smooth(b, 2600);
+  save("land-" + (i + 1), b, 0.56);
 });
 
-// 异常体 / 故障：门限噪声 + 方波扫频
+/* 8. 异常体：数字故障但压住高频，听感"脏而不炸" */
 [0, 1, 2].forEach((v) => {
-  const b = buf(0.34);
-  const f0 = 200 + v * 30;
-  sine(b, { freq: f0, sweepTo: f0 * 2.6, amp: 0.32, decay: 1.4, attack: 0.004 });
-  sine(b, { freq: f0 * 1.7, sweepTo: f0 * 0.6, amp: 0.18, decay: 1.8 });
-  noise(b, { amp: 0.5, dur: 0.3, decay: 1.2, lowpass: 0.85 });
-  // 门限：每 0.02 秒开关一次，做出数字故障感
-  for (let i = 0; i < b.length; i++) {
-    const gate = Math.sin(i / SR * Math.PI * 2 * 26) > 0 ? 1 : 0.25;
-    b[i] *= gate;
+  const b = make(0.38);
+  const f0 = 168 + v * 26;
+  tone(b, { freq: f0, to: f0 * 2.2, amp: 0.26, dur: 0.34, decay: 9, tail: 3, attack: 0.006, curve: 1.8 });
+  tone(b, { freq: f0 * 2.7, to: f0 * 0.9, amp: 0.14, dur: 0.3, decay: 12, tail: 3.4, attack: 0.008 });
+  noise(b, { amp: 0.34, dur: 0.34, decay: 6.5, lp: 0.3, hp: 0.03 });
+  for (let i = 0; i < b.n; i++) {
+    const gate = Math.sin(i / SR * Math.PI * 2 * 18 + v) > -0.2 ? 1 : 0.32;
+    b.L[i] *= gate; b.R[i] *= gate;
   }
-  hp(b, 120);
-  save("glitch-" + (v + 1), b, 0.86);
+  room(b, 0.5);
+  smooth(b, 5200);
+  save("glitch-" + (v + 1), b, 0.55);
 });
 
-// 警告：两声短促提示
-[520, 640].forEach((f, i) => {
-  const b = buf(0.42);
-  sine(b, { freq: f, amp: 0.42, decay: 9, attack: 0.005, dur: 0.13 });
-  sine(b, { freq: f * 1.06, amp: 0.17, decay: 9, dur: 0.13, start: 0.16 });
-  save("warn-" + (i + 1), b, 0.84);
+/* 9. 警告：两下低调的提示，像设备提示音 */
+[
+  { f: 440, pan: -0.06 },
+  { f: 523, pan: 0.06 }
+].forEach((v, i) => {
+  const b = make(0.46);
+  tone(b, { freq: v.f, amp: 0.30, dur: 0.15, decay: 14, tail: 5, attack: 0.01, pan: v.pan });
+  tone(b, { freq: v.f * 1.02, amp: 0.14, dur: 0.15, decay: 16, tail: 6, attack: 0.012, start: 0.2, pan: v.pan });
+  room(b, 0.55);
+  smooth(b, 4000);
+  save("warn-" + (i + 1), b, 0.5);
 });
 
-// 开始：上冲能量
+/* 10. 开始：上冲的能量，带厚度 */
 [0, 1].forEach((v) => {
-  const b = buf(0.55);
-  sine(b, { freq: 220 + v * 40, sweepTo: 880 + v * 120, amp: 0.45, decay: 1.1, attack: 0.01 });
-  sine(b, { freq: 330, sweepTo: 1320, amp: 0.2, decay: 1.4, attack: 0.02 });
-  noise(b, { amp: 0.12, dur: 0.4, decay: 1.6, lowpass: 0.6 });
-  save("start-" + (v + 1), b, 0.88);
+  const b = make(0.62);
+  tone(b, { freq: 196 + v * 30, to: 760 + v * 90, amp: 0.34, dur: 0.5, decay: 6.5, tail: 2.6, attack: 0.02, curve: 2.2, pan: -0.05 });
+  tone(b, { freq: 296 + v * 40, to: 1180 + v * 120, amp: 0.16, dur: 0.42, decay: 9, tail: 3.2, attack: 0.03, curve: 2.4, pan: 0.08 });
+  noise(b, { amp: 0.10, dur: 0.44, decay: 5.5, lp: 0.4, hp: 0.01 });
+  room(b, 0.6);
+  smooth(b, 6000);
+  save("start-" + (v + 1), b, 0.56);
 });
 
-// 完成：琶音
+/* 11. 完成：四音上行，尾巴长一点 */
 [0, 1].forEach((v) => {
-  const b = buf(0.62);
-  const notes = v === 0 ? [523, 659, 784, 1046] : [587, 740, 880, 1174];
+  const b = make(0.82);
+  const notes = v === 0 ? [523, 659, 784, 1046] : [587, 698, 880, 1174];
   notes.forEach((f, i) => {
-    bell(b, { freq: f, amp: 0.42, start: i * 0.09, dur: 0.3, decay: 3.0 });
+    chime(b, { freq: f, amp: 0.26, start: i * 0.1, dur: 0.34, decay: 14, parts: [1, 2.1, 3.5], amps: [1, 0.3, 0.14] });
   });
-  save("success-" + (v + 1), b, 0.86);
+  room(b, 0.85);
+  smooth(b, 5200);
+  save("success-" + (v + 1), b, 0.54);
 });
 
-// 开关：双击咔嗒
+/* 12. 开关：两下小咔哒 */
 [0, 1].forEach((v) => {
-  const b = buf(0.14);
-  sine(b, { freq: 1500 - v * 200, amp: 0.4, decay: 12, attack: 0.002, dur: 0.03 });
-  sine(b, { freq: 900 + v * 150, amp: 0.3, decay: 12, attack: 0.002, dur: 0.03, start: 0.055 });
-  noise(b, { amp: 0.14, dur: 0.02, decay: 10, lowpass: 0.95 });
-  save("toggle-" + (v + 1), b, 0.8);
+  const b = make(0.17);
+  tone(b, { freq: 900 - v * 90, amp: 0.24, dur: 0.04, decay: 40, tail: 10, attack: 0.002, pan: -0.08 });
+  tone(b, { freq: 640 + v * 60, amp: 0.18, dur: 0.05, decay: 36, tail: 9, attack: 0.002, start: 0.06, pan: 0.08 });
+  noise(b, { amp: 0.10, dur: 0.025, decay: 30, lp: 0.5, hp: 0.01 });
+  room(b, 0.25);
+  smooth(b, 5000);
+  save("toggle-" + (v + 1), b, 0.45);
 });
 
-/* ---------------- 清单 ---------------- */
+/* ---------- 清单 ---------- */
 const manifest = {
+  version: 2,
+  sampleRate: SR,
+  channels: 2,
   generatedAt: new Date().toISOString(),
   total: FILES.length,
   bytes: FILES.reduce((s, f) => s + f.bytes, 0),
   files: FILES
 };
 fs.writeFileSync(path.join(OUT, "manifest.json"), JSON.stringify(manifest, null, 2));
-console.log("files=" + FILES.length + "  total=" + (manifest.bytes / 1024).toFixed(1) + " KB");
+console.log("v2 files=" + FILES.length + "  total=" + (manifest.bytes / 1024).toFixed(1) + " KB");
 FILES.forEach(f => console.log("  " + f.name + "  " + f.ms + "ms  " + (f.bytes / 1024).toFixed(1) + "KB"));
