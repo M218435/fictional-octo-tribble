@@ -2,6 +2,9 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
+<link rel="icon" type="image/png" href="../icon.png">
+<link rel="apple-touch-icon" href="../icon.png">
+
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>记忆翻牌 · RTSX</title>
 <style>
@@ -56,8 +59,11 @@
     background:#fff;border:1px solid var(--line);
     box-shadow:0 1px 2px rgba(25,24,23,.05);
   }
-  .back-face::after{
-    content:"✦";font-size:19px;color:rgba(217,119,87,.45);
+  .back-face{padding:7px;}
+  .back-face img{
+    width:32px;height:32px;object-fit:contain;
+    opacity:.42;image-rendering:-webkit-optimize-contrast;
+    pointer-events:none;
   }
   .front-face{
     transform:rotateY(180deg);
@@ -66,6 +72,8 @@
   .card.matched .front-face{
     background:#FBF5F0;border-color:#E9DED2;color:#B98A72;
   }
+  /* 配对成功的卡片保持正面朝上，不再翻回背面 */
+  .card.matched .inner{transform:rotateY(180deg);}
   .card.matched{cursor:default;}
   .card.wrong .front-face{animation:wrong .32s ease;}
   @keyframes wrong{0%,100%{transform:rotateY(180deg) translateX(0);}25%{transform:rotateY(180deg) translateX(-4px);}75%{transform:rotateY(180deg) translateX(4px);}}
@@ -178,7 +186,8 @@
   });
   window.addEventListener("storage", paintSnd);
 
-  var SYMS = ["◆", "●", "▲", "■", "✦", "✚", "❍", "✳"];
+  /* 正面符号：加 FE0E 强制文本形态，避免被系统渲染成彩色 emoji；也不再用与图标相似的星形 */
+  var SYMS = ["◆", "●", "▲", "■", "★", "✚", "❍", "☾"].map(function(s){ return s + "\uFE0E"; });
   var grid = document.getElementById("grid");
   var movesEl = document.getElementById("moves"), timeEl = document.getElementById("time");
   var overlay = document.getElementById("overlay");
@@ -211,7 +220,7 @@
       card.setAttribute("data-i", i);
       card.innerHTML =
         '<span class="inner">' +
-          '<span class="face back-face"></span>' +
+          '<span class="face back-face"><img src="../icon.png" alt="" draggable="false"></span>' +
           '<span class="face front-face">' + deck[i] + '</span>' +
         '</span>';
       grid.appendChild(card);
@@ -233,7 +242,7 @@
     var card = e.target.closest ? e.target.closest(".card") : null;
     if (!card || lock) return;
     var i = parseInt(card.getAttribute("data-i"), 10);
-    if (card.classList.contains("flip")) return;
+    if (card.classList.contains("flip") || card.classList.contains("matched")) return;   // 已配对的不再响应
 
     startClock();
     SFX.click();
