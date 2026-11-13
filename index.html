@@ -807,40 +807,70 @@
     if (window.requestIdleCallback) requestIdleCallback(go, { timeout: 4000 });
     else setTimeout(go, 1500);
   }
+  /* 预取记录：页面缓存有效期是 10 分钟，9 分钟内不用重取，过了就补一次 */
+  var PREFETCH_KEY = "rtsx.prefetch.v1";
+  function readPrefetch() {
+    try {
+      var o = JSON.parse(localStorage.getItem(PREFETCH_KEY) || "null");
+      return o && typeof o.at === "number" ? o : null;
+    } catch (e) { return null; }
+  }
+  function writePrefetch(n) {
+    try { localStorage.setItem(PREFETCH_KEY, JSON.stringify({ at: Date.now(), done: n })); } catch (e) {}
+  }
+
   function preload() {
-    // 大厅不再等资源：先把门打开，游戏页在后台一页一页预热。
+    // 大厅不等资源：先把门打开，游戏页在后台预热好，后面点开就不用再下。
     // 以前是 9 个页面全下完才放行（最多卡 8 秒），慢网络下点什么都像"打不开"。
     bootReady = true;
     checkEnter();
-    setTimeout(prefetchGames, 900);
+    setTimeout(function () { prefetchGames(); }, 500);
   }
 
-  function prefetchGames() {
+  function prefetchGames(force) {
     if (!window.fetch) return;
+    var last = readPrefetch();
+    if (!force && last && Date.now() - last.at < 9 * 60 * 1000) {
+      setProgress(1);                 // 本机已经有缓存，不用重复取
+      warmHeavy();
+      return;
+    }
+
     var queue = ASSETS.slice();
-    var done = 0, total = queue.length;
-    var step = function () {
-      done++;
-      setProgress(done / total);
-      if (!queue.length) { warmHeavy(); return; }
-      setTimeout(next, 140);          // 串行预热，别和页面本身抢带宽
+    var total = queue.length, done = 0, running = 0;
+    var canFit = 2;                   // 两路并发：既快一点，又不会把带宽吃满
+
+    var finish = function () {
+      if (running || queue.length) return;
+      setProgress(1);
+      writePrefetch(done);
+      warmHeavy();
     };
+
     var next = function () {
-      if (!queue.length) { warmHeavy(); return; }
+      if (!queue.length) { finish(); return; }
+      if (running >= canFit) return;
       var u = queue.shift();
+      running++;
       try {
-        fetch(u, { credentials: "same-origin", cache: "force-cache" })
+        fetch(u, { credentials: "same-origin", cache: "force-cache", priority: "low" })
           .then(function (r) { return r.text(); })
-          .then(step, step);
-      } catch (e) { step(); }
+          .then(after, after);
+      } catch (e) { after(); }
+
+      function after() {
+        running--; done++;
+        setProgress(done / total);
+        next();
+      }
     };
-    next();
+    next(); next();
   }
 
   // 鼠标/手指压到某个游戏块时，先把那一页取回来，点开就不用等
   function warmPage(url) {
     if (!window.fetch || !url) return;
-    try { fetch(url, { credentials: "same-origin", cache: "force-cache" }).catch(function () {}); } catch (e) {}
+    try { fetch(url, { credentials: "same-origin", cache: "force-cache", priority: "low" }).catch(function () {}); } catch (e) {}
   }
 
   /* ================= 永久状态存储 ================= */
