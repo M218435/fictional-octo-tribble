@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#171513">
+<title>我的世界 · RTSX</title>
+<style>
+  :root{
+    --ink:#F6F1E8; --dim:rgba(246,241,232,.56); --dim2:rgba(246,241,232,.34);
+    --line:#2F2A24; --clay:#E2916F; --grass:#6FA84B; --dirt:#8A5A3B;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{
+    margin:0;min-height:100vh;
+    background:
+      radial-gradient(90% 60% at 50% 0%, #26221C 0%, rgba(38,34,28,0) 62%),
+      #171513;
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding:calc(18px + env(safe-area-inset-top)) 20px calc(34px + env(safe-area-inset-bottom));
+    overflow-x:hidden;
+  }
+  .bar{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .bar .right{display:flex;align-items:center;gap:12px;}
+  .back{border:0;background:none;font:inherit;font-size:12px;color:var(--dim2);cursor:pointer;padding:4px 0;letter-spacing:.02em;}
+  .back:hover{color:var(--dim);}
+  .snd{
+    border:1px solid var(--line);background:none;border-radius:8px;
+    padding:3px 7px;font:inherit;font-size:10px;letter-spacing:.12em;
+    color:var(--dim2);cursor:pointer;
+  }
+  .snd.off{opacity:.55;text-decoration:line-through;}
+  .badge{font-family:Georgia,serif;font-size:11px;letter-spacing:.28em;color:var(--dim2);text-transform:uppercase;}
+
+  .hero{display:flex;flex-direction:column;align-items:center;margin:22px 0 26px;}
+  .scene{width:104px;height:104px;perspective:760px;margin-bottom:22px;}
+  .cube{position:relative;width:104px;height:104px;transform-style:preserve-3d;animation:spin 18s linear infinite;}
+  @keyframes spin{
+    from{transform:rotateX(-18deg) rotateY(-28deg);}
+    to{transform:rotateX(-18deg) rotateY(332deg);}
+  }
+  .face{position:absolute;width:104px;height:104px;border:1px solid rgba(0,0,0,.28);}
+  .f1,.f2{background:
+      linear-gradient(180deg,#74AE4F 0%,#74AE4F 21%,#8A5A3B 21%,#8A5A3B 100%);
+    background-blend-mode:normal;}
+  .f1{transform:translateZ(52px);}
+  .f2{transform:rotateY(180deg) translateZ(52px);}
+  .f3{transform:rotateY(90deg) translateZ(52px);}
+  .f4{transform:rotateY(-90deg) translateZ(52px);}
+  .f5{transform:rotateX(90deg) translateZ(52px);background:linear-gradient(150deg,#82BB59,#5E913E);}
+  .f6{transform:rotateX(-90deg) translateZ(52px);background:#7A4E33;}
+
+  h1{margin:0 0 10px;font-family:Georgia,"Songti SC","STSong",serif;font-size:34px;font-weight:600;letter-spacing:-.01em;}
+  .sub{margin:0;max-width:520px;text-align:center;font-size:13.5px;line-height:1.78;color:var(--dim);}
+  .hintchip{
+    display:inline-flex;align-items:center;gap:7px;margin:16px 0 0;
+    padding:6px 13px;border-radius:999px;border:1px solid rgba(226,145,111,.34);
+    background:rgba(226,145,111,.08);font-size:11.5px;color:var(--clay);letter-spacing:.02em;
+  }
+
+  .hintchip.padbtn{border:0;cursor:pointer;font-family:inherit;margin-left:8px;}
+  .hintchip.padbtn.off{color:#8C8378;border-color:rgba(140,131,120,.3);background:rgba(140,131,120,.07);}
+  .list{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:820px;margin:26px auto 0;}
+  .vrow{
+    display:flex;align-items:center;gap:14px;
+    padding:15px 16px;border:1px solid var(--line);border-radius:13px;
+    background:linear-gradient(160deg,#232019 0%,#1C1A17 100%);
+    cursor:pointer;text-align:left;width:100%;color:var(--ink);font:inherit;
+    transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;
+  }
+  .vrow:hover{transform:translateY(-2px);border-color:#443B31;box-shadow:0 18px 40px -30px #000;}
+  .vrow:active{transform:translateY(0);}
+  .vrow .ico{width:38px;height:38px;flex:0 0 auto;border-radius:8px;position:relative;overflow:hidden;
+    background:linear-gradient(180deg,#74AE4F 0%,#74AE4F 34%,#8A5A3B 34%,#8A5A3B 100%);
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.3);}
+  .vrow .ico::after{content:"";position:absolute;inset:0;
+    background:repeating-linear-gradient(90deg,rgba(0,0,0,.14) 0 1px,transparent 1px 7px),
+               repeating-linear-gradient(0deg,rgba(0,0,0,.14) 0 1px,transparent 1px 7px);}
+  .vrow .main{flex:1 1 auto;min-width:0;}
+  .vrow .nm{font-family:Georgia,"Songti SC",serif;font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .vrow .nm .star{font-size:9.5px;letter-spacing:.18em;color:#1C1A17;background:var(--clay);border-radius:5px;padding:1px 6px;}
+  .vrow .meta{margin-top:4px;font-size:11.5px;color:var(--dim2);display:flex;flex-wrap:wrap;gap:6px 10px;}
+  .vrow .meta span{white-space:nowrap;}
+  .vrow .go{flex:0 0 auto;font-size:11px;letter-spacing:.14em;color:var(--clay);}
+  .vrow.recommend{border-color:rgba(226,145,111,.4);}
+  .vrow .cached{color:#8CBF67;}
+  .foot{margin:26px auto 0;max-width:560px;text-align:center;font-size:11.5px;line-height:1.9;color:var(--dim2);}
+
+  @media (max-width:700px){
+    .list{grid-template-columns:1fr;}
+    h1{font-size:27px;}
+    .scene{width:88px;height:88px;}
+    .cube{width:88px;height:88px;}
+    .face{width:88px;height:88px;}
+    .f1{transform:translateZ(44px);} .f2{transform:rotateY(180deg) translateZ(44px);}
+    .f3{transform:rotateY(90deg) translateZ(44px);} .f4{transform:rotateY(-90deg) translateZ(44px);}
+    .f5{transform:rotateX(90deg) translateZ(44px);} .f6{transform:rotateX(-90deg) translateZ(44px);}
+  }
+
+  /* ---------- 装载层 ---------- */
+  .load{
+    position:fixed;inset:0;z-index:40;display:none;
+    align-items:center;justify-content:center;
+    background:rgba(12,11,10,.94);
+    -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+    padding:26px;
+  }
+  .load.show{display:flex;}
+  .load .box{width:100%;max-width:420px;text-align:center;}
+  .load .ttl{font-family:Georgia,"Songti SC",serif;font-size:20px;font-weight:600;margin:0 0 8px;}
+  .load .note{font-size:12px;color:var(--dim2);line-height:1.8;margin:0 0 20px;}
+  .barwrap{height:10px;border-radius:999px;background:rgba(246,241,232,.1);overflow:hidden;border:1px solid rgba(246,241,232,.08);}
+  .barfill{height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,#E2916F,#C4603F);transition:width .18s linear;}
+  .pct{margin-top:12px;font-size:12.5px;color:var(--dim);font-variant-numeric:tabular-nums;}
+  .pct b{color:var(--ink);font-size:15px;}
+  .load .cancel{
+    margin-top:22px;border:1px solid var(--line);background:none;color:var(--dim2);
+    border-radius:9px;padding:9px 18px;font:inherit;font-size:12.5px;cursor:pointer;
+  }
+  .load .cancel:hover{color:var(--dim);border-color:#443B31;}
+  .err{margin-top:14px;font-size:12px;color:#E2916F;line-height:1.7;}
+
+  /* ---------- 运行层 ---------- */
+  .play{position:fixed;inset:0;z-index:60;display:none;flex-direction:column;background:#000;}
+  .play.show{display:flex;}
+  body.playing{overflow:hidden;}
+  .play .pbar{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:calc(6px + env(safe-area-inset-top)) 12px 6px 14px;
+    background:#100F0D;border-bottom:1px solid #232019;flex:0 0 auto;
+  }
+  .play .pbar .pn{font-size:12px;color:var(--dim);letter-spacing:.04em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .play .pbar .pt{display:flex;align-items:center;gap:8px;flex:0 0 auto;}
+  .pbtn{
+    border:1px solid #33302A;background:#1B1915;color:var(--dim);border-radius:8px;
+    padding:6px 11px;font:inherit;font-size:11.5px;cursor:pointer;white-space:nowrap;
+  }
+  .pbtn:hover{color:var(--ink);border-color:#4A443B;}
+  #gframe{flex:1 1 auto;width:100%;height:100%;border:0;background:#000;display:block;}
+
+  .toast{
+    position:fixed;left:50%;bottom:calc(26px + env(safe-area-inset-bottom));transform:translate(-50%,12px);
+    background:#221F1C;color:#F6F2EC;font-size:12.5px;padding:9px 16px;border-radius:999px;
+    opacity:0;pointer-events:none;transition:opacity .3s ease,transform .3s ease;z-index:80;white-space:nowrap;
+  }
+  .toast.show{opacity:1;transform:translate(-50%,0);}
+</style>
+</head>
+<body>
+  <div class="bar">
+    <button class="back" id="back" type="button">← 返回大厅</button>
+    <div class="right">
+      <button class="snd" id="snd" type="button">SFX</button>
+      <span class="badge">WebMC</span>
+    </div>
+  </div>
+
+  <section class="hero">
+    <div class="scene"><div class="cube">
+      <div class="face f1"></div><div class="face f2"></div><div class="face f3"></div>
+      <div class="face f4"></div><div class="face f5"></div><div class="face f6"></div>
+    </div></div>
+    <h1>我的世界</h1>
+    <p class="sub">浏览器里直接跑的 Minecraft，单文件、不装 Java、不用外网。手机上选 PE 版（自带摇杆），电脑上选 1.21.11（鼠标锁定视角）。手机点其他版本会自动加触屏手柄。</p>
+    <span class="hintchip" id="devchip">正在识别设备…</span>
+      <button class="hintchip padbtn" id="padbtn" type="button">触屏手柄：开</button>
+  </section>
+
+  <div class="list" id="list"></div>
+
+  <p class="foot">
+    第一次进要把整包下载下来（进度条走完才开始），下过一次会存在本机缓存里，第二次秒开。<br>
+    单个版本 17–93 MB，建议 Wi-Fi。要是你把整个文件夹拷到本地双击打开（file://），浏览器不给读进度，会直接打开、不显示进度条。
+    <button class="back" id="clear" type="button" style="margin-left:6px;text-decoration:underline;">清掉本地缓存</button>
+  </p>
+
+  <!-- 装载 -->
+  <div class="load" id="load">
+    <div class="box">
+      <div class="ttl" id="load-ttl">正在装载</div>
+      <p class="note" id="load-note">下载完就直接进世界，别关页面。</p>
+      <div class="barwrap"><div class="barfill" id="barfill"></div></div>
+      <div class="pct" id="pct"><b>0%</b> · 0.0 / 0.0 MB</div>
+      <div class="err" id="err"></div>
+      <button class="cancel" id="cancel" type="button">取消</button>
+    </div>
+  </div>
+
+  <!-- 运行 -->
+  <div class="play" id="play">
+    <div class="pbar">
+      <span class="pn" id="play-name">Minecraft</span>
+      <span class="pt">
+        <button class="pbtn" id="btn-full" type="button">全屏</button>
+        <button class="pbtn" id="btn-close" type="button">关闭</button>
+      </span>
+    </div>
+    <iframe id="gframe" title="Minecraft" allowfullscreen allow="fullscreen; pointer-lock; gamepad; autoplay; microphone"></iframe>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  var VERSIONS = [
+    { id:"pe",      file:"webmc-main/0.6.1-pe.html", name:"0.6.1 PE",  tag:"触屏 · 手机", size:17.3,  desc:"手机点这个，屏幕自带摇杆和跳跃", star:true },
+    { id:"1.21.11", file:"webmc-main/1.21.11.html",  name:"1.21.11",   tag:"键鼠 · 电脑", size:49.0,  desc:"最新电脑版，鼠标锁视角，WASD 走路", star:true },
+    { id:"26.3",    file:"webmc-main/26.3.html",     name:"26.3",      tag:"键鼠 · 电脑", size:85.8,  desc:"体积最大，内容最全" },
+    { id:"26.2",    file:"webmc-main/26.2.html",     name:"26.2",      tag:"键鼠 · 电脑", size:75.5,  desc:"" },
+    { id:"26.1.2",  file:"webmc-main/26.1.2.html",   name:"26.1.2",    tag:"键鼠 · 电脑", size:18.1,  desc:"小体积电脑版" },
+    { id:"1.20.6",  file:"webmc-main/1.20.6.html",   name:"1.20.6",    tag:"键鼠 · 电脑", size:93.0,  desc:"" },
+    { id:"1.16.5",  file:"webmc-main/1.16.5.html",   name:"1.16.5",    tag:"键鼠 · 电脑", size:85.1,  desc:"" },
+    { id:"1.14.4",  file:"webmc-main/1.14.4.html",   name:"1.14.4",    tag:"键鼠 · 电脑", size:36.0,  desc:"" },
+    { id:"1.13.2",  file:"webmc-main/1.13.2.html",   name:"1.13.2",    tag:"键鼠 · 电脑", size:54.2,  desc:"" },
+    { id:"1.12.2",  file:"webmc-main/1.12.2.html",   name:"1.12.2",    tag:"键鼠 · 电脑", size:25.0,  desc:"老版本，轻" },
+    { id:"1.8",     file:"webmc-main/1.8.html",      name:"1.8",       tag:"键鼠 · 电脑", size:18.4,  desc:"PvP 经典版" }
+  ];
+
+
+  /* ---------- 触屏手柄：注入到非触屏版本里，手机也能玩 ---------- */
+  var PAD_JS = "(function(){\n  var doc = document, win = window;\n  if (win.__rtsxPad) return;\n  win.__rtsxPad = true;\n\n  var CSS = \"\"\n    + \"#rtsxpad-root{position:fixed;left:0;top:0;width:0;height:0;z-index:2147483000;pointer-events:none;}\"\n    + \"#rx-look{position:fixed;left:0;top:0;right:0;bottom:0;background:transparent;touch-action:none;pointer-events:none;}\"\n    + \"#rx-stick{position:fixed;left:14px;bottom:14px;width:132px;height:132px;border-radius:50%;background:rgba(18,18,18,.34);border:2px solid rgba(255,255,255,.26);touch-action:none;pointer-events:auto;-webkit-user-select:none;user-select:none;}\"\n    + \"#rx-knob{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:rgba(255,255,255,.28);border:2px solid rgba(255,255,255,.55);box-shadow:0 2px 8px rgba(0,0,0,.4);}\"\n    + \"#rx-btns{position:fixed;right:10px;bottom:12px;display:flex;flex-direction:column;align-items:flex-end;gap:8px;touch-action:none;pointer-events:none;}\"\n    + \".rx-b{display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(18,18,18,.36);border:2px solid rgba(255,255,255,.3);color:#fff;font:600 17px/1 -apple-system,'Segoe UI',sans-serif;text-shadow:0 1px 2px rgba(0,0,0,.6);touch-action:none;pointer-events:auto;-webkit-user-select:none;user-select:none;}\"\n    + \".rx-b.on{background:rgba(226,112,66,.66);border-color:rgba(255,190,150,.85);}\"\n    + \".rx-b.big{width:74px;height:74px;font-size:18px;}\"\n    + \".rx-b.mid{width:60px;height:60px;}\"\n    + \".rx-b.sm{width:52px;height:52px;font-size:15px;}\"\n    + \".rx-row{display:flex;gap:8px;align-items:flex-end;pointer-events:none;}\"\n    + \"#rx-lock{position:fixed;left:50%;top:64px;transform:translateX(-50%);padding:9px 18px;border-radius:999px;background:rgba(226,112,66,.9);color:#fff;font:600 13px/1 -apple-system,'Segoe UI',sans-serif;border:1px solid rgba(255,210,180,.9);box-shadow:0 4px 14px rgba(0,0,0,.35);pointer-events:auto;touch-action:none;}\"\n    + \"#rx-tip{position:fixed;left:50%;top:78px;transform:translateX(-50%);max-width:86vw;padding:8px 14px;border-radius:999px;background:rgba(12,12,12,.86);color:#f0e9e4;font:13px/1.45 -apple-system,'Segoe UI',sans-serif;text-align:center;opacity:0;transition:opacity .25s;pointer-events:none;}\";\n\n  function el(tag, cls, html){\n    var n = doc.createElement(tag);\n    if (cls) n.className = cls;\n    if (html != null) n.innerHTML = html;\n    return n;\n  }\n\n  var root = null, look = null, stick = null, knob = null, btns = null, tip = null, canvas = null;\n\n  function mount(){\n    if (!root) return;\n    var host = doc.documentElement;\n    if (host && root.parentNode !== host) host.appendChild(root);\n  }\n\n  function build(){\n    root = el(\"div\"); root.id = \"rtsxpad-root\";\n    var st = el(\"style\"); st.textContent = CSS; root.appendChild(st);\n\n    look = el(\"div\"); look.id = \"rx-look\"; root.appendChild(look);\n\n    stick = el(\"div\"); stick.id = \"rx-stick\";\n    knob = el(\"div\"); knob.id = \"rx-knob\";\n    stick.appendChild(knob); root.appendChild(stick);\n\n    btns = el(\"div\"); btns.id = \"rx-btns\";\n    var r1 = el(\"div\", \"rx-row\");\n    var bBag = el(\"div\", \"rx-b sm\", \"包\"); bBag.id = \"rx-bag\";\n    var bJump = el(\"div\", \"rx-b big\", \"跳\"); bJump.id = \"rx-jump\";\n    r1.appendChild(bBag); r1.appendChild(bJump);\n    var r2 = el(\"div\", \"rx-row\");\n    var bPut = el(\"div\", \"rx-b mid\", \"放\"); bPut.id = \"rx-put\";\n    var bHit = el(\"div\", \"rx-b mid\", \"打\"); bHit.id = \"rx-hit\";\n    r2.appendChild(bPut); r2.appendChild(bHit);\n    var r3 = el(\"div\", \"rx-row\");\n    var bSneak = el(\"div\", \"rx-b sm\", \"蹲\"); bSneak.id = \"rx-sneak\";\n    var bEsc = el(\"div\", \"rx-b sm\", \"菜\"); bEsc.id = \"rx-esc\";\n    r3.appendChild(bSneak); r3.appendChild(bEsc);\n    bEsc.addEventListener(\"touchstart\", function(){ softUnlock(); }, { passive: true });\n    btns.appendChild(r3); btns.appendChild(r2); btns.appendChild(r1);\n    root.appendChild(btns);\n\n    var lockBtn = el(\"div\", \"\", \"点我锁视角\"); lockBtn.id = \"rx-lock\"; root.appendChild(lockBtn);\n    lockBtn.addEventListener(\"touchstart\", function(e){\n      e.preventDefault(); e.stopPropagation();\n      var c = gameCanvas();\n      var fn = c.requestPointerLock || c.webkitRequestPointerLock || c.mozRequestPointerLock;\n      win.__rxLockTouch = (win.__rxLockTouch || 0) + 1;\n      if (fn){\n        try {\n          var pr = fn.call(c);\n          setTimeout(function(){\n            if (!isLocked()) softLock();\n          }, 700);\n          if (pr && pr.catch) pr.catch(function(e){ win.__rxLockErr = (e && e.name) + \":\" + (e && e.message); });\n        } catch (err) {\n          win.__rxLockErr = \"sync:\" + err.name;\n          say(\"这个浏览器锁不住鼠标，建议用 0.6.1 PE\");\n        }\n      }\n      else say(\"这个浏览器不支持锁鼠标，建议用 0.6.1 PE\");\n    }, { passive: false });\n    window.__rxLockBtn = lockBtn;\n    tip = el(\"div\"); tip.id = \"rx-tip\"; root.appendChild(tip);\n\n    mount();\n  }\n\n  var KEYS = {\n    KeyW: [\"w\", 87], KeyA: [\"a\", 65], KeyS: [\"s\", 83], KeyD: [\"d\", 68],\n    Space: [\" \", 32], ShiftLeft: [\"Shift\", 16], KeyE: [\"e\", 69], Escape: [\"Escape\", 27]\n  };\n  var down = {};\n\n  function keyEvent(type, code){\n    var m = KEYS[code] || [code, 0];\n    var e = new KeyboardEvent(type, { key: m[0], code: code, bubbles: true, cancelable: true });\n    try {\n      Object.defineProperty(e, \"keyCode\", { get: function(){ return m[1]; } });\n      Object.defineProperty(e, \"which\", { get: function(){ return m[1]; } });\n    } catch (err) {}\n    doc.dispatchEvent(e);\n    win.dispatchEvent(e);\n  }\n  function setKey(code, on){\n    if (!!down[code] === !!on) return;\n    down[code] = on;\n    keyEvent(on ? \"keydown\" : \"keyup\", code);\n  }\n  function releaseAll(){\n    for (var k in down){ if (down[k]) setKey(k, false); }\n  }\n  function gameCanvas(){\n    if (canvas && canvas.parentNode) return canvas;\n    canvas = doc.querySelector(\"canvas\") || doc.body;\n    return canvas;\n  }\n  function mouseEvent(type, button){\n    var c = gameCanvas();\n    var r = c.getBoundingClientRect();\n    var x = r.left + r.width / 2, y = r.top + r.height / 2;\n    var e = new MouseEvent(type, {\n      bubbles: true, cancelable: true, view: win,\n      clientX: x, clientY: y, screenX: x, screenY: y,\n      button: button, buttons: type === \"mousedown\" ? (button === 2 ? 2 : 1) : 0\n    });\n    c.dispatchEvent(e);\n    doc.dispatchEvent(e);\n  }\n  function lookMove(dx, dy){\n    win.__rtsxLookN = (win.__rtsxLookN || 0) + 1;\n    var c = gameCanvas();\n    var r = c.getBoundingClientRect();\n    var x = r.left + r.width / 2, y = r.top + r.height / 2;\n    var e = new MouseEvent(\"mousemove\", {\n      bubbles: true, cancelable: true, view: win,\n      clientX: x, clientY: y, screenX: x, screenY: y\n    });\n    try {\n      Object.defineProperty(e, \"movementX\", { get: function(){ return dx; } });\n      Object.defineProperty(e, \"movementY\", { get: function(){ return dy; } });\n    } catch (err) {}\n    c.dispatchEvent(e);\n    doc.dispatchEvent(e);\n  }\n\n  var lockWarned = false, lockTip = false;\n  function isLocked(){\n    return !!(doc.pointerLockElement || doc.webkitPointerLockElement || doc.mozPointerLockElement);\n  }\n  var softDescDoc = null, softDescEl = null, softLocked = false;\n  function softLock(){\n    if (softLocked) return;\n    try {\n      var d = Object.getOwnPropertyDescriptor(Document.prototype, \"pointerLockElement\");\n      var e = Object.getOwnPropertyDescriptor(Element.prototype, \"requestPointerLock\");\n      softDescDoc = d; softDescEl = e;\n      Object.defineProperty(Document.prototype, \"pointerLockElement\", {\n        configurable: true,\n        get: function(){ return gameCanvas(); }\n      });\n      Object.defineProperty(Element.prototype, \"requestPointerLock\", {\n        configurable: true, writable: true,\n        value: function(){ return Promise.resolve(); }\n      });\n      softLocked = true;\n      syncLock();\n      say(\"已接管视角：右侧拖动就是转头，按「菜」回菜单\");\n    } catch (err) {}\n  }\n  function softUnlock(){\n    if (!softLocked) return;\n    try {\n      if (softDescDoc) Object.defineProperty(Document.prototype, \"pointerLockElement\", softDescDoc);\n      if (softDescEl) Object.defineProperty(Element.prototype, \"requestPointerLock\", softDescEl);\n    } catch (err) {}\n    softLocked = false;\n    syncLock();\n  }\n\n  function syncLock(){\n    var l = isLocked();\n    if (look) look.style.pointerEvents = l ? \"auto\" : \"none\";\n    if (win.__rxLockBtn) win.__rxLockBtn.style.display = l ? \"none\" : \"block\";\n    releaseAll();\n    if (l && !lockTip){ lockTip = true; say(\"已锁定鼠标 · 左摇杆走，右侧拖动转视角\"); }\n  }\n  doc.addEventListener(\"pointerlockchange\", syncLock, true);\n  doc.addEventListener(\"pointerlockerror\", function(){\n    if (lockWarned) return;\n    lockWarned = true;\n    say(\"这个浏览器锁不住鼠标：视角转不动，建议换 0.6.1 PE 那版\");\n    setTimeout(function(){ lockWarned = false; }, 8000);\n  }, true);\n  win.addEventListener(\"blur\", releaseAll);\n  doc.addEventListener(\"visibilitychange\", function(){ if (doc.hidden) releaseAll(); });\n\n  var tipTimer = null;\n  function say(msg){\n    if (!tip) return;\n    tip.textContent = msg;\n    tip.style.opacity = \"1\";\n    clearTimeout(tipTimer);\n    tipTimer = setTimeout(function(){ tip.style.opacity = \"0\"; }, 2600);\n  }\n\n  var stickId = null, sx = 0, sy = 0, R = 46, DEAD = 0.22;\n\n  function stickApply(dx, dy){\n    var dist = Math.sqrt(dx * dx + dy * dy);\n    if (dist > R){ dx = dx / dist * R; dy = dy / dist * R; }\n    knob.style.transform = \"translate(\" + dx.toFixed(1) + \"px,\" + dy.toFixed(1) + \"px)\";\n    var nx = dx / R, ny = dy / R;\n    setKey(\"KeyW\", ny < -DEAD);\n    setKey(\"KeyS\", ny > DEAD);\n    setKey(\"KeyA\", nx < -DEAD);\n    setKey(\"KeyD\", nx > DEAD);\n  }\n  function stickCenter(){\n    var r = stick.getBoundingClientRect();\n    sx = r.left + r.width / 2;\n    sy = r.top + r.height / 2;\n  }\n  function stickReset(){\n    stickId = null;\n    knob.style.transform = \"translate(0,0)\";\n    setKey(\"KeyW\", false); setKey(\"KeyA\", false); setKey(\"KeyS\", false); setKey(\"KeyD\", false);\n  }\n\n  var buttons = [];\n  var btnTouch = {};\n\n  function initButtons(){\n    buttons = [\n      { el: doc.getElementById(\"rx-jump\"),  key: \"Space\" },\n      { el: doc.getElementById(\"rx-bag\"),   key: \"KeyE\" },\n      { el: doc.getElementById(\"rx-sneak\"), key: \"ShiftLeft\" },\n      { el: doc.getElementById(\"rx-esc\"),   key: \"Escape\" },\n      { el: doc.getElementById(\"rx-hit\"),   mouse: 0 },\n      { el: doc.getElementById(\"rx-put\"),   mouse: 2 }\n    ];\n  }\n\n  function inRect(node, x, y){\n    if (!node) return false;\n    var r = node.getBoundingClientRect();\n    return x >= r.left - 8 && x <= r.right + 8 && y >= r.top - 8 && y <= r.bottom + 8;\n  }\n  function press(b){\n    if (!b || b.on || !b.el) return;\n    b.on = true;\n    b.el.classList.add(\"on\");\n    if (b.key) setKey(b.key, true);\n    else mouseEvent(\"mousedown\", b.mouse);\n  }\n  function unpress(b){\n    if (!b || !b.on) return;\n    b.on = false;\n    if (b.el) b.el.classList.remove(\"on\");\n    if (b.key) setKey(b.key, false);\n    else mouseEvent(\"mouseup\", b.mouse);\n  }\n\n  var lookId = null, lx = 0, ly = 0;\n\n  function onStart(e){\n    if (!stick || !stick.isConnected) return;\n    for (var i = 0; i < e.changedTouches.length; i++){\n      var t = e.changedTouches[i], x = t.clientX, y = t.clientY, hit = null;\n      for (var j = 0; j < buttons.length; j++){\n        if (inRect(buttons[j].el, x, y)) { hit = buttons[j]; break; }\n      }\n      if (hit){ e.preventDefault(); btnTouch[t.identifier] = hit; press(hit); continue; }\n      if (inRect(stick, x, y)){\n        e.preventDefault(); stickId = t.identifier; stickCenter(); stickApply(x - sx, y - sy); continue;\n      }\n      if (isLocked() && lookId === null){\n        e.preventDefault(); lookId = t.identifier; lx = x; ly = y;\n      }\n    }\n  }\n  function onMove(e){\n    for (var i = 0; i < e.changedTouches.length; i++){\n      var t = e.changedTouches[i];\n      if (t.identifier === stickId){ e.preventDefault(); stickApply(t.clientX - sx, t.clientY - sy); }\n      else if (t.identifier === lookId){\n        e.preventDefault();\n        var dx = (t.clientX - lx) * 1.35, dy = (t.clientY - ly) * 1.35;\n        lx = t.clientX; ly = t.clientY;\n        if (Math.abs(dx) < 6 && Math.abs(dy) < 6) continue;\n        lookMove(dx, dy);\n      } else if (btnTouch[t.identifier] && !inRect(btnTouch[t.identifier].el, t.clientX, t.clientY)){\n        var b = btnTouch[t.identifier];\n        delete btnTouch[t.identifier];\n        unpress(b);\n      }\n    }\n  }\n  function onEnd(e){\n    for (var i = 0; i < e.changedTouches.length; i++){\n      var t = e.changedTouches[i];\n      if (t.identifier === stickId) stickReset();\n      if (t.identifier === lookId) lookId = null;\n      var b = btnTouch[t.identifier];\n      if (b){ delete btnTouch[t.identifier]; unpress(b); }\n    }\n  }\n\n  var opts = { passive: false };\n  doc.addEventListener(\"touchstart\", onStart, opts);\n  doc.addEventListener(\"touchmove\", onMove, opts);\n  doc.addEventListener(\"touchend\", onEnd, opts);\n  doc.addEventListener(\"touchcancel\", onEnd, opts);\n\n  function start(){\n    build();\n    initButtons();\n    setTimeout(function(){ if (!root || !root.isConnected) mount(); }, 1000);\n    setInterval(function(){\n      if (!root){ build(); initButtons(); return; }\n      if (!root.isConnected) mount();\n    }, 1500);\n    say(\"触屏手柄已就绪 · 点一下画面锁定鼠标，然后左摇杆走、右侧拖动转视角\");\n    win.__rtsxPadApi = {\n      down: down, setKey: setKey, look: lookMove, mouse: mouseEvent,\n      locked: isLocked, canvas: gameCanvas,\n      mounted: function(){ return !!(root && root.isConnected); }\n    };\n  }\n\n  if (doc.readyState === \"loading\") doc.addEventListener(\"DOMContentLoaded\", start);\n  else start();\n})();\n";
+  var PAD_KEY = "rtsx.mc.pad";
+  function padOn(){ try{ return localStorage.getItem(PAD_KEY) !== "0"; }catch(e){ return true; } }
+  function wantPad(){ return padOn() && (isPhone || /[?&]pad=1/.test(location.search)); }
+  var isPhone = (window.matchMedia && window.matchMedia("(pointer:coarse)").matches) ||
+                ("ontouchstart" in window) || /Android|iPhone|iPad|Mobile|HarmonyOS/.test(navigator.userAgent);
+  var CACHE = "rtsx-webmc-v1";
+
+  /* ---------- 音效 ---------- */
+  var SFX = (function(){
+    var ctx=null, on=true, out=null;
+    try { on = localStorage.getItem("rtsx.sound.v1") !== "off"; } catch(e){}
+    function ac(){
+      if(!ctx){ var C = window.AudioContext || window.webkitAudioContext; if(!C) return null; try{ ctx=new C(); }catch(e){ return null; } }
+      if(ctx.state==="suspended"){ try{ ctx.resume(); }catch(e){} }
+      if(!out){ out=ctx.createDynamicsCompressor(); out.threshold.value=-2; out.knee.value=20; out.ratio.value=12;
+        out.attack.value=.004; out.release.value=.2; out.connect(ctx.destination); }
+      return ctx;
+    }
+    function tone(f,dur,type,gain,delay,to){
+      if(!on) return; var c=ac(); if(!c) return;
+      var t0=c.currentTime+(delay||0), o=c.createOscillator(), g=c.createGain();
+      o.type=type||"sine"; o.frequency.setValueAtTime(f,t0);
+      if(to) o.frequency.exponentialRampToValueAtTime(to,t0+dur);
+      g.gain.setValueAtTime(.0001,t0);
+      g.gain.exponentialRampToValueAtTime(Math.min(.99,(gain||.05)*14),t0+.01);
+      g.gain.exponentialRampToValueAtTime(.0001,t0+dur);
+      o.connect(g); g.connect(out||c.destination); o.start(t0); o.stop(t0+dur+.03);
+    }
+    return {
+      click:function(){ tone(520,.055,"triangle",.045); },
+      ok:function(){ tone(660,.07,"triangle",.05); tone(880,.09,"triangle",.045,.06); },
+      isOn:function(){ return on; },
+      set:function(v){ on=v; try{ localStorage.setItem("rtsx.sound.v1", v?"on":"off"); }catch(e){} }
+    };
+  })();
+  var sndBtn=document.getElementById("snd");
+  function paintSnd(){ if(sndBtn) sndBtn.classList.toggle("off", !SFX.isOn()); }
+  paintSnd();
+  sndBtn && sndBtn.addEventListener("click", function(){ SFX.set(!SFX.isOn()); paintSnd(); if(SFX.isOn()) SFX.click(); });
+  window.addEventListener("storage", function(e){ if(e.key==="rtsx.sound.v1"){ try{ }catch(err){} } paintSnd(); });
+
+  /* ---------- 列表 ---------- */
+  function mb(n){ return n.toFixed(1) + " MB"; }
+  var listEl=document.getElementById("list");
+  function render(){
+    var frag=document.createDocumentFragment();
+    VERSIONS.forEach(function(v){
+      var rec = isPhone ? (v.id==="pe") : (v.id==="1.21.11");
+      var b=document.createElement("button");
+      b.className="vrow"+(rec?" recommend":"");
+      b.type="button";
+      b.setAttribute("data-file", v.file);
+      b.innerHTML =
+        '<span class="ico" aria-hidden="true"></span>'+
+        '<span class="main">'+
+          '<span class="nm">'+v.name+(v.star?'<span class="star">推荐</span>':'')+'</span>'+
+          '<span class="meta"><span>'+v.tag+'</span><span>'+mb(v.size)+'</span>'+
+          (v.desc?'<span>'+v.desc+'</span>':'')+
+          (isPhone && v.id!=="pe" ? '<span style="color:#B98E6B">加触屏手柄可玩</span>' : '')+
+          '</span>'+
+        '</span>'+
+        '<span class="go">进入 →</span>';
+      b.addEventListener("click", function(){ SFX.click(); start(v); });
+      frag.appendChild(b);
+    });
+    listEl.innerHTML=""; listEl.appendChild(frag);
+    markCached();
+  }
+
+  async function markCached(){
+    if(!("caches" in window)) return;
+    try{
+      var c=await caches.open(CACHE);
+      var rows=listEl.querySelectorAll(".vrow");
+      for(var i=0;i<rows.length;i++){
+        var f=rows[i].getAttribute("data-file");
+        var hit=await c.match(f);
+        if(hit){
+          var meta=rows[i].querySelector(".meta");
+          if(meta && !meta.querySelector(".cached")){
+            var s=document.createElement("span"); s.className="cached"; s.textContent="已缓存";
+            meta.appendChild(s);
+          }
+        }
+      }
+    }catch(e){}
+  }
+
+  var devchip=document.getElementById("devchip");
+  devchip.textContent = isPhone ? "检测到手机 · 推荐 0.6.1 PE（触屏操作）" : "检测到电脑 · 推荐 1.21.11（鼠标锁视角）";
+
+  /* 触屏手柄开关：手机访问非 PE 版本时，会把手柄脚本塞进游戏页面里 */
+  var padBtn=document.getElementById("padbtn");
+  function paintPad(){
+    var on=padOn();
+    padBtn.textContent="触屏手柄："+(on?"开":"关");
+    padBtn.classList.toggle("off", !on);
+    padBtn.style.display = isPhone ? "inline-flex" : "none";
+  }
+  padBtn.addEventListener("click", function(){
+    SFX.click();
+    try{ localStorage.setItem(PAD_KEY, padOn() ? "0" : "1"); }catch(e){}
+    paintPad();
+    toast(padOn() ? "下次进非 PE 版本会带触屏手柄" : "已关掉触屏手柄（电脑版要键鼠）");
+  });
+  paintPad();
+
+  /* ---------- 装载 ---------- */
+  var loadEl=document.getElementById("load"), barfill=document.getElementById("barfill"),
+      pctEl=document.getElementById("pct"), ttlEl=document.getElementById("load-ttl"),
+      noteEl=document.getElementById("load-note"), errEl=document.getElementById("err"),
+      cancelEl=document.getElementById("cancel");
+  var playEl=document.getElementById("play"), frame=document.getElementById("gframe"),
+      playName=document.getElementById("play-name");
+  var blobUrl=null, ctrl=null;
+
+  function showLoad(v){
+    ttlEl.textContent="正在装载 "+v.name;
+    noteEl.textContent="要把整包 "+mb(v.size)+" 下载到本机，走完进度条才开始。别关页面。";
+    errEl.textContent=""; barfill.style.width="0%";
+    pctEl.innerHTML="<b>0%</b> · 0.0 / "+mb(v.size);
+    loadEl.classList.add("show");
+  }
+  function hideLoad(){ loadEl.classList.remove("show"); }
+  function setPct(r, got, total){
+    var p=Math.max(0,Math.min(1,r));
+    barfill.style.width=(p*100).toFixed(1)+"%";
+    pctEl.innerHTML="<b>"+Math.round(p*100)+"%</b> · "+(got/1048576).toFixed(1)+" / "+
+      (total?mb(total/1048576):mb(0));
+  }
+  function readStream(res, total, onChunk){
+    if(!res.body || !res.body.getReader){
+      return res.arrayBuffer().then(function(ab){ onChunk(ab.byteLength, total); return ab; });
+    }
+    var reader=res.body.getReader(), chunks=[], got=0;
+    return (function pump(){
+      return reader.read().then(function(r){
+        if(r.done){
+          var out=new Uint8Array(got), off=0;
+          for(var i=0;i<chunks.length;i++){ out.set(chunks[i], off); off+=chunks[i].length; }
+          return out.buffer;
+        }
+        chunks.push(r.value); got+=r.value.length;
+        onChunk(got, total);
+        return pump();
+      });
+    })();
+  }
+
+  /* 直读：不给 fetch（本地双击打开、跨域被拦、离线）时直接让 iframe 读文件 */
+  function directLoad(v, note){
+    playName.textContent="我的世界 · "+v.name;
+    frame.src=v.file;
+    hideLoad();
+    errEl.textContent=""; cancelEl.textContent="取消";
+    playEl.classList.add("show");
+    document.body.classList.add("playing");
+    SFX.ok();
+    if(note) toast(note);
+    if(note){
+      setTimeout(function(){
+        if(playEl.classList.contains("show")) toast("还是黑屏的话：这个版本文件没上传成功，或路径大小写不对");
+      }, 12000);
+    }
+  }
+
+  function start(v){
+    if(ctrl) try{ ctrl.abort(); }catch(e){}
+    ctrl = ("AbortController" in window) ? new AbortController() : null;
+    showLoad(v);
+    var signal = ctrl ? ctrl.signal : undefined;
+
+    // file:// 下浏览器一律禁止 fetch，别白等进度条，直接开
+    if(location.protocol === "file:" || typeof fetch !== "function"){
+      directLoad(v, "本地文件直读 · 读不到下载进度");
+      return;
+    }
+
+    Promise.resolve().then(function(){
+      if("caches" in window){
+        return caches.open(CACHE).then(function(c){ return c.match(v.file); });
+      }
+      return null;
+    }).catch(function(){ return null; }).then(function(cached){
+      if(cached){
+        noteEl.textContent="本机已缓存 "+v.name+"，正在从缓存装载…";
+        var total=Number(cached.headers.get("Content-Length"))||0;
+        return readStream(cached, total, function(got,t){ setPct(total?got/total:0, got, total); })
+          .then(function(buf){ return { buf:buf, fromCache:true }; });
+      }
+      return fetch(v.file, signal?{signal:signal}:{}).then(function(res){
+        if(!res.ok) throw new Error("HTTP "+res.status);
+        var total=Number(res.headers.get("Content-Length"))||0;
+        var copy=null;
+        if("caches" in window){ try{ copy=res.clone(); }catch(e){} }
+        return readStream(res, total, function(got,t){ setPct(total?got/total:0.02, got, total); })
+          .then(function(buf){
+            if(copy && "caches" in window){
+              try{ caches.open(CACHE).then(function(c){ c.put(v.file, copy); }).catch(function(){}); }catch(e){}
+            }
+            return { buf:buf, fromCache:false };
+          });
+      });
+    }).then(function(r){
+      setPct(1, r.buf.byteLength, r.buf.byteLength);
+      var parts=[r.buf];
+      if(v.id!=="pe" && wantPad()) parts.push("`n<script>"+PAD_JS+"<\/script>");
+      var blob=new Blob(parts, {type:"text/html;charset=utf-8"});
+      if(blobUrl) URL.revokeObjectURL(blobUrl);
+      blobUrl=URL.createObjectURL(blob);
+      playName.textContent="我的世界 · "+v.name;
+      frame.src=blobUrl;
+      hideLoad();
+      playEl.classList.add("show");
+      document.body.classList.add("playing");
+      SFX.ok();
+      markCached();
+    }).catch(function(e){
+      if(e && (e.name==="AbortError" || /abort/i.test(e.message||""))){ hideLoad(); return; }
+      var msg=(e && e.message) ? e.message : String(e);
+      if(/Failed to fetch|NetworkError|Load failed|network|fetch/i.test(msg)){
+        directLoad(v, "读不到进度，改为直接打开（"+msg+"）");
+        return;
+      }
+      errEl.textContent="装载失败："+msg+"（文件："+v.file+" · 协议："+location.protocol+"）"+(/HTTP 404/.test(msg)?"。服务器上没有这个文件：没上传成功，或路径大小写不一样。":"");
+      cancelEl.textContent="返回";
+      barfill.style.width="0%";
+    });
+  }
+
+  cancelEl.addEventListener("click", function(){
+    SFX.click();
+    if(ctrl) try{ ctrl.abort(); }catch(e){}
+    hideLoad(); errEl.textContent=""; cancelEl.textContent="取消";
+  });
+
+  function closePlay(){
+    SFX.click();
+    playEl.classList.remove("show");
+    document.body.classList.remove("playing");
+    frame.src="about:blank";
+    if(document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(function(){});
+  }
+  document.getElementById("btn-close").addEventListener("click", closePlay);
+  document.getElementById("btn-full").addEventListener("click", function(){
+    SFX.click();
+    var box=playEl;
+    if(document.fullscreenElement){ document.exitFullscreen && document.exitFullscreen(); return; }
+    var req=box.requestFullscreen||box.webkitRequestFullscreen||box.msRequestFullscreen;
+    if(req){
+      var p=req.call(box, {navigationUI:"hide"});
+      if(p && p.then) p.then(function(){
+        try{ if(screen.orientation && screen.orientation.lock) screen.orientation.lock("landscape").catch(function(){}); }catch(e){}
+      }).catch(function(){ toast("这个浏览器不给全屏"); });
+    } else toast("这个浏览器不支持全屏，直接转横屏也能玩");
+  });
+
+  var toastEl=document.getElementById("toast"), toastT=null;
+  function toast(t){
+    toastEl.textContent=t; toastEl.classList.add("show");
+    clearTimeout(toastT); toastT=setTimeout(function(){ toastEl.classList.remove("show"); }, 2200);
+  }
+
+  document.getElementById("clear").addEventListener("click", function(){
+    if(!("caches" in window)) return toast("这个浏览器不支持缓存管理");
+    caches.delete(CACHE).then(function(){ toast("本地缓存已清掉"); render(); }).catch(function(){ toast("清理失败"); });
+  });
+
+  document.getElementById("back").addEventListener("click", function(){
+    if(window.parent !== window) window.parent.postMessage("rtsx-close", "*");
+    else location.href = "../../index.html";
+  });
+
+  window.addEventListener("beforeunload", function(){ if(blobUrl) URL.revokeObjectURL(blobUrl); });
+
+  render();
+})();
+</script>
+</body>
+</html>
