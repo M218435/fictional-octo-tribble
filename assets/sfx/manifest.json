@@ -2,9 +2,9 @@
   "version": 2,
   "sampleRate": 16000,
   "channels": 1,
-  "generatedAt": "2026-11-13T13:02:10.643Z",
-  "total": 29,
-  "bytes": 348796,
+  "generatedAt": "2026-11-13T13:18:17.783Z",
+  "total": 27,
+  "bytes": 307748,
   "embedded": 3,
   "files": [
     {
@@ -121,16 +121,6 @@
       "name": "warn-2.wav",
       "bytes": 14764,
       "ms": 460
-    },
-    {
-      "name": "start-1.wav",
-      "bytes": 20524,
-      "ms": 640
-    },
-    {
-      "name": "start-2.wav",
-      "bytes": 20524,
-      "ms": 640
     },
     {
       "name": "success-1.wav",

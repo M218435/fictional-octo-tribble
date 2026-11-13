@@ -333,23 +333,7 @@ function save(name, buf, peak) {
   save("warn-" + (i + 1), b, 0.5);
 });
 
-/* 10. 开始：三音和弦一起上冲 + 低频托底，不做单调滑音 */
-[0, 1].forEach((v) => {
-  const b = make(0.64);
-  [0, 1, 2].forEach((i) => {
-    const f0 = (196 + v * 16) * Math.pow(1.48, i);
-    tone(b, {
-      freq: f0, to: f0 * 2.05, amp: 0.22 / (1 + i * 0.55),
-      dur: 0.42 + i * 0.05, decay: 7, tail: 2.8, attack: 0.03,
-      start: i * 0.045, curve: 2.4, pan: (i - 1) * 0.2
-    });
-  });
-  tone(b, { freq: 88, amp: 0.20, dur: 0.5, decay: 9, tail: 3, attack: 0.02 });
-  noise(b, { amp: 0.12, dur: 0.44, decay: 5, lp: 0.36, hp: 0.02 });
-  room(b, 0.7);
-  smooth(b, 6200);
-  save("start-" + (v + 1), b, 0.56);
-});
+/* 10. 打开/开始：直接用开关音（用户指定），这里不再单独生成 start-*.wav */
 
 /* 11. 完成：四音上行，尾巴长一点 */
 [0, 1].forEach((v) => {
