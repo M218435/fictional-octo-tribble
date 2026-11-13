@@ -189,7 +189,8 @@
   window.addEventListener("storage", paintSnd);
 
   [].forEach.call(document.querySelectorAll("a.card"), function(a){
-    a.addEventListener("click", function(){ SFX.click(); });
+    // 按下就响：卡片点了会跳页，等 click 再出声会被跳转截断
+    a.addEventListener("pointerdown", function(){ SFX.click(); });
     a.addEventListener("pointerenter", function(){ SFX.hover(); });
   });
 

@@ -155,10 +155,9 @@ RTSXSFX.setPreference("click", null);               // 恢复随机
     var file = row.getAttribute("data-file");
     if (btn) {
       if (file) {
-        // 试听指定文件：临时直接播（不改偏好）
-        var a = new Audio(RTSXSFX.base + file);
-        a.volume = RTSXSFX.getVolume();
-        a.play().catch(function(){});
+        // 试听指定文件：复用池子里的实例，第一次之后即时出声（不改偏好）
+        RTSXSFX.warm(file);
+        RTSXSFX.preview(file, group);
         row.querySelector("button").classList.add("now");
         setTimeout(function(){ row.querySelector("button").classList.remove("now"); }, 320);
       } else {
@@ -172,14 +171,21 @@ RTSXSFX.setPreference("click", null);               // 恢复随机
     if (radio) radio.checked = true;
     if (file) {
       RTSXSFX.setPreference(group, file);
-      var a2 = new Audio(RTSXSFX.base + file);
-      a2.volume = RTSXSFX.getVolume();
-      a2.play().catch(function(){});
+      RTSXSFX.warm(file);
+      RTSXSFX.preview(file, group);
     } else {
       RTSXSFX.setPreference(group, null);
       RTSXSFX.play(group);
     }
     render();
+  });
+
+  // 手指/鼠标移到某一行就先取该文件，点试听时不用等下载
+  grid.addEventListener("pointerover", function(e){
+    var row = e.target.closest ? e.target.closest(".row") : null;
+    if (!row) return;
+    var file = row.getAttribute("data-file");
+    if (file) RTSXSFX.warm(file);
   });
 
   render();

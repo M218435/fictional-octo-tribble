@@ -1039,10 +1039,16 @@
     document.body.style.overflow = "";
   }
 
-  el.grid.addEventListener("click", function (e) {
+  // 音效按下即响（新窗口打开会立刻切走页面，等 click 会被吃掉）
+  el.grid.addEventListener("pointerdown", function (e) {
     var tile = e.target.closest ? e.target.closest(".tile") : null;
     if (!tile) return;
     SFX.open();
+  });
+
+  el.grid.addEventListener("click", function (e) {
+    var tile = e.target.closest ? e.target.closest(".tile") : null;
+    if (!tile) return;
     var nameEl = tile.querySelector("[data-name]");
     var file = tile.getAttribute("data-file");
     if (tile.getAttribute("data-blank") === "1") {

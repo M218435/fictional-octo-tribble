@@ -9,6 +9,7 @@ const path = require("path");
 const SR = 48000;
 const OUT = path.join(__dirname, "..");
 const FILES = [];
+const EMBED = {};
 
 /* ---------- 基础 ---------- */
 function make(dur) {
@@ -151,6 +152,9 @@ function fade(buf, ms) {
   });
 }
 
+const OUT_SR = 16000;          // 落盘采样率：音效内容都在 5k 以下，16k 足够
+const HOT = /^ui-click/;   // 点击音内嵌进 sfx.js，点下去立刻响，不等请求
+
 function save(name, buf, peak) {
   // 先软限幅到 1.0，再统一峰值到 0.8；各类响度由 sfx.js 的 GAIN 控制
   limit(buf, 1.0);
@@ -163,29 +167,41 @@ function save(name, buf, peak) {
     }
   })();
   fade(buf, 6);
-  const n = buf.n;
-  const data = Buffer.alloc(44 + n * 4);
+
+  // 降采样到 OUT_SR + 合并单声道（手机外放本来就是单声道）
+  const factor = Math.round(SR / OUT_SR);
+  const n = Math.floor(buf.n / factor);
+  const mono = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    let acc = 0;
+    for (let k = 0; k < factor; k++) {
+      const j = i * factor + k;
+      acc += (buf.L[j] + buf.R[j]) * 0.5;
+    }
+    mono[i] = acc / factor;
+  }
+
+  const data = Buffer.alloc(44 + n * 2);
   data.write("RIFF", 0);
-  data.writeUInt32LE(36 + n * 4, 4);
+  data.writeUInt32LE(36 + n * 2, 4);
   data.write("WAVE", 8);
   data.write("fmt ", 12);
   data.writeUInt32LE(16, 16);
   data.writeUInt16LE(1, 20);
-  data.writeUInt16LE(2, 22);          // 双声道
-  data.writeUInt32LE(SR, 24);
-  data.writeUInt32LE(SR * 4, 28);
-  data.writeUInt16LE(4, 32);
+  data.writeUInt16LE(1, 22);           // 单声道
+  data.writeUInt32LE(OUT_SR, 24);
+  data.writeUInt32LE(OUT_SR * 2, 28);
+  data.writeUInt16LE(2, 32);
   data.writeUInt16LE(16, 34);
   data.write("data", 36);
-  data.writeUInt32LE(n * 4, 40);
+  data.writeUInt32LE(n * 2, 40);
   for (let i = 0; i < n; i++) {
-    let l = Math.max(-1, Math.min(1, buf.L[i])) * 32767;
-    let r = Math.max(-1, Math.min(1, buf.R[i])) * 32767;
-    data.writeInt16LE(l < 0 ? l - 0.5 | 0 : l + 0.5 | 0, 44 + i * 4);
-    data.writeInt16LE(r < 0 ? r - 0.5 | 0 : r + 0.5 | 0, 46 + i * 4);
+    let v = Math.max(-1, Math.min(1, mono[i])) * 32767;
+    data.writeInt16LE(v < 0 ? v - 0.5 | 0 : v + 0.5 | 0, 44 + i * 2);
   }
   fs.writeFileSync(path.join(OUT, name + ".wav"), data);
-  FILES.push({ name: name + ".wav", bytes: data.length, ms: Math.round(n / SR * 1000) });
+  FILES.push({ name: name + ".wav", bytes: data.length, ms: Math.round(n / OUT_SR * 1000) });
+  if (HOT.test(name)) EMBED[name + ".wav"] = data.toString("base64");
 }
 
 /* ======================================================================
@@ -361,13 +377,36 @@ function save(name, buf, peak) {
 /* ---------- 清单 ---------- */
 const manifest = {
   version: 2,
-  sampleRate: SR,
-  channels: 2,
+  sampleRate: OUT_SR,
+  channels: 1,
   generatedAt: new Date().toISOString(),
   total: FILES.length,
   bytes: FILES.reduce((s, f) => s + f.bytes, 0),
+  embedded: Object.keys(EMBED).length,
   files: FILES
 };
 fs.writeFileSync(path.join(OUT, "manifest.json"), JSON.stringify(manifest, null, 2));
-console.log("v2 files=" + FILES.length + "  total=" + (manifest.bytes / 1024).toFixed(1) + " KB");
+
+/* ---------- 把常用音效内嵌进 sfx.js（放在标记之间，重复生成会覆盖旧数据） ---------- */
+(function patchEmbed() {
+  const jsPath = path.join(OUT, "sfx.js");
+  if (!fs.existsSync(jsPath)) return;
+  const src = fs.readFileSync(jsPath, "utf8");
+  const re = /\/\*@@EMBED\*\/[\s\S]*?\/\*@@\/EMBED\*\//;
+  if (!re.test(src)) {
+    console.log("! sfx.js 里没有 /*@@EMBED*/ 标记，跳过内嵌");
+    return;
+  }
+  const body =
+    "/*@@EMBED*/\n" +
+    "  // 以下为常用音效的 base64 WAV（24k 单声道），内嵌后点击时不需要再发请求\n" +
+    "  var EMBED = {\n" +
+    Object.keys(EMBED).map(k => '    "' + k + '": "' + EMBED[k] + '"').join(",\n") +
+    "\n  };\n" +
+    "  /*@@/EMBED*/";
+  fs.writeFileSync(jsPath, src.replace(re, body), "utf8");
+  console.log("内嵌 " + Object.keys(EMBED).length + " 个音效到 sfx.js");
+})();
+
+console.log("files=" + FILES.length + "  total=" + (manifest.bytes / 1024).toFixed(1) + " KB");
 FILES.forEach(f => console.log("  " + f.name + "  " + f.ms + "ms  " + (f.bytes / 1024).toFixed(1) + "KB"));
