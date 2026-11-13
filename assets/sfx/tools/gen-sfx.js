@@ -231,14 +231,17 @@ function save(name, buf, peak) {
   save("ui-back-" + (i + 1), b, 0.5);
 });
 
-/* 4. 得分：温暖的三音叮（弱不谐和，带房间尾音） */
-[784, 988, 1174].forEach((f, i) => {
-  const b = make(0.42);
-  chime(b, { freq: f, amp: 0.42, dur: 0.30, decay: 11, parts: [1, 2.18, 3.44, 5.2], amps: [1, 0.36, 0.18, 0.08] });
-  tone(b, { freq: f * 0.5, amp: 0.10, dur: 0.34, decay: 16, tail: 5, attack: 0.01 });
-  room(b, 0.7);
-  smooth(b, 5200);
-  save("score-" + (i + 1), b, 0.58);
+/* 4. 得分：低频支撑 + 温暖钟 + 亮片，明确"奖励感" */
+[0, 1, 2].forEach((v) => {
+  const b = make(0.52);
+  const base = 880 + v * 36;
+  tone(b, { freq: 96, amp: 0.24, dur: 0.18, decay: 28, tail: 8, attack: 0.004 });
+  chime(b, { freq: base, amp: 0.42, dur: 0.44, decay: 8.5, parts: [1, 2.02, 3.06, 4.62], amps: [1, 0.34, 0.16, 0.07] });
+  chime(b, { freq: base * 1.52, amp: 0.13, start: 0.02, dur: 0.18, decay: 22, parts: [1, 1.41], amps: [1, 0.3] });
+  tone(b, { freq: base * 0.5, amp: 0.12, dur: 0.34, decay: 14, tail: 4.5, attack: 0.008 });
+  room(b, 0.8);
+  smooth(b, 5800);
+  save("score-" + (v + 1), b, 0.58);
 });
 
 /* 5. 接住：温润的拨弦 + 细碎亮片 */
@@ -279,19 +282,25 @@ function save(name, buf, peak) {
   save("land-" + (i + 1), b, 0.56);
 });
 
-/* 8. 异常体：数字故障但压住高频，听感"脏而不炸" */
+/* 8. 异常体：数字碎片 + 量化颗粒，脏但有节奏，不炸耳 */
 [0, 1, 2].forEach((v) => {
-  const b = make(0.38);
-  const f0 = 168 + v * 26;
-  tone(b, { freq: f0, to: f0 * 2.2, amp: 0.26, dur: 0.34, decay: 9, tail: 3, attack: 0.006, curve: 1.8 });
-  tone(b, { freq: f0 * 2.7, to: f0 * 0.9, amp: 0.14, dur: 0.3, decay: 12, tail: 3.4, attack: 0.008 });
-  noise(b, { amp: 0.34, dur: 0.34, decay: 6.5, lp: 0.3, hp: 0.03 });
-  for (let i = 0; i < b.n; i++) {
-    const gate = Math.sin(i / SR * Math.PI * 2 * 18 + v) > -0.2 ? 1 : 0.32;
-    b.L[i] *= gate; b.R[i] *= gate;
-  }
-  room(b, 0.5);
-  smooth(b, 5200);
+  const b = make(0.40);
+  tone(b, { freq: 118 + v * 14, to: 152 + v * 18, amp: 0.16, dur: 0.34, decay: 8, tail: 3, attack: 0.004, pan: -0.12 });
+  const steps = [0, 0.035, 0.08, 0.118, 0.156, 0.198, 0.242];
+  const pitches = [620, 900, 540, 1140, 760, 1320, 480];
+  steps.forEach((t, i) => {
+    const f = pitches[(i + v) % pitches.length];
+    tone(b, {
+      freq: f, to: f * (0.72 + ((i + v) % 3) * 0.18), amp: 0.19,
+      dur: 0.032, decay: 55, tail: 14, attack: 0.002, start: t,
+      pan: ((i % 3) - 1) * 0.3
+    });
+  });
+  // 轻度量化，做出数字颗粒感又不至于刺耳
+  const q = 1 / 64;
+  [b.L, b.R].forEach(ch => { for (let i = 0; i < ch.length; i++) ch[i] = Math.round(ch[i] / q) * q; });
+  room(b, 0.4);
+  smooth(b, 5400);
   save("glitch-" + (v + 1), b, 0.55);
 });
 
@@ -308,14 +317,21 @@ function save(name, buf, peak) {
   save("warn-" + (i + 1), b, 0.5);
 });
 
-/* 10. 开始：上冲的能量，带厚度 */
+/* 10. 开始：三音和弦一起上冲 + 低频托底，不做单调滑音 */
 [0, 1].forEach((v) => {
-  const b = make(0.62);
-  tone(b, { freq: 196 + v * 30, to: 760 + v * 90, amp: 0.34, dur: 0.5, decay: 6.5, tail: 2.6, attack: 0.02, curve: 2.2, pan: -0.05 });
-  tone(b, { freq: 296 + v * 40, to: 1180 + v * 120, amp: 0.16, dur: 0.42, decay: 9, tail: 3.2, attack: 0.03, curve: 2.4, pan: 0.08 });
-  noise(b, { amp: 0.10, dur: 0.44, decay: 5.5, lp: 0.4, hp: 0.01 });
-  room(b, 0.6);
-  smooth(b, 6000);
+  const b = make(0.64);
+  [0, 1, 2].forEach((i) => {
+    const f0 = (196 + v * 16) * Math.pow(1.48, i);
+    tone(b, {
+      freq: f0, to: f0 * 2.05, amp: 0.22 / (1 + i * 0.55),
+      dur: 0.42 + i * 0.05, decay: 7, tail: 2.8, attack: 0.03,
+      start: i * 0.045, curve: 2.4, pan: (i - 1) * 0.2
+    });
+  });
+  tone(b, { freq: 88, amp: 0.20, dur: 0.5, decay: 9, tail: 3, attack: 0.02 });
+  noise(b, { amp: 0.12, dur: 0.44, decay: 5, lp: 0.36, hp: 0.02 });
+  room(b, 0.7);
+  smooth(b, 6200);
   save("start-" + (v + 1), b, 0.56);
 });
 

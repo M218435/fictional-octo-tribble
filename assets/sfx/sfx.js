@@ -54,13 +54,13 @@
     "ui-click-1.wav": 100, "ui-click-2.wav": 100, "ui-click-3.wav": 100,
     "ui-hover-1.wav": 160, "ui-hover-2.wav": 160,
     "ui-back-1.wav": 240, "ui-back-2.wav": 240,
-    "score-1.wav": 420, "score-2.wav": 420, "score-3.wav": 420,
+    "score-1.wav": 520, "score-2.wav": 520, "score-3.wav": 520,
     "catch-1.wav": 360, "catch-2.wav": 360, "catch-3.wav": 360,
     "error-1.wav": 420, "error-2.wav": 420,
     "land-1.wav": 300, "land-2.wav": 300, "land-3.wav": 300,
-    "glitch-1.wav": 380, "glitch-2.wav": 380, "glitch-3.wav": 380,
+    "glitch-1.wav": 400, "glitch-2.wav": 400, "glitch-3.wav": 400,
     "warn-1.wav": 460, "warn-2.wav": 460,
-    "start-1.wav": 620, "start-2.wav": 620,
+    "start-1.wav": 640, "start-2.wav": 640,
     "success-1.wav": 820, "success-2.wav": 820,
     "toggle-1.wav": 170, "toggle-2.wav": 170
   };

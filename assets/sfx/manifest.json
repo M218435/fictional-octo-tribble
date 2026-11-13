@@ -2,9 +2,9 @@
   "version": 2,
   "sampleRate": 48000,
   "channels": 2,
-  "generatedAt": "2026-11-13T12:42:22.057Z",
+  "generatedAt": "2026-11-13T12:54:22.375Z",
   "total": 29,
-  "bytes": 2009596,
+  "bytes": 2086396,
   "files": [
     {
       "name": "ui-click-1.wav",
@@ -43,18 +43,18 @@
     },
     {
       "name": "score-1.wav",
-      "bytes": 80684,
-      "ms": 420
+      "bytes": 99884,
+      "ms": 520
     },
     {
       "name": "score-2.wav",
-      "bytes": 80684,
-      "ms": 420
+      "bytes": 99884,
+      "ms": 520
     },
     {
       "name": "score-3.wav",
-      "bytes": 80684,
-      "ms": 420
+      "bytes": 99884,
+      "ms": 520
     },
     {
       "name": "catch-1.wav",
@@ -98,18 +98,18 @@
     },
     {
       "name": "glitch-1.wav",
-      "bytes": 73004,
-      "ms": 380
+      "bytes": 76844,
+      "ms": 400
     },
     {
       "name": "glitch-2.wav",
-      "bytes": 73004,
-      "ms": 380
+      "bytes": 76844,
+      "ms": 400
     },
     {
       "name": "glitch-3.wav",
-      "bytes": 73004,
-      "ms": 380
+      "bytes": 76844,
+      "ms": 400
     },
     {
       "name": "warn-1.wav",
@@ -123,13 +123,13 @@
     },
     {
       "name": "start-1.wav",
-      "bytes": 119084,
-      "ms": 620
+      "bytes": 122924,
+      "ms": 640
     },
     {
       "name": "start-2.wav",
-      "bytes": 119084,
-      "ms": 620
+      "bytes": 122924,
+      "ms": 640
     },
     {
       "name": "success-1.wav",
