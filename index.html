@@ -974,7 +974,9 @@
 
   /* ================= 视图切换 ================= */
   function show(stage) {
-    el.boot.classList.remove("on");
+    // 先把所有舞台关掉，再开目标，避免两个界面叠在一起
+    var all = document.querySelectorAll(".stage");
+    for (var i = 0; i < all.length; i++) all[i].classList.remove("on");
     setTimeout(function () { stage.classList.add("on"); }, 120);
   }
 
@@ -1018,6 +1020,9 @@
       el.appealErr.classList.remove("show");
       writeState("unlocked", currentLang);   // 永久解除，重开页面也不再封
       SFX.ok();
+      el.appeal.classList.remove("open");    // 收起申诉面板，别把残留状态带进主界面
+      el.terms.classList.remove("open");
+      el.input.value = "";
       enterHome(currentLang);
       toast(COPY[currentLang].toast);
       return;
