@@ -113,7 +113,9 @@
     if (pools[file]) return pools[file];
     var arr = [];
     var src = EMBED[file] ? ("data:audio/wav;base64," + EMBED[file]) : url(file);
-    for (var i = 0; i < POOL_SIZE; i++) {
+    // 内嵌音效不花流量，备两份；文件类只备一份，别在打开页面时抢带宽
+    var size = EMBED[file] ? POOL_SIZE : 1;
+    for (var i = 0; i < size; i++) {
       var a = new Audio();
       a.preload = "auto";
       a.src = src;
@@ -289,10 +291,14 @@
   document.addEventListener("pointerdown", unlockOnce, true);
   document.addEventListener("keydown", unlockOnce, true);
 
-  // 常用音在脚本执行时就开始预取（不等 window.load，否则首批点击还在下载）
-  preload(["click", "hover", "toggle", "back", "start"]);
+  // 常用音等页面空闲了再取，别和页面本身抢带宽（点击音已内嵌，不需要网络）
+  function warmHot() { preload(["click", "hover", "toggle", "back", "start"]); }
 
-  function boot() { bind(document); }
+  function boot() {
+    bind(document);
+    if (window.requestIdleCallback) requestIdleCallback(warmHot, { timeout: 2500 });
+    else setTimeout(warmHot, 800);
+  }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();
 })();

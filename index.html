@@ -808,37 +808,39 @@
     else setTimeout(go, 1500);
   }
   function preload() {
-    var t0 = Date.now(), done = 0, total = ASSETS.length || 1, settled = false;
+    // 大厅不再等资源：先把门打开，游戏页在后台一页一页预热。
+    // 以前是 9 个页面全下完才放行（最多卡 8 秒），慢网络下点什么都像"打不开"。
+    bootReady = true;
+    checkEnter();
+    setTimeout(prefetchGames, 900);
+  }
 
-    function finish() {
-      if (settled) return;
-      settled = true;
-      setProgress(1);
-      bootReady = true;
-      checkEnter();
-      warmHeavy();
-    }
-
-    setProgress(0);
-    var bump = function () {
+  function prefetchGames() {
+    if (!window.fetch) return;
+    var queue = ASSETS.slice();
+    var done = 0, total = queue.length;
+    var step = function () {
       done++;
       setProgress(done / total);
-      if (done >= total) {
-        // 留一点时间让进度条走完，避免一闪而过
-        var wait = Math.max(0, 700 - (Date.now() - t0));
-        setTimeout(finish, wait);
-      }
+      if (!queue.length) { warmHeavy(); return; }
+      setTimeout(next, 140);          // 串行预热，别和页面本身抢带宽
     };
+    var next = function () {
+      if (!queue.length) { warmHeavy(); return; }
+      var u = queue.shift();
+      try {
+        fetch(u, { credentials: "same-origin", cache: "force-cache" })
+          .then(function (r) { return r.text(); })
+          .then(step, step);
+      } catch (e) { step(); }
+    };
+    next();
+  }
 
-    ASSETS.forEach(function (u) {
-      if (!window.fetch) { bump(); return; }
-      fetch(u, { credentials: "same-origin" })
-        .then(function (r) { return r.text(); })
-        .then(bump, bump);
-    });
-
-    // 网络卡住也不要一直停在进度条上
-    setTimeout(finish, 8000);
+  // 鼠标/手指压到某个游戏块时，先把那一页取回来，点开就不用等
+  function warmPage(url) {
+    if (!window.fetch || !url) return;
+    try { fetch(url, { credentials: "same-origin", cache: "force-cache" }).catch(function () {}); } catch (e) {}
   }
 
   /* ================= 永久状态存储 ================= */
@@ -857,6 +859,23 @@
   }
   function clearState() {
     try { localStorage.removeItem(STORE_KEY); } catch (e) {}
+  }
+
+  /* 上次查到的归属地缓存 12 小时：老访客不用再等一次外部查询，进来就是首页 */
+  var GEO_KEY = "rtsx.geo.v1";
+  function readGeo() {
+    try {
+      var o = JSON.parse(localStorage.getItem(GEO_KEY) || "null");
+      if (!o || typeof o.at !== "number") return null;
+      if (Date.now() - o.at > 12 * 3600 * 1000) return null;
+      return o;
+    } catch (e) { return null; }
+  }
+  function writeGeo(country) {
+    try {
+      if (!country) return;
+      localStorage.setItem(GEO_KEY, JSON.stringify({ country: country, at: Date.now() }));
+    } catch (e) {}
   }
 
   /* ================= IP 归属地（只取国家代码） ================= */
@@ -1046,6 +1065,14 @@
     SFX.open();
   });
 
+  // 压上去就先把对应页面取回来
+  el.grid.addEventListener("pointerover", function (e) {
+    var tile = e.target.closest ? e.target.closest(".tile") : null;
+    if (!tile) return;
+    var file = tile.getAttribute("data-file");
+    if (file) warmPage(file);
+  });
+
   el.grid.addEventListener("click", function (e) {
     var tile = e.target.closest ? e.target.closest(".tile") : null;
     if (!tile) return;
@@ -1116,23 +1143,34 @@
 
     var t0 = Date.now();
     var decided = false;
+    var enterByCountry = function (country) {
+      if (country && CHINA_REGIONS.indexOf(country) !== -1) {
+        enterBan("zh", true);         // 国内 IP：永久记录为封禁
+      } else {
+        enterHome(pickLang(country)); // 其它地区：正常首页，不写入状态
+      }
+    };
     var settle = function (country) {
       if (decided) return;
       decided = true;
+      if (country) writeGeo(country);
       var wait = Math.max(0, 700 - (Date.now() - t0));
       setTimeout(function () {
         ipReady = true;
-        gate(function () {
-          if (country && CHINA_REGIONS.indexOf(country) !== -1) {
-            enterBan("zh", true);         // 国内 IP：永久记录为封禁
-          } else {
-            enterHome(pickLang(country)); // 其它地区：正常首页，不写入状态
-          }
-        });
+        gate(function () { enterByCountry(country); });
       }, wait);
     };
 
-    var guard = setTimeout(function () { settle(null); }, 8000);
+    // 12 小时内查过就别再等了，直接用缓存
+    var geo = readGeo();
+    if (geo) {
+      decided = true;
+      ipReady = true;
+      gate(function () { enterByCountry(geo.country); });
+      return;
+    }
+
+    var guard = setTimeout(function () { settle(null); }, 6000);
 
     anyCountry().then(function (code) {
       clearTimeout(guard);
