@@ -169,6 +169,72 @@
   }
   .btn:hover{background:#C4603F;transform:translateY(-1px);}
   .btn:active{transform:none;}
+
+  /* ---------------- 外挂面板 ---------------- */
+  .cheat{
+    position:fixed;left:calc(12px + env(safe-area-inset-left));top:calc(50px + env(safe-area-inset-top));
+    z-index:6;font:inherit;
+  }
+  .cheat-btn{
+    display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 11px;border-radius:9px;
+    background:rgba(26,22,19,.86);border:1px solid rgba(244,237,227,.18);color:#E8DFD2;
+    font:inherit;font-size:11.5px;letter-spacing:.06em;cursor:pointer;
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+    box-shadow:0 10px 24px -18px #000;
+  }
+  .cheat-btn b{color:#D97757;font-weight:600;font-size:10px;}
+  .cheat-panel{
+    display:none;margin-top:8px;width:min(244px,70vw);max-height:min(72vh,520px);overflow:auto;
+    background:rgba(20,17,15,.94);border:1px solid rgba(244,237,227,.16);border-radius:12px;
+    box-shadow:0 26px 60px -34px #000;
+    backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    scrollbar-width:thin;scrollbar-color:#4A3F36 transparent;-webkit-overflow-scrolling:touch;
+  }
+  .cheat-panel::-webkit-scrollbar{width:6px;}
+  .cheat-panel::-webkit-scrollbar-thumb{background:#4A3F36;border-radius:3px;}
+  .cheat-panel.open{display:block;animation:cfade .18s ease both;}
+  @keyframes cfade{from{opacity:0;transform:translateY(-5px);}to{opacity:1;transform:none;}}
+  .cheat-group{border-bottom:1px solid rgba(244,237,227,.08);}
+  .cheat-group:last-child{border-bottom:0;}
+  .cheat-head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:9px 12px;cursor:pointer;user-select:none;-webkit-user-select:none;
+    color:#F4EDE3;font-size:12px;letter-spacing:.04em;
+  }
+  .cheat-head:hover{background:rgba(244,237,227,.05);}
+  .cheat-head .ar{
+    width:8px;height:8px;font-size:0;background:#9C9287;margin-right:2px;
+    clip-path:polygon(0 0,100% 50%,0 100%);-webkit-clip-path:polygon(0 0,100% 50%,0 100%);
+    transition:background .16s ease,clip-path .16s ease;
+  }
+  .cheat-group.open .cheat-head .ar{
+    background:#D97757;
+    clip-path:polygon(0 0,100% 0,50% 100%);-webkit-clip-path:polygon(0 0,100% 0,50% 100%);
+  }
+  .cheat-body{display:none;padding:2px 12px 11px;}
+  .cheat-group.open .cheat-body{display:block;}
+  .cheat-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 0;}
+  .cheat-row em{font-style:normal;color:#C9BFB2;font-size:11.5px;}
+  .cheat-row .v{color:#D97757;font-size:11px;min-width:32px;text-align:right;font-variant-numeric:tabular-nums;}
+  .cheat-row input[type=range]{
+    -webkit-appearance:none;appearance:none;width:92px;height:2px;
+    background:rgba(244,237,227,.22);border-radius:2px;outline:0;
+  }
+  .cheat-row input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:#D97757;border:0;
+  }
+  .cheat-row input[type=range]::-moz-range-thumb{
+    width:12px;height:12px;border:0;border-radius:50%;background:#D97757;
+  }
+  .sw{width:34px;height:18px;border-radius:9px;background:rgba(244,237,227,.2);position:relative;cursor:pointer;flex:0 0 auto;transition:background .16s ease;}
+  .sw.on{background:#D97757;}
+  .sw i{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#F4EDE3;transition:transform .16s ease;}
+  .sw.on i{transform:translateX(16px);}
+  .cbtn{
+    width:100%;height:28px;margin-top:6px;border:1px solid rgba(244,237,227,.16);border-radius:8px;
+    background:rgba(244,237,227,.06);color:#E8DFD2;font:inherit;font-size:11.5px;cursor:pointer;
+  }
+  .cbtn:active{background:rgba(217,119,87,.3);}
 </style>
 </head>
 <body>
@@ -189,6 +255,41 @@
   <button class="snd" id="snd" type="button">SFX</button>
 </div>
 <button class="ham" id="ham" type="button">锤</button>
+<div class="cheat" id="cheat">
+  <button class="cheat-btn" id="cheatBtn" type="button">外挂 <b>&#9662;</b></button>
+  <div class="cheat-panel" id="cheatPanel">
+    <div class="cheat-group open" id="cgView">
+      <div class="cheat-head">视角 <span class="ar"></span></div>
+      <div class="cheat-body">
+        <div class="cheat-row"><em>视野 FOV</em><input id="cfov" type="range" min="55" max="115" step="1" value="78"><span class="v" id="cfovV">78</span></div>
+        <div class="cheat-row"><em>眼高</em><input id="ceye" type="range" min="0.4" max="1.9" step="0.05" value="0.98"><span class="v" id="ceyeV">0.98</span></div>
+        <div class="cheat-row"><em>俯仰角度</em><input id="cpit" type="range" min="0.6" max="1.55" step="0.05" value="1.15"><span class="v" id="cpitV">1.15</span></div>
+        <div class="cheat-row"><em>亮度</em><input id="cbr" type="range" min="0.6" max="2.2" step="0.05" value="1"><span class="v" id="cbrV">1.00</span></div>
+      </div>
+    </div>
+    <div class="cheat-group" id="cgWorld">
+      <div class="cheat-head">世界 <span class="ar"></span></div>
+      <div class="cheat-body">
+        <div class="cheat-row"><em>小地图</em><div class="sw" id="cmm"><i></i></div></div>
+        <button class="cbtn" id="ctpExit" type="button">传送到出口门</button>
+        <button class="cbtn" id="ctpCube" type="button">传送到最近的 67</button>
+        <button class="cbtn" id="cregen" type="button">重新生成迷宫</button>
+      </div>
+    </div>
+    <div class="cheat-group" id="cgFight">
+      <div class="cheat-head">战斗 <span class="ar"></span></div>
+      <div class="cheat-body">
+        <div class="cheat-row"><em>无敌</em><div class="sw" id="cinv"><i></i></div></div>
+        <div class="cheat-row"><em>定住追兵</em><div class="sw" id="cfrz"><i></i></div></div>
+        <div class="cheat-row"><em>无限锤</em><div class="sw" id="chin"><i></i></div></div>
+        <div class="cheat-row"><em>追兵速度倍率</em><input id="chs" type="range" min="0" max="3" step="0.05" value="1"><span class="v" id="chsV">1.00</span></div>
+        <button class="cbtn" id="cclear" type="button">清空追兵</button>
+        <button class="cbtn" id="call" type="button">一键收齐所有 67</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="tip">WASD 移动 · 鼠标转视角 · Shift 冲刺 · X 挥锤</div>
 <div class="lockhint" id="lockhint">点击画面锁定鼠标</div>
 
@@ -1460,6 +1561,78 @@
     if (window.parent !== window) window.parent.postMessage("rtsx-close", "*");
     else location.href = "index.html";
   });
+
+  /* ---------------- 外挂面板：本地 UI 直接调用同一套注入指令 ---------------- */
+  var cheatBtnEl = document.getElementById("cheatBtn");
+  var cheatPanelEl = document.getElementById("cheatPanel");
+
+  function cheatOpen(force){
+    if (!cheatPanelEl) return;
+    var open = (force === undefined) ? !cheatPanelEl.classList.contains("open") : !!force;
+    cheatPanelEl.classList.toggle("open", open);
+    if (cheatBtnEl) cheatBtnEl.innerHTML = open ? "外挂 <b>&#9652;</b>" : "外挂 <b>&#9662;</b>";
+  }
+  if (cheatBtnEl) {
+    cheatBtnEl.addEventListener("click", function(e){
+      e.preventDefault(); e.stopPropagation(); cheatOpen();
+    });
+  }
+  if (cheatPanelEl) {
+    var cgHeads = cheatPanelEl.querySelectorAll(".cheat-head");
+    for (var gi = 0; gi < cgHeads.length; gi++) {
+      cgHeads[gi].addEventListener("click", function(){ this.parentNode.classList.toggle("open"); });
+    }
+  }
+
+  function cUiRange(id, vid, cmd, digits){
+    var el = document.getElementById(id), out = document.getElementById(vid);
+    if (!el) return;
+    el.addEventListener("input", function(){
+      var v = parseFloat(el.value);
+      if (out) out.textContent = digits ? v.toFixed(digits) : String(v);
+      mzApply(cmd, v);
+    });
+  }
+  cUiRange("cfov", "cfovV", "fov");
+  cUiRange("ceye", "ceyeV", "eye", 2);
+  cUiRange("cpit", "cpitV", "pitch", 2);
+  cUiRange("cbr", "cbrV", "bright", 2);
+  cUiRange("chs", "chsV", "hsp", 2);
+
+  function cUiSwitch(id, cmd){
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener("click", function(){
+      var on = !el.classList.contains("on");
+      var res = mzApply(cmd, on);
+      el.classList.toggle("on", typeof res === "boolean" ? res : on);
+    });
+  }
+  cUiSwitch("cmm", "map");
+  cUiSwitch("cinv", "inv");
+  cUiSwitch("cfrz", "frz");
+  cUiSwitch("chin", "hin");
+
+  function cUiBtn(id, cmd, after){
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener("click", function(e){
+      e.preventDefault(); e.stopPropagation();
+      mzApply(cmd);
+      if (after) after();
+    });
+  }
+  cUiBtn("ctpExit", "tp_exit");
+  cUiBtn("ctpCube", "tp_cube");
+  cUiBtn("cregen", "regen", function(){ cheatOpen(false); });
+  cUiBtn("cclear", "clear");
+  cUiBtn("call", "collect");
+
+  /* 被注入台嵌进 iframe 时收起自带面板，避免和注入台两层控件重叠 */
+  if (window.self !== window.top) {
+    var cheatBox = document.getElementById("cheat");
+    if (cheatBox) cheatBox.style.display = "none";
+  }
 
   setup();
   if (isTouch) {
