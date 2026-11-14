@@ -531,7 +531,7 @@
   }
 
   /* ---------------- 迷宫 ---------------- */
-  var MW = 61, MH = 61, map = [];
+  var MW = 101, MH = 51, map = [];
   function genMaze(){
     map = [];
     for (var y = 0; y < MH; y++) {
@@ -778,7 +778,7 @@
     var pool = opens.filter(function(c){
       return dist[c.y * MW + c.x] >= 5 && !(c.x === exitCell.x && c.y === exitCell.y);
     });
-    var cubeCount = Math.max(8, Math.min(28, Math.round(opens.length / 60)));
+    var cubeCount = Math.max(8, Math.min(34, Math.round(opens.length / 60)));
     for (var n = 0; n < cubeCount && pool.length; n++) {
       var pick = Math.floor(Math.random() * pool.length);
       cubes.push({ x: pool[pick].x + 0.5, y: pool[pick].y + 0.5, got: false, spin: Math.random() * 6.28 });
@@ -788,7 +788,7 @@
     hunters = [];
     var farPool = opens.filter(function(c){ return dist[c.y * MW + c.x] >= 8; });
     if (!farPool.length) farPool = opens.slice();
-    for (var h = 0; h < 5 && farPool.length; h++) {
+    for (var h = 0; h < 6 && farPool.length; h++) {
       var hp = Math.floor(Math.random() * farPool.length);
       var cell = farPool[hp];
       farPool.splice(hp, 1);
