@@ -315,12 +315,12 @@
     "precision mediump float;",
     "varying vec3 vN; varying vec3 vC; varying vec2 vUV; varying float vD;",
     "uniform vec3 uTint; uniform float uUseTex; uniform sampler2D uTex;",
-    "uniform vec3 uLight; uniform vec3 uFog; uniform float uFogNear; uniform float uFogFar;",
+    "uniform vec3 uLight; uniform vec3 uFog; uniform float uFogNear; uniform float uFogFar; uniform float uBright;",
     "void main(){",
     "  vec3 base = vC;",
     "  if (uUseTex > 0.5) base = texture2D(uTex, vUV).rgb * vC;",
     "  float dl = max(0.0, dot(normalize(vN), uLight));",
-    "  vec3 lit = base * (0.50 + 0.62 * dl) * uTint;",
+    "  vec3 lit = base * (0.50 + 0.62 * dl) * uTint * uBright;",
     "  float f = clamp((vD - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);",
     "  f = f * f;",
     "  gl_FragColor = vec4(mix(lit, uFog, f), 1.0);",
@@ -349,6 +349,7 @@
     tex: gl.getUniformLocation(prog, "uTex"),
     light: gl.getUniformLocation(prog, "uLight"),
     fog: gl.getUniformLocation(prog, "uFog"),
+    bright: gl.getUniformLocation(prog, "uBright"),
     fogNear: gl.getUniformLocation(prog, "uFogNear"),
     fogFar: gl.getUniformLocation(prog, "uFogFar")
   };
@@ -723,7 +724,7 @@
     var idx = t.y * MW + t.x;
     wallDmg[idx] = (wallDmg[idx] || 0) + 1;
     hammerFlash = 0.16;
-    hammerCd = HAMMER_CD;
+    hammerCd = MZX.hin ? 0 : HAMMER_CD;
     if (hamBtn) hamBtn.classList.add("cd");
     SFX.hammer();
     if (wallDmg[idx] >= 5) {
@@ -931,8 +932,8 @@
   cv.addEventListener("lostpointercapture", endLook);
 
   function clampPitch(){
-    if (pitch > 1.15) pitch = 1.15;
-    if (pitch < -1.15) pitch = -1.15;
+    if (pitch > MZX.pitch) pitch = MZX.pitch;
+    if (pitch < -MZX.pitch) pitch = -MZX.pitch;
   }
 
   /* 摇杆：只负责移动（前后 + 左右平移） */
@@ -1089,11 +1090,11 @@
         var v = field[ny2 * MW + nx2];
         if (v < bd) { bd = v; best = [nx2 + 0.5, ny2 + 0.5]; }
       }
-      if (buffT.freeze <= 0) {                       // 冻结期间整只定住，只能原地瞪你
+      if (buffT.freeze <= 0 && !MZX.frz) {                       // 冻结期间整只定住，只能原地瞪你
         if (best) {
           var ddx = best[0] - hh.x, ddy = best[1] - hh.y;
           var len = Math.hypot(ddx, ddy) || 1;
-          var mul = buffT.slow > 0 ? 0.52 : 1;
+          var mul = (buffT.slow > 0 ? 0.52 : 1) * MZX.hsp;
           var sx2 = ddx / len * hh.speed * mul * dt, sy2 = ddy / len * hh.speed * mul * dt;
           if (!solid(hh.x + sx2, hh.y)) hh.x += sx2;    // 逐轴走，别贴着墙角斜穿进墙里
           if (!solid(hh.x, hh.y + sy2)) hh.y += sy2;
@@ -1111,6 +1112,7 @@
       var d2 = Math.hypot(hh.x - px, hh.y - py);
       if (d2 < nearest) nearest = d2;
       if (d2 < 0.6) {
+        if (MZX.inv) continue;
         if (invuln > 0) continue;                    // 刚破盾，给一点喘气时间
         if (shields > 0) {                           // 护盾顶一下：消耗掉，把这只丢回最远的格子
           shields--;
@@ -1177,7 +1179,7 @@
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     var aspect = W / H;
-    var hfov = 78 * Math.PI / 180;
+    var hfov = MZX.fov * Math.PI / 180;
     var vfov = 2 * Math.atan(Math.tan(hfov / 2) / aspect);
     if (vfov > 1.62) vfov = 1.62;
     var proj = persp(vfov, aspect, 0.05, 60);
@@ -1187,7 +1189,7 @@
     var r = [Math.cos(yaw), 0, -Math.sin(yaw)];
     var u = [f[1] * r[2] - f[2] * r[1], f[2] * r[0] - f[0] * r[2], f[0] * r[1] - f[1] * r[0]];
     var bob = Math.sin(walkPhase) * 0.022;
-    var eye = [px, 0.98 + bob, py];
+    var eye = [px, MZX.eye + bob, py];
     var view = viewMat(eye, r, u, f);
     var mvp = m4mul(proj, view);
 
@@ -1197,6 +1199,7 @@
     gl.uniform3fv(U.cam, eye);
     gl.uniform3fv(U.light, LIGHT);
     gl.uniform3fv(U.fog, FOG);
+    gl.uniform1f(U.bright, MZX.bright);
     gl.uniform1f(U.fogNear, 1.6);
     gl.uniform1f(U.fogFar, 11.5);
     gl.uniform1i(U.tex, 0);
@@ -1310,12 +1313,141 @@
 
   /* ---------------- 主循环 ---------------- */
   var last = 0;
+
+  /* ============================================================
+     注入接口（只加接口，不动原有界面）
+     协议
+       父页 → 本页 : { t:"mz-cmd"|"mz-hello", key, id, cmd, val }
+       本页 → 父页 : { t:"mz-ack", key, id, cmd, ok, res }
+     cmd
+       fov / eye / pitch / bright / hsp   数值
+       map / inv / frz / hin              布尔
+       tp_exit / tp_cube / regen          无值
+       clear / collect                    无值
+       state                             无值（返回分数、追兵、参数）
+     ============================================================ */
+  var MZ_KEY = "rtsx-67-inject-2026";
+  var MZX = { fov: 78, eye: 0.98, pitch: 1.15, bright: 1, hsp: 1,
+              map: false, inv: false, frz: false, hin: false };
+  var mzCanvas = null, mzCtx = null, mzLast = 0;
+
+  function mzMapCanvas(){
+    if (mzCanvas) return mzCanvas;
+    mzCanvas = document.createElement("canvas");
+    mzCanvas.id = "mzMap";
+    mzCanvas.style.cssText = "position:fixed;right:calc(10px + env(safe-area-inset-right));" +
+      "top:calc(" + (window.innerWidth < 520 ? 96 : 54) + "px + env(safe-area-inset-top));" +
+      "width:min(168px,34vw);z-index:4;border:1px solid rgba(244,237,227,.16);border-radius:10px;" +
+      "background:#151210;box-shadow:0 16px 34px -22px #000;display:none;pointer-events:none;";
+    document.body.appendChild(mzCanvas);
+    mzCtx = mzCanvas.getContext("2d");
+    return mzCanvas;
+  }
+
+  function mzDrawMap(){
+    var cv = mzMapCanvas();
+    cv.style.display = MZX.map ? "block" : "none";
+    if (!MZX.map) return;
+    var now = (window.performance && performance.now) ? performance.now() : Date.now();
+    if (now - mzLast < 110) return;
+    mzLast = now;
+    var sc = 4;
+    if (cv.width !== MW * sc) { cv.width = MW * sc; cv.height = MH * sc; }
+    var g = mzCtx;
+    g.fillStyle = "#151210";
+    g.fillRect(0, 0, cv.width, cv.height);
+    for (var y = 0; y < MH; y++) {
+      for (var x = 0; x < MW; x++) {
+        g.fillStyle = map[y][x] === 0 ? "#574A3E" : "#221C18";
+        g.fillRect(x * sc, y * sc, sc, sc);
+      }
+    }
+    for (var ci = 0; ci < cubes.length; ci++) {
+      var cb = cubes[ci];
+      if (cb.got) continue;
+      g.fillStyle = "#E6B35C";
+      g.fillRect(cb.x * sc - 2, cb.y * sc - 2, 4, 4);
+    }
+    g.fillStyle = "#9ED47A";
+    g.fillRect((exitCell.x + 0.5) * sc - 3, (exitCell.y + 0.5) * sc - 3, 6, 6);
+    for (var hi = 0; hi < hunters.length; hi++) {
+      g.fillStyle = "#D9534F";
+      g.beginPath();
+      g.arc(hunters[hi].x * sc, hunters[hi].y * sc, 2.4, 0, 6.283);
+      g.fill();
+    }
+    g.fillStyle = "#FFFFFF";
+    g.beginPath();
+    g.arc(px * sc, py * sc, 2.8, 0, 6.283);
+    g.fill();
+    g.strokeStyle = "rgba(255,255,255,.85)";
+    g.beginPath();
+    g.moveTo(px * sc, py * sc);
+    g.lineTo((px + Math.sin(yaw) * 2.6) * sc, (py + Math.cos(yaw) * 2.6) * sc);
+    g.stroke();
+  }
+
+  function mzApply(cmd, val){
+    switch (cmd) {
+      case "fov":    MZX.fov = Math.max(50, Math.min(120, +val || 78)); return MZX.fov;
+      case "eye":    MZX.eye = Math.max(0.35, Math.min(2, +val || 0.98)); return MZX.eye;
+      case "pitch":  MZX.pitch = Math.max(0.4, Math.min(1.5, +val || 1.15)); clampPitch(); return MZX.pitch;
+      case "bright": MZX.bright = Math.max(0.4, Math.min(2.4, +val || 1)); return MZX.bright;
+      case "hsp":    MZX.hsp = Math.max(0, Math.min(4, +val)); return MZX.hsp;
+      case "map":    MZX.map = !!val; mzDrawMap(); return MZX.map;
+      case "inv":    MZX.inv = !!val; return MZX.inv;
+      case "frz":    MZX.frz = !!val; return MZX.frz;
+      case "hin":    MZX.hin = !!val; return MZX.hin;
+      case "tp_exit":
+        px = exitCell.x + 0.5; py = exitCell.y + 0.5; fieldTimer = 0; return true;
+      case "tp_cube":
+        var best = null, bd = 1e9, i, c, d;
+        for (i = 0; i < cubes.length; i++) {
+          c = cubes[i];
+          if (c.got) continue;
+          d = Math.sqrt((c.x - px) * (c.x - px) + (c.y - py) * (c.y - py));
+          if (d < bd) { bd = d; best = c; }
+        }
+        if (!best) return false;
+        px = best.x; py = best.y; fieldTimer = 0; return true;
+      case "regen":
+        setup(); start(); mzLast = 0; return true;
+      case "clear":
+        hunters.length = 0; huntersEl.textContent = "0"; fieldTimer = 0; return true;
+      case "collect":
+        for (i = 0; i < cubes.length; i++) cubes[i].got = true;
+        collected = cubes.length;
+        countEl.textContent = String(collected);
+        huntersEl.textContent = String(hunters.length) + " · 出口开了";
+        paintBuffs(); return true;
+      case "state":
+        return { count: countEl.textContent, hunters: huntersEl.textContent,
+                 clock: document.getElementById("clock").textContent,
+                 fov: MZX.fov, eye: MZX.eye, bright: MZX.bright, hsp: MZX.hsp,
+                 map: MZX.map, inv: MZX.inv, frz: MZX.frz, hin: MZX.hin,
+                 state: state, px: px, py: py };
+      default: return false;
+    }
+  }
+  window.MZInject = mzApply;
+
+  window.addEventListener("message", function (ev) {
+    var d = ev.data;
+    if (!d || d.key !== MZ_KEY || (d.t !== "mz-cmd" && d.t !== "mz-hello")) return;
+    var out = { t: "mz-ack", key: MZ_KEY, id: d.id || 0, cmd: d.cmd || "hello", ok: true };
+    if (d.t === "mz-cmd") out.res = mzApply(d.cmd, d.val);
+    if (ev.source) {
+      try { ev.source.postMessage(out, "*"); } catch (e) {}
+    }
+  });
+
   function frame(t){
     if (!last) last = t;
     var dt = Math.min(0.05, (t - last) / 1000);
     last = t;
     if (state === "run" && !softPaused) update(dt);
     draw(t);
+    if (MZX.map) mzDrawMap();
     requestAnimationFrame(frame);
   }
 
