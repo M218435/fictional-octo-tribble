@@ -25,6 +25,7 @@
   .ui{position:fixed;inset:0;pointer-events:none;z-index:3;}
   .ui>*{pointer-events:auto;}
   .ui button,.ui input,.ui .bar,.ui .bottom,.ui .craftBtn,.ui .craft,.ui .tbtns,#joy{pointer-events:auto;}
+  .ui button,.ui input{box-sizing:border-box;}
   .ui button,.ui input,.ui .craftBtn,.ui .tbtn,.ui .mk,#joy{-webkit-tap-highlight-color:transparent;}
 
   .bar{
@@ -142,10 +143,15 @@
   .touch{display:none;}
   @media (pointer:coarse){
     .touch{display:block;}
-    .hotbar .slot{width:42px;height:42px;}
+    .bottom{bottom:calc(10px + env(safe-area-inset-bottom));padding:0 8px 8px;}
+    .hotbar{gap:4px;}
+    .hotbar .slot{width:40px;height:40px;}
     .craftBtn{top:calc(46px + env(safe-area-inset-top));bottom:auto;height:38px;}
     .craft{bottom:auto;top:calc(92px + env(safe-area-inset-top));max-height:min(46vh,340px);}
-    .tbtns{bottom:calc(104px + env(safe-area-inset-bottom));}
+    .tbtns{bottom:calc(118px + env(safe-area-inset-bottom));right:calc(10px + env(safe-area-inset-right));
+      grid-template-columns:repeat(2,56px);gap:8px;}
+    .tbtn{height:50px;font-size:12px;}
+    #joy{width:96px;height:96px;bottom:calc(118px + env(safe-area-inset-bottom));left:calc(12px + env(safe-area-inset-left));}
   }
   #joy{
     position:absolute;left:calc(16px + env(safe-area-inset-left));bottom:calc(96px + env(safe-area-inset-bottom));
@@ -167,6 +173,7 @@
     transition:background .1s ease,transform .1s ease;
   }
   .tbtn:active,.tbtn.press{background:rgba(217,119,87,.38);transform:scale(.96);}
+  #tJump{grid-column:1 / span 2;}
 
   #overlay{
     position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
@@ -242,7 +249,6 @@
       <button class="tbtn" id="tBreak" type="button">挖</button>
       <button class="tbtn" id="tPlace" type="button">放</button>
       <button class="tbtn" id="tJump" type="button">跳</button>
-      <button class="tbtn" id="tLook" type="button" style="opacity:.35">视角</button>
     </div>
   </div>
 </div>
@@ -255,7 +261,8 @@
     <div class="keys">
       <b>WASD</b> 移动 · <b>空格</b> 跳 · <b>Shift</b> 冲刺<br>
       <b>左键</b> 长按挖方块 · <b>右键</b> 放方块<br>
-      <b>1–8</b> 选方块 · <b>E</b> 合成 · <b>Esc</b> 松鼠标
+      <b>1–8</b> 选方块 · <b>E</b> 合成 · <b>Esc</b> 松鼠标<br>
+      手机：<b>左摇杆</b> 走 · <b>右侧拖动</b> 转视角 · 右下 <b>挖 / 放 / 跳</b>
     </div>
     <div class="row">
       <button class="go" id="soloStart" type="button">单机开始</button>
