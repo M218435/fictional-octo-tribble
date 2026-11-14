@@ -532,33 +532,47 @@
 
   /* ---------------- 迷宫 ---------------- */
   var MW = 101, MH = 51, map = [];
+  /* 通道加宽：先在 51×27 的底图上凿迷宫，再把每格放大成 2×2。
+     结果就是"走廊两格宽、墙也两格厚"，走起来明显宽敞，并且所有
+     碰撞/寻路仍然按格子算，不用改任何运动代码。 */
+  var BW = 51, BH = 27;
+  var MW = BW * 2, MH = BH * 2, map = [];
+  var START = { x: 2, y: 2 };
+  var BORDER = 2;
   function genMaze(){
-    map = [];
-    for (var y = 0; y < MH; y++) {
-      var row = [];
-      for (var x = 0; x < MW; x++) row.push(1);
-      map.push(row);
+    var base = [];
+    for (var by = 0; by < BH; by++) {
+      var brow = [];
+      for (var bx = 0; bx < BW; bx++) brow.push(1);
+      base.push(brow);
     }
     var stack = [[1, 1]];
-    map[1][1] = 0;
+    base[1][1] = 0;
     while (stack.length) {
       var cx = stack[stack.length - 1][0], cy = stack[stack.length - 1][1];
       var dirs = [[2, 0], [-2, 0], [0, 2], [0, -2]].filter(function(d){
         var nx = cx + d[0], ny = cy + d[1];
-        return nx > 0 && ny > 0 && nx < MW - 1 && ny < MH - 1 && map[ny][nx] === 1;
+        return nx > 0 && ny > 0 && nx < BW - 1 && ny < BH - 1 && base[ny][nx] === 1;
       });
       if (!dirs.length) { stack.pop(); continue; }
       var d = dirs[Math.floor(Math.random() * dirs.length)];
-      map[cy + d[1] / 2][cx + d[0] / 2] = 0;
-      map[cy + d[1]][cx + d[0]] = 0;
+      base[cy + d[1] / 2][cx + d[0] / 2] = 0;
+      base[cy + d[1]][cx + d[0]] = 0;
       stack.push([cx + d[0], cy + d[1]]);
     }
     // 大图要够多"岔路口"，不然全是死胡同，跑起来像在走一条长走廊
-    var loops = Math.round(MW * MH / 60);
+    var loops = Math.round(BW * BH / 15);
     for (var k = 0; k < loops; k++) {
-      var sx = 1 + Math.floor(Math.random() * (MW - 2));
-      var sy = 1 + Math.floor(Math.random() * (MH - 2));
-      if (map[sy][sx] === 1 && ((sx % 2 === 0 && sy % 2 === 1) || (sy % 2 === 0 && sx % 2 === 1))) map[sy][sx] = 0;
+      var sx = 1 + Math.floor(Math.random() * (BW - 2));
+      var sy = 1 + Math.floor(Math.random() * (BH - 2));
+      if (base[sy][sx] === 1 && ((sx % 2 === 0 && sy % 2 === 1) || (sy % 2 === 0 && sx % 2 === 1))) base[sy][sx] = 0;
+    }
+
+    map = [];
+    for (var y = 0; y < MH; y++) {
+      var row2 = [];
+      for (var x = 0; x < MW; x++) row2.push(base[Math.floor(y / 2)][Math.floor(x / 2)]);
+      map.push(row2);
     }
   }
 
@@ -596,6 +610,7 @@
     quad(list, p0, p1, p2, p3, n, col,
          [uvOf(p0)[0], uvOf(p1)[0], uvOf(p2)[0], uvOf(p3)[0]]);
   }
+  var WH = 1.34;   // 墙高 / 顶棚高度（抬高一点，宽通道才不显得压头）
   function buildLevel(){
     var list = [];
     var wallCol = [0.72, 0.47, 0.34];
@@ -619,15 +634,15 @@
             if (map[ny][nx] === 1) continue;
             var shade = (s === 0 || s === 1) ? 0.80 : 1.0;
             var col = [wallCol[0] * t * shade, wallCol[1] * t * shade, wallCol[2] * t * shade];
-            if (s === 0)      quadW(list, [x+1,0,y], [x+1,0,y+1], [x+1,1,y+1], [x+1,1,y], [1,0,0], col, UVC);
-            else if (s === 1) quadW(list, [x,0,y+1], [x,0,y], [x,1,y], [x,1,y+1], [-1,0,0], col, UVC);
-            else if (s === 2) quadW(list, [x+1,0,y+1], [x,0,y+1], [x,1,y+1], [x+1,1,y+1], [0,0,1], col, UVC);
-            else              quadW(list, [x,0,y], [x+1,0,y], [x+1,1,y], [x,1,y], [0,0,-1], col, UVC);
+            if (s === 0)      quadW(list, [x+1,0,y], [x+1,0,y+1], [x+1,WH,y+1], [x+1,WH,y], [1,0,0], col, UVC);
+            else if (s === 1) quadW(list, [x,0,y+1], [x,0,y], [x,WH,y], [x,WH,y+1], [-1,0,0], col, UVC);
+            else if (s === 2) quadW(list, [x+1,0,y+1], [x,0,y+1], [x,WH,y+1], [x+1,WH,y+1], [0,0,1], col, UVC);
+            else              quadW(list, [x,0,y], [x+1,0,y], [x+1,WH,y], [x,WH,y], [0,0,-1], col, UVC);
           }
         } else {
           var fc = ((x + y) % 2 === 0) ? floorA : floorB;
           quadW(list, [x,0,y], [x,0,y+1], [x+1,0,y+1], [x+1,0,y], [0,1,0], fc, UVC);
-          quadW(list, [x,1,y+1], [x,1,y], [x+1,1,y], [x+1,1,y+1], [0,-1,0], ceilCol, UVC);
+          quadW(list, [x,WH,y+1], [x,WH,y], [x+1,WH,y], [x+1,WH,y+1], [0,-1,0], ceilCol, UVC);
         }
       }
     }
@@ -694,7 +709,7 @@
     var s = Math.sin(yaw), c = Math.cos(yaw);
     for (var d = 0.30; d <= 1.55; d += 0.1) {
       var x = Math.floor(px + s * d), y = Math.floor(py + c * d);
-      if (x < 1 || y < 1 || x > MW - 2 || y > MH - 2) return null;   // 外围圈是地图边界，不给砸
+      if (x < BORDER || y < BORDER || x > MW - BORDER - 1 || y > MH - BORDER - 1) return null;   // 外圈是地图边界，不给砸
       if (map[y][x] === 1) return { x: x, y: y };
     }
     return null;
@@ -743,16 +758,16 @@
   function setup(){
     genMaze();
     buildLevel();
-    px = 1.5; py = 1.5; yaw = 0; pitch = 0;
+    px = START.x + 0.5; py = START.y + 0.5; yaw = 0; pitch = 0;
     // 出生就面朝一条通道，别一睁眼顶着墙
     var look = [[1, 0, Math.PI / 2], [0, 1, 0], [0, -1, Math.PI], [-1, 0, -Math.PI / 2]];
     for (var li = 0; li < look.length; li++) {
-      if (map[1 + look[li][1]][1 + look[li][0]] === 0) { yaw = look[li][2]; break; }
+      if (map[START.y + look[li][1]][START.x + look[li][0]] === 0) { yaw = look[li][2]; break; }
     }
     collected = 0; elapsed = 0; fieldTimer = 0; walkPhase = 0;
-    var dist = cellDist(1, 1);
+    var dist = cellDist(START.x, START.y);
 
-    var far = { x: 1, y: 1, d: 0 };
+    var far = { x: START.x, y: START.y, d: 0 };
     var opens = openCells();
     openList = opens.slice();
     for (var i = 0; i < opens.length; i++) {
@@ -809,7 +824,7 @@
     if (hamBtn) hamBtn.classList.remove("on");
     paintBuffs();
 
-    field = cellDist(1, 1);
+    field = cellDist(START.x, START.y);
     countEl.textContent = "0";
     countOfEl.textContent = "/ " + cubes.length;
     huntersEl.textContent = String(hunters.length);
@@ -1168,7 +1183,7 @@
     var r = [Math.cos(yaw), 0, -Math.sin(yaw)];
     var u = [f[1] * r[2] - f[2] * r[1], f[2] * r[0] - f[0] * r[2], f[0] * r[1] - f[1] * r[0]];
     var bob = Math.sin(walkPhase) * 0.022;
-    var eye = [px, 0.58 + bob, py];
+    var eye = [px, 0.72 + bob, py];
     var view = viewMat(eye, r, u, f);
     var mvp = m4mul(proj, view);
 
@@ -1280,10 +1295,10 @@
     var doorTintFront = open ? [1.45, 1.42, 1.34] : [0.66, 0.62, 0.58];
     var dcx = exitCell.x + 0.5, dcz = exitCell.y + 0.5;
     gl.uniform3f(U.tint, doorTintFront[0], doorTintFront[1], doorTintFront[2]);
-    gl.uniformMatrix4fv(U.model, false, trs(dcx, 0, dcz, exitFace, 0.66, 0.86, 1));
+    gl.uniformMatrix4fv(U.model, false, trs(dcx, 0, dcz, exitFace, 1.02, 1.12, 1));
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     gl.uniformMatrix4fv(U.model, false,
-      trs(dcx - Math.sin(exitFace) * 0.012, 0, dcz - Math.cos(exitFace) * 0.012, exitFace + Math.PI, 0.66, 0.86, 1));
+      trs(dcx - Math.sin(exitFace) * 0.012, 0, dcz - Math.cos(exitFace) * 0.012, exitFace + Math.PI, 1.02, 1.12, 1));
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     gl.uniform3f(U.tint, 1, 1, 1);
 
