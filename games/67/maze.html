@@ -71,8 +71,23 @@
   .ctl .snd{padding:8px 12px;font-size:10.5px;letter-spacing:.12em;}
   .snd.off{opacity:.55;text-decoration:line-through;}
 
+  /* 锤子：捡到之后才出现的圆形按钮（拇指够得着的位置） */
+  .ham{
+    position:absolute;right:calc(20px + env(safe-area-inset-right));bottom:calc(30px + env(safe-area-inset-bottom));
+    width:72px;height:72px;border-radius:50%;z-index:5;
+    display:none;align-items:center;justify-content:center;
+    border:1px solid rgba(244,237,227,.24);
+    background:radial-gradient(circle at 50% 38%,rgba(217,119,87,.42),rgba(96,52,34,.55));
+    color:#F4EDE3;font:inherit;font-size:16px;letter-spacing:.08em;
+    box-shadow:0 14px 30px -22px #000,inset 0 1px 0 rgba(255,255,255,.14);
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+    touch-action:none;cursor:pointer;
+  }
+  .ham.on{display:flex;}
+  .ham:active{transform:scale(.95);background:radial-gradient(circle at 50% 38%,rgba(240,140,105,.55),rgba(120,62,40,.6));}
+
   .tip{
-    position:absolute;right:16px;bottom:calc(18px + env(safe-area-inset-bottom));
+    position:absolute;right:16px;bottom:calc(114px + env(safe-area-inset-bottom));
     font-size:11px;letter-spacing:.04em;color:rgba(244,237,227,.42);
   }
 
@@ -173,7 +188,8 @@
   <button id="back" type="button">← 专辑</button>
   <button class="snd" id="snd" type="button">SFX</button>
 </div>
-<div class="tip">WASD 移动 · 鼠标转视角 · Shift 冲刺</div>
+<button class="ham" id="ham" type="button">锤</button>
+<div class="tip">WASD 移动 · 鼠标转视角 · Shift 冲刺 · X 挥锤</div>
 <div class="lockhint" id="lockhint">点击画面锁定鼠标</div>
 
 <div class="stick" id="stick"><div class="knob" id="knob"></div></div>
@@ -184,7 +200,7 @@
     <div class="tag">第一人称 · 追逐</div>
     <h2 id="ovTitle">67 迷宫追逐战</h2>
     <p id="ovText">真 3D 的立体迷宫。捡齐 7 个 67 方块，出口的门才会亮；三个影子一直在寻路追你，被贴上就出局。地上散着道具：加速、冻结、缓速、护盾，捡到立刻生效。</p>
-    <div class="keys" id="ovKeys">电脑：点击画面锁定鼠标，移动鼠标上下左右转视角<br>WASD 走动，Shift 冲刺，ESC 松鼠标＝暂停（点画面继续）<br>手机：右半屏滑动转视角，左下角摇杆移动</div>
+    <div class="keys" id="ovKeys">电脑：点击画面锁定鼠标，移动鼠标上下左右转视角<br>WASD 走动，Shift 冲刺，X 挥锤砸墙（一堵墙 5 下），ESC 松鼠标＝暂停<br>手机：右半屏滑动转视角，左下角摇杆移动，右下圆钮挥锤</div>
     <button class="btn" id="ovBtn" type="button">进入迷宫</button>
   </div>
 </div>
@@ -242,6 +258,16 @@
         else { tone(560, 0.1, "sine", 0.05); tone(880, 0.12, "sine", 0.05, 0.09); tone(1240, 0.16, "sine", 0.045, 0.19); }
       },
       shieldBreak: function(){ tone(260, 0.16, "square", 0.045, 0, 130); tone(540, 0.14, "triangle", 0.04, 0.12); },
+      hammer: function(){
+        tone(96, 0.09, "square", 0.055, 0, 62);
+        tone(1500, 0.04, "triangle", 0.03);
+        tone(220, 0.12, "sine", 0.04, 0.02, 120);
+      },
+      breakWall: function(){
+        tone(140, 0.22, "square", 0.055, 0, 60);
+        tone(70, 0.32, "sine", 0.05, 0.05, 40);
+        tone(760, 0.1, "triangle", 0.03, 0.16, 420);
+      },
       isOn:  function(){ return on; },
       set:   function(v){ on = v; try { localStorage.setItem("rtsx.sound.v1", v ? "on" : "off"); } catch(e) {} }
     };
@@ -505,7 +531,7 @@
   }
 
   /* ---------------- 迷宫 ---------------- */
-  var MW = 21, MH = 21, map = [];
+  var MW = 41, MH = 41, map = [];
   function genMaze(){
     map = [];
     for (var y = 0; y < MH; y++) {
@@ -615,19 +641,21 @@
 
   /* ---------------- 道具 ---------------- */
   var items = [], buffT = { speed: 0, slow: 0, freeze: 0 }, shields = 0, invuln = 0, lastBuffTxt = "";
+  var hammers = 0, wallDmg = [], hammerFlash = 0, wallAim = null;
   var openList = [];
   var ITEMS = {
     speed:  { name: "加速", col: [1.72, 1.34, 0.50], dur: 6 },
     freeze: { name: "冻结", col: [0.55, 1.42, 1.70], dur: 5 },
     slow:   { name: "缓速", col: [1.42, 0.70, 1.58], dur: 6 },
-    shield: { name: "护盾", col: [1.30, 1.54, 1.04], dur: 0 }
+    shield: { name: "护盾", col: [1.30, 1.54, 1.04], dur: 0 },
+    hammer: { name: "锤子", col: [0.98, 1.02, 1.10], dur: 0 }
   };
-  var ITEM_KEYS = ["speed", "freeze", "slow", "shield"];
+  var ITEM_KEYS = ["speed", "freeze", "slow", "shield", "hammer"];
   function spawnItems(pool, count){
     items = [];
     var kinds = ITEM_KEYS.slice();
     while (kinds.length < count) kinds.push(ITEM_KEYS[Math.floor(Math.random() * ITEM_KEYS.length)]);
-    for (var s2 = kinds.length - 1; s2 > 0; s2--) {          // 打乱：四种各来一个，多的随机
+    for (var s2 = kinds.length - 1; s2 > 0; s2--) {          // 打乱：每种各来一个，多的随机
       var r2 = Math.floor(Math.random() * (s2 + 1));
       var tmp2 = kinds[s2]; kinds[s2] = kinds[r2]; kinds[r2] = tmp2;
     }
@@ -645,6 +673,10 @@
     if (buffT.freeze > 0) parts.push("<b>冻结 " + Math.ceil(buffT.freeze) + "s</b>");
     if (buffT.slow > 0) parts.push("<b>缓速 " + Math.ceil(buffT.slow) + "s</b>");
     if (shields > 0) parts.push("<b>护盾 ×" + shields + "</b>");
+    if (hammers > 0) {
+      var aim = wallAim ? (wallDmg[wallAim.y * MW + wallAim.x] || 0) : 0;
+      parts.push("<b>锤子" + (aim ? " · 这堵墙 " + aim + "/5" : "") + "</b>");
+    }
     return parts.join("");
   }
   function paintBuffs(){
@@ -655,6 +687,37 @@
     buffsEl.style.opacity = html ? "1" : "0";
   }
 
+  /* ---------------- 锤子：对着墙砸 5 下，墙变通道 ---------------- */
+  function targetWall(){
+    var s = Math.sin(yaw), c = Math.cos(yaw);
+    for (var d = 0.30; d <= 1.55; d += 0.1) {
+      var x = Math.floor(px + s * d), y = Math.floor(py + c * d);
+      if (x < 1 || y < 1 || x > MW - 2 || y > MH - 2) return null;   // 外围圈是地图边界，不给砸
+      if (map[y][x] === 1) return { x: x, y: y };
+    }
+    return null;
+  }
+  function swing(){
+    if (!hammers || state !== "run") return false;
+    var t = targetWall();
+    if (!t) { SFX.warn(); return false; }
+    var idx = t.y * MW + t.x;
+    wallDmg[idx] = (wallDmg[idx] || 0) + 1;
+    hammerFlash = 0.16;
+    SFX.hammer();
+    if (wallDmg[idx] >= 5) {
+      map[t.y][t.x] = 0;          // 变通道：实体碰撞一起消失
+      wallDmg[idx] = 0;
+      buildLevel();               // 重建几何，墙上那个面真的没了
+      fieldTimer = 0;             // 通路变了，追兵立刻重算
+      SFX.breakWall();
+      wallAim = null;
+    }
+    paintBuffs();
+    return true;
+  }
+
+  var hamBtn = document.getElementById("ham");
   var countEl = document.getElementById("count");
   var countOfEl = document.getElementById("countOf");
   var buffsEl = document.getElementById("buffs");
@@ -713,7 +776,7 @@
     var pool = opens.filter(function(c){
       return dist[c.y * MW + c.x] >= 5 && !(c.x === exitCell.x && c.y === exitCell.y);
     });
-    var cubeCount = Math.max(7, Math.round(opens.length / 26));
+    var cubeCount = Math.max(8, Math.min(22, Math.round(opens.length / 55)));
     for (var n = 0; n < cubeCount && pool.length; n++) {
       var pick = Math.floor(Math.random() * pool.length);
       cubes.push({ x: pool[pick].x + 0.5, y: pool[pick].y + 0.5, got: false, spin: Math.random() * 6.28 });
@@ -723,7 +786,7 @@
     hunters = [];
     var farPool = opens.filter(function(c){ return dist[c.y * MW + c.x] >= 8; });
     if (!farPool.length) farPool = opens.slice();
-    for (var h = 0; h < 3 && farPool.length; h++) {
+    for (var h = 0; h < 4 && farPool.length; h++) {
       var hp = Math.floor(Math.random() * farPool.length);
       var cell = farPool[hp];
       farPool.splice(hp, 1);
@@ -734,10 +797,14 @@
     var itemPool = opens.filter(function(c){
       return dist[c.y * MW + c.x] >= 4 && !(c.x === exitCell.x && c.y === exitCell.y);
     });
-    spawnItems(itemPool, Math.max(4, Math.round(cubes.length / 2)));
+    spawnItems(itemPool, Math.max(6, Math.round(cubes.length / 2)));
 
     buffT.speed = 0; buffT.slow = 0; buffT.freeze = 0;
     shields = 0; invuln = 0; lastBuffTxt = "";
+    hammers = 0; wallAim = null; hammerFlash = 0;
+    wallDmg = [];
+    for (var wd = 0; wd < MW * MH; wd++) wallDmg.push(0);
+    if (hamBtn) hamBtn.classList.remove("on");
     paintBuffs();
 
     field = cellDist(1, 1);
@@ -761,6 +828,7 @@
   };
   document.addEventListener("keydown", function(e){
     if (e.key === "Shift") { keys.sprint = true; return; }
+    if (e.key === "x" || e.key === "X") { e.preventDefault(); swing(); return; }
     var k = KMAP[e.key];
     if (!k) return;
     e.preventDefault();
@@ -781,6 +849,7 @@
   var locked = false;
   cv.addEventListener("click", function(){
     setSoftPause(false);
+    if (locked) { swing(); return; }      // 锁了鼠标：左键就是挥锤
     if (isTouch) return;
     if (!locked && cv.requestPointerLock) {
       try {
@@ -885,6 +954,14 @@
     joy.fwd = Math.abs(dy) > 0.14 ? -dy : 0;
   });
 
+  /* 锤子按钮：按下就砸，不要抢视角滑动 */
+  if (hamBtn) {
+    hamBtn.addEventListener("pointerdown", function(e){
+      e.preventDefault(); e.stopPropagation();
+      swing();
+    });
+  }
+
   /* ---------------- 玩法 ---------------- */
   function start(){
     if (state === "run") return;
@@ -921,6 +998,8 @@
     if (buffT.slow > 0) buffT.slow = Math.max(0, buffT.slow - dt);
     if (buffT.freeze > 0) buffT.freeze = Math.max(0, buffT.freeze - dt);
     if (invuln > 0) invuln = Math.max(0, invuln - dt);
+    if (hammerFlash > 0) hammerFlash = Math.max(0, hammerFlash - dt);
+    wallAim = hammers > 0 ? targetWall() : null;
     paintBuffs();
 
     var turn = (keys.tr ? 1 : 0) - (keys.tl ? 1 : 0);
@@ -963,6 +1042,7 @@
       if (Math.hypot(it.x - px, it.y - py) < 0.72) {
         it.got = true;
         if (it.k === "shield") shields = Math.min(2, shields + 1);
+        else if (it.k === "hammer") { hammers = 1; if (hamBtn) hamBtn.classList.add("on"); }
         else buffT[it.k] = ITEMS[it.k].dur;
         SFX.item(it.k);
         paintBuffs();
@@ -1110,6 +1190,35 @@
     bindBuf(staticBuf);
     gl.drawArrays(gl.TRIANGLES, 0, staticCount);
 
+    // 砸墙反馈：墙面上的暗斑（越砸越黑，命中瞬间整块亮一下）
+    if (hammers > 0 && wallAim) {
+      var dirX = px - (wallAim.x + 0.5), dirZ = py - (wallAim.y + 0.5);
+      var horiz = Math.abs(dirX) > Math.abs(dirZ);
+      var rot2, fx2, fz2;
+      if (horiz) {
+        var sx3 = dirX > 0 ? 1 : -1;
+        rot2 = sx3 > 0 ? Math.PI / 2 : -Math.PI / 2;
+        fx2 = wallAim.x + (sx3 > 0 ? 1 : 0) + sx3 * 0.015;
+        fz2 = wallAim.y + 0.5;
+      } else {
+        var sz3 = dirZ > 0 ? 1 : -1;
+        rot2 = sz3 > 0 ? 0 : Math.PI;
+        fx2 = wallAim.x + 0.5;
+        fz2 = wallAim.y + (sz3 > 0 ? 1 : 0) + sz3 * 0.015;
+      }
+      var dmg2 = wallDmg[wallAim.y * MW + wallAim.x] || 0;
+      if (dmg2 > 0 || hammerFlash > 0) {
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        gl.uniform1f(U.useTex, 0);
+        bindBuf(quadBuf);
+        var sh = hammerFlash > 0 ? 0.92 : 0.16 + dmg2 * 0.07;
+        gl.uniform3f(U.tint, sh, sh * 0.9, sh * 0.84);
+        gl.uniformMatrix4fv(U.model, false, trs(fx2, 0, fz2, rot2, 0.92, 0.94, 1));
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        gl.uniform3f(U.tint, 1, 1, 1);
+      }
+    }
+
     // 67 方块
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texCube);
@@ -1226,7 +1335,11 @@
     joy: joy,
     pause: function(v){ setSoftPause(v); },
     paused: function(){ return softPaused; },
-    give: function(k){ if (k === "shield") shields = Math.min(2, shields + 1); else if (ITEMS[k]) buffT[k] = ITEMS[k].dur; paintBuffs(); return buffLabel(); },
+    give: function(k){ if (k === "shield") shields = Math.min(2, shields + 1); else if (k === "hammer") { hammers = 1; if (hamBtn) hamBtn.classList.add("on"); } else if (ITEMS[k]) buffT[k] = ITEMS[k].dur; paintBuffs(); return buffLabel(); },
+    swing: swing,
+    aim: function(){ return wallAim; },
+    dmgAt: function(x, y){ return wallDmg[y * MW + x] || 0; },
+    solid: function(x, y){ return solid(x, y); },
     hunt: function(i, x, y){ if (hunters[i]) { hunters[i].x = x; hunters[i].y = y; } },
     gl: function(){ return { err: gl.getError(), lost: gl.isContextLost(), w: cv.width, h: cv.height }; },
     pixels: function(){
