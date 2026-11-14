@@ -22,8 +22,10 @@
   }
   #gl{position:fixed;inset:0;width:100%;height:100%;display:block;}
 
-  .ui{position:fixed;inset:0;pointer-events:none;}
+  .ui{position:fixed;inset:0;pointer-events:none;z-index:3;}
   .ui>*{pointer-events:auto;}
+  .ui button,.ui input,.ui .bar,.ui .bottom,.ui .craftBtn,.ui .craft,.ui .tbtns,#joy{pointer-events:auto;}
+  .ui button,.ui input,.ui .craftBtn,.ui .tbtn,.ui .mk,#joy{-webkit-tap-highlight-color:transparent;}
 
   .bar{
     position:absolute;left:0;right:0;top:0;display:flex;align-items:center;gap:8px;
@@ -160,10 +162,11 @@
     display:grid;grid-template-columns:repeat(2,52px);gap:8px;
   }
   .tbtn{
-    height:46px;border-radius:12px;border:1px solid rgba(246,241,232,.18);
-    background:rgba(24,20,17,.78);color:#F2E9DC;font:inherit;font-size:11px;
+    height:52px;border-radius:12px;border:1px solid rgba(246,241,232,.18);
+    background:rgba(24,20,17,.78);color:#F2E9DC;font:inherit;font-size:12px;
+    transition:background .1s ease,transform .1s ease;
   }
-  .tbtn:active{background:rgba(217,119,87,.3);}
+  .tbtn:active,.tbtn.press{background:rgba(217,119,87,.38);transform:scale(.96);}
 
   #overlay{
     position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
@@ -376,6 +379,8 @@ function newIsland(keepPlayer){
   dirty = true;
   spawnOnIsland();
   saveSoon();
+  /* 房主重建世界后必须同步一次，否则客户端还停在旧岛 */
+  if (NET && NET.on && NET.host) bcast({ k:"w", n: myName, w: dumpWorld() });
 }
 
 /* 播种机：挑一块已有方块，在它旁边的空格长出新方块 */
@@ -889,60 +894,145 @@ window.addEventListener("keydown", function(e){
 });
 window.addEventListener("keyup", function(e){ keysDown[e.code] = false; });
 
-/* 触屏 */
-var joy = { active:false, id:-1, cx:0, cy:0, dx:0, dy:0 };
+/* 触屏：全部走 Pointer Events，避免 click 被手势吞掉 */
+var joy = { active:false, id:-1, dx:0, dy:0 };
 var draggingLook = false, lookId = -1, lastLX = 0, lastLY = 0;
 (function(){
   var j = el("joy");
-  if (!j) return;
-  j.addEventListener("touchstart", function(e){
-    var t = e.changedTouches[0];
-    joy.active = true; joy.id = t.identifier;
-    joy.cx = 0; joy.cy = 0; joy.dx = 0; joy.dy = 0;
-    e.stopPropagation();
-  }, { passive:true });
-  j.addEventListener("touchmove", function(e){
-    e.stopPropagation();
-    for (var i = 0; i < e.changedTouches.length; i++){
-      var t = e.changedTouches[i];
-      if (t.identifier !== joy.id) continue;
-      var r = j.getBoundingClientRect();
-      joy.dx = ((t.clientX - (r.left + r.width/2)) / (r.width/2));
-      joy.dy = ((t.clientY - (r.top + r.height/2)) / (r.height/2));
-      var len = Math.hypot(joy.dx, joy.dy);
-      if (len > 1){ joy.dx /= len; joy.dy /= len; }
+  function joyMove(e){
+    var r = j.getBoundingClientRect();
+    joy.dx = (e.clientX - (r.left + r.width/2)) / (r.width/2);
+    joy.dy = (e.clientY - (r.top + r.height/2)) / (r.height/2);
+    var len = Math.sqrt(joy.dx*joy.dx + joy.dy*joy.dy);
+    if (len > 1){ joy.dx /= len; joy.dy /= len; }
+    var knob = j.firstElementChild;
+    if (knob){ knob.style.transform = "translate(" + (joy.dx * 30) + "px," + (joy.dy * 30) + "px)"; }
+  }
+  if (j){
+    j.addEventListener("pointerdown", function(e){
+      e.preventDefault(); e.stopPropagation();
+      joy.active = true; joy.id = e.pointerId; joy.dx = 0; joy.dy = 0;
+      try { j.setPointerCapture(e.pointerId); } catch(_){}
+      joyMove(e);
+      if (navigator.vibrate) navigator.vibrate(8);
+    }, { passive:false });
+    j.addEventListener("pointermove", function(e){
+      if (!joy.active || e.pointerId !== joy.id) return;
+      e.preventDefault(); joyMove(e);
+    }, { passive:false });
+    function joyEnd(e){
+      if (e.pointerId !== joy.id) return;
+      joy.active = false; joy.id = -1; joy.dx = 0; joy.dy = 0;
+      var knob = j.firstElementChild;
+      if (knob) knob.style.transform = "translate(0,0)";
     }
-  }, { passive:true });
-  j.addEventListener("touchend", function(){ joy.active = false; joy.dx = 0; joy.dy = 0; }, { passive:true });
+    j.addEventListener("pointerup", joyEnd);
+    j.addEventListener("pointercancel", joyEnd);
+    j.addEventListener("pointerleave", joyEnd);
+  }
 
-  cvs.addEventListener("touchstart", function(e){
-    if (overlayOpen()) return;
-    for (var i = 0; i < e.changedTouches.length; i++){
-      var t = e.changedTouches[i];
-      if (t.clientX < window.innerWidth * 0.35) continue;
-      if (draggingLook) continue;
-      draggingLook = true; lookId = t.identifier; lastLX = t.clientX; lastLY = t.clientY;
-    }
+  /* 画布：右侧拖动看视角 */
+  cvs.addEventListener("pointerdown", function(e){
+    if (overlayOpen() || e.pointerType === "mouse") return;
+    if (e.clientX < window.innerWidth * 0.4) return;
+    if (draggingLook) return;
+    draggingLook = true; lookId = e.pointerId; lastLX = e.clientX; lastLY = e.clientY;
+    try { cvs.setPointerCapture(e.pointerId); } catch(_){}
   }, { passive:true });
-  cvs.addEventListener("touchmove", function(e){
-    if (!draggingLook) return;
-    for (var i = 0; i < e.changedTouches.length; i++){
-      var t = e.changedTouches[i];
-      if (t.identifier !== lookId) continue;
-      yaw += (t.clientX - lastLX) * 0.006;
-      pitch -= (t.clientY - lastLY) * 0.0055;
-      pitch = Math.max(-1.52, Math.min(1.52, pitch));
-      lastLX = t.clientX; lastLY = t.clientY;
-    }
+  cvs.addEventListener("pointermove", function(e){
+    if (!draggingLook || e.pointerId !== lookId) return;
+    yaw += (e.clientX - lastLX) * 0.006;
+    pitch -= (e.clientY - lastLY) * 0.0055;
+    pitch = Math.max(-1.52, Math.min(1.52, pitch));
+    lastLX = e.clientX; lastLY = e.clientY;
   }, { passive:true });
-  cvs.addEventListener("touchend", function(){ draggingLook = false; lookId = -1; }, { passive:true });
+  function lookEnd(e){ if (e.pointerId === lookId){ draggingLook = false; lookId = -1; } }
+  cvs.addEventListener("pointerup", lookEnd);
+  cvs.addEventListener("pointercancel", lookEnd);
 
-  var tb = el("tBreak"), tp = el("tPlace"), tj = el("tJump");
-  if (tb){ tb.addEventListener("touchstart", function(e){ e.preventDefault(); mouse.down = true; }, { passive:false });
-          tb.addEventListener("touchend", function(e){ e.preventDefault(); mouse.down = false; mining = null; }, { passive:false }); }
-  if (tp){ tp.addEventListener("click", function(){ placeBlock(); }); }
-  if (tj){ tj.addEventListener("click", function(){ if (onGround){ vy = 7.4; onGround = false; } }); }
+  /* ---------- 兜底：没有 Pointer Events 的浏览器走 touch ---------- */
+  if (!window.PointerEvent){
+    if (j){
+      j.addEventListener("touchstart", function(e){
+        e.preventDefault(); e.stopPropagation();
+        var t = e.changedTouches[0];
+        joy.active = true; joy.id = t.identifier; joyMove(t);
+      }, { passive:false });
+      j.addEventListener("touchmove", function(e){
+        if (!joy.active) return;
+        e.preventDefault();
+        for (var i = 0; i < e.changedTouches.length; i++){
+          var t = e.changedTouches[i];
+          if (t.identifier === joy.id) joyMove(t);
+        }
+      }, { passive:false });
+      j.addEventListener("touchend", function(){
+        joy.active = false; joy.id = -1; joy.dx = 0; joy.dy = 0;
+        var knob = j.firstElementChild;
+        if (knob) knob.style.transform = "translate(0,0)";
+      });
+    }
+    cvs.addEventListener("touchstart", function(e){
+      if (overlayOpen()) return;
+      for (var i = 0; i < e.changedTouches.length; i++){
+        var t = e.changedTouches[i];
+        if (t.clientX < window.innerWidth * 0.4) continue;
+        if (draggingLook) continue;
+        draggingLook = true; lookId = t.identifier; lastLX = t.clientX; lastLY = t.clientY;
+      }
+    }, { passive:true });
+    cvs.addEventListener("touchmove", function(e){
+      if (!draggingLook) return;
+      for (var i = 0; i < e.changedTouches.length; i++){
+        var t = e.changedTouches[i];
+        if (t.identifier !== lookId) continue;
+        yaw += (t.clientX - lastLX) * 0.006;
+        pitch -= (t.clientY - lastLY) * 0.0055;
+        pitch = Math.max(-1.52, Math.min(1.52, pitch));
+        lastLX = t.clientX; lastLY = t.clientY;
+      }
+    }, { passive:true });
+    cvs.addEventListener("touchend", function(){ draggingLook = false; lookId = -1; }, { passive:true });
+  }
+
+  function press(node, down, up){
+    if (!node) return;
+    if (window.PointerEvent){
+      node.addEventListener("pointerdown", function(e){
+        e.preventDefault(); e.stopPropagation();
+        try { node.setPointerCapture(e.pointerId); } catch(_){}
+        node.classList.add("press");
+        if (navigator.vibrate) navigator.vibrate(10);
+        if (down) down(e);
+      }, { passive:false });
+      var relP = function(e){
+        node.classList.remove("press");
+        if (up) up(e);
+      };
+      node.addEventListener("pointerup", relP);
+      node.addEventListener("pointercancel", relP);
+      node.addEventListener("pointerleave", relP);
+    } else {
+      /* 老浏览器没有 Pointer Events，退回 touch */
+      node.addEventListener("touchstart", function(e){
+        e.preventDefault(); e.stopPropagation();
+        node.classList.add("press");
+        if (down) down(e);
+      }, { passive:false });
+      var relT = function(e){
+        e.preventDefault();
+        node.classList.remove("press");
+        if (up) up(e);
+      };
+      node.addEventListener("touchend", relT, { passive:false });
+      node.addEventListener("touchcancel", relT, { passive:false });
+    }
+  }
+  press(el("tBreak"), function(){ mouse.down = true; }, function(){ mouse.down = false; mining = null; });
+  press(el("tPlace"), function(){ placeBlock(); });
+  press(el("tJump"), function(){ if (onGround){ vy = 7.4; onGround = false; } });
 })();
+
 
 /* ============================== 物理 ============================== */
 function solidAt(x, y, z){ return getB(x, y, z) > 0; }
@@ -997,7 +1087,12 @@ function tick(dt){
 
   if (!onGround && boxBlocked(px, py - 0.06, pz)) onGround = true;
 
-  if (py < -20){ newIsland(true); toast("掉下去了，重新落岛"); }
+  if (py < -20){
+    /* 掉下去只把人送回岛顶，绝不重建岛：重建会让联机两边的世界分叉 */
+    var wasNet = NET.on;
+    spawnOnIsland();
+    toast(wasNet ? "掉下去了，落回岛上" : "掉下去了，重新落岛");
+  }
 
   /* 播种计时 */
   genT += dt;
@@ -1060,14 +1155,17 @@ function breakBlock(x, y, z){
 
 function placeBlock(){
   var hit = raycast(6);
-  if (!hit) return false;
+  if (!hit){ if (IS_TOUCH) toast("准星没对上方块"); return false; }
   var p = hit.prev;
   if (getB(p.x, p.y, p.z)) return false;
   /* 目标格和玩家身体重叠就拒绝 */
   var bodyX0 = Math.floor(px - HW), bodyX1 = Math.floor(px + HW);
   var bodyZ0 = Math.floor(pz - HW), bodyZ1 = Math.floor(pz + HW);
   var bodyY0 = Math.floor(py), bodyY1 = Math.floor(py + PH);
-  if (p.x >= bodyX0 && p.x <= bodyX1 && p.z >= bodyZ0 && p.z <= bodyZ1 && p.y >= bodyY0 && p.y <= bodyY1) return false;
+  if (p.x >= bodyX0 && p.x <= bodyX1 && p.z >= bodyZ0 && p.z <= bodyZ1 && p.y >= bodyY0 && p.y <= bodyY1){
+    if (IS_TOUCH) toast("这块贴着你，换个地方放");
+    return false;
+  }
   var mat = BD[selBlock].mat;
   if ((inv[mat] || 0) <= 0){ toast("没有" + mat + "了，先去挖点"); SFX.play("error", { volume:.5 }); return false; }
   inv[mat] -= 1;
@@ -1461,9 +1559,7 @@ function paintBars(){
       d.className = "tool" + (equipped === t.id ? " eq" : "");
       d.innerHTML = t.name + ' <span class="p">×' + t.power.toFixed(1) + "</span>";
       (function(id){
-        d.addEventListener("click", function(){
-          equipped = id; paintBars(); SFX.play("click");
-        });
+        tap(d, function(){ equipped = id; paintBars(); SFX.play("click"); });
       })(t.id);
       tools.appendChild(d);
     }
@@ -1480,7 +1576,7 @@ function paintBars(){
       s.innerHTML = '<i class="sw" style="background:' + (TILE_COL[dd.tiles[0]] || "#888") + '"></i>'
         + '<span class="k">' + (j + 1) + '</span>'
         + '<span class="n">' + (inv[dd.mat] || 0) + '</span>';
-      (function(bb){ s.addEventListener("click", function(){ selBlock = bb; paintBars(); SFX.play("click"); }); })(b);
+      (function(bb){ tap(s, function(){ selBlock = bb; paintBars(); SFX.play("click"); }); })(b);
       hb.appendChild(s);
     }
   }
@@ -1512,9 +1608,9 @@ function paintCraft(){
   p.innerHTML = "<h3>合成 67 工具</h3><div class=\"mats\">" + mats + "</div>" + rows;
   var btns = p.querySelectorAll(".mk");
   for (var b = 0; b < btns.length; b++){
-    btns[b].addEventListener("click", function(){
-      craft(this.getAttribute("data-id"));
-    });
+    (function(btn){
+      tap(btn, function(){ if (btn.disabled) return; craft(btn.getAttribute("data-id")); });
+    })(btns[b]);
   }
 }
 
@@ -1623,7 +1719,8 @@ function onNetData(data, conn){
 
   if (m.k === "b"){
     setB(m.x, m.y, m.z, m.b);
-    if (NET.host) bcast({ k:"b", x:m.x, y:m.y, z:m.z, b:m.b }, m.id || (conn && conn.peer));
+    /* 房主作为权威端回显给所有人（含发送者），顺便修掉“加入瞬间本地改动被快照覆盖”的竞态 */
+    if (NET.host) bcast({ k:"b", x:m.x, y:m.y, z:m.z, b:m.b });
     return;
   }
 }
@@ -1822,7 +1919,23 @@ function loop(t){
 requestAnimationFrame(loop);
 
 /* ============================== 事件绑定 ============================== */
-el("soloStart").addEventListener("click", function(){
+/* 统一入口：pointerdown 立即响应，click 作为兜底（避免部分浏览器吞掉点击） */
+function tap(node, fn){
+  if (!node) return;
+  var stamp = 0;
+  node.addEventListener("pointerdown", function(e){
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    stamp = Date.now();
+    fn(e, node);
+  }, { passive:false });
+  node.addEventListener("click", function(e){
+    if (Date.now() - stamp < 600) return;
+    fn(e, node);
+  });
+}
+
+tap(el("soloStart"), function(){
   SFX.play("click");
   if (!loadSave()) { newIsland(false); inv["泥"] = 2; inv["石"] = 1; }
   else spawnOnIsland();
@@ -1830,33 +1943,33 @@ el("soloStart").addEventListener("click", function(){
   paintBars();
   toast("中间那台 67 播种会一直长新方块");
 });
-el("back").addEventListener("click", function(){
+tap(el("back"), function(){
   if (document.exitPointerLock) document.exitPointerLock();
   if (window.parent !== window) window.parent.postMessage("rtsx-close", "*");
   else location.href = "index.html";
 });
-el("regen").addEventListener("click", function(){
+tap(el("regen"), function(){
   if (NET.on && !NET.host){ toast("只有房主能换岛"); return; }
   newIsland(true);
   if (NET.on) bcast({ k:"w", n: myName, w: dumpWorld() });
   SFX.play("toggle", { volume:.6 });
   toast("换了一座新岛");
 });
-el("craftBtn").addEventListener("click", function(){ SFX.play("click"); toggleCraft(); });
-el("snd").addEventListener("click", function(){
+tap(el("craftBtn"), function(){ SFX.play("click"); toggleCraft(); });
+tap(el("snd"), function(e, node){
   SFX.set(!SFX.on());
-  this.classList.toggle("off", !SFX.on());
-  this.style.opacity = SFX.on() ? 1 : .5;
+  node.classList.toggle("off", !SFX.on());
+  node.style.opacity = SFX.on() ? 1 : .5;
   if (SFX.on()) SFX.play("toggle");
 });
 el("snd").style.opacity = SFX.on() ? 1 : .5;
 
-el("createBtn").addEventListener("click", function(){
+tap(el("createBtn"), function(){
   SFX.play("click");
   var v = (el("roomIn").value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
   hostRoom(v || code5());
 });
-el("joinBtn").addEventListener("click", function(){
+tap(el("joinBtn"), function(){
   SFX.play("click");
   var v = (el("roomIn").value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
   if (!v){ netStat("先填房号再加入", "bad"); return; }
