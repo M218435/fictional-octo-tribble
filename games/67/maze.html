@@ -83,7 +83,7 @@
     backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
     touch-action:none;cursor:pointer;
   }
-  .ham.on{display:flex;}
+  .ham.on{display:flex;}  .ham.cd{opacity:.45;filter:grayscale(.3);}
   .ham:active{transform:scale(.95);background:radial-gradient(circle at 50% 38%,rgba(240,140,105,.55),rgba(120,62,40,.6));}
 
   .tip{
@@ -614,7 +614,7 @@
   var WH = 1.95;   // 墙高 / 顶棚高度（走廊加宽，顶棚跟着抬，不然像趴着走）
   function buildLevel(){
     var list = [];
-    var wallCol = [0.72, 0.47, 0.34];
+    var wallCol = [0.72, 0.47, 0.34];    var edgeCol = [0.93, 0.94, 0.97];   // 最外圈的外墙：白色
     var floorA = [0.168, 0.126, 0.095], floorB = [0.208, 0.158, 0.120];
     var ceilCol = [0.300, 0.246, 0.202];
 
@@ -634,7 +634,7 @@
             if (nx < 0 || ny < 0 || nx >= MW || ny >= MH) continue;
             if (map[ny][nx] === 1) continue;
             var shade = (s === 0 || s === 1) ? 0.80 : 1.0;
-            var col = [wallCol[0] * t * shade, wallCol[1] * t * shade, wallCol[2] * t * shade];
+            var bc = (x < BORDER || y < BORDER || x > MW - BORDER - 1 || y > MH - BORDER - 1) ? edgeCol : wallCol;            var col = [bc[0] * t * shade, bc[1] * t * shade, bc[2] * t * shade];
             if (s === 0)      quadW(list, [x+1,0,y], [x+1,0,y+1], [x+1,WH,y+1], [x+1,WH,y], [1,0,0], col, UVC);
             else if (s === 1) quadW(list, [x,0,y+1], [x,0,y], [x,WH,y], [x,WH,y+1], [-1,0,0], col, UVC);
             else if (s === 2) quadW(list, [x+1,0,y+1], [x,0,y+1], [x,WH,y+1], [x+1,WH,y+1], [0,0,1], col, UVC);
@@ -659,7 +659,7 @@
 
   /* ---------------- 道具 ---------------- */
   var items = [], buffT = { speed: 0, slow: 0, freeze: 0 }, shields = 0, invuln = 0, lastBuffTxt = "";
-  var hammers = 0, wallDmg = [], hammerFlash = 0, wallAim = null;
+  var hammers = 0, wallDmg = [], hammerFlash = 0, wallAim = null;  var HAMMER_CD = 0.7, hammerCd = 0;   // 砸完要等 0.7s，不能连点
   var openList = [];
   var ITEMS = {
     speed:  { name: "加速", col: [1.72, 1.34, 0.50], dur: 6 },
@@ -693,7 +693,7 @@
     if (shields > 0) parts.push("<b>护盾 ×" + shields + "</b>");
     if (hammers > 0) {
       var aim = wallAim ? (wallDmg[wallAim.y * MW + wallAim.x] || 0) : 0;
-      parts.push("<b>锤子" + (aim ? " · 这堵墙 " + aim + "/5" : "") + "</b>");
+      parts.push("<b>锤子" + (hammerCd > 0 ? " · 冷却 " + hammerCd.toFixed(1) + "s" : (aim ? " · 这堵墙 " + aim + "/5" : "")) + "</b>");
     }
     return parts.join("");
   }
@@ -717,11 +717,14 @@
   }
   function swing(){
     if (!hammers || state !== "run") return false;
+    if (hammerCd > 0) return false;
     var t = targetWall();
     if (!t) { SFX.warn(); return false; }
     var idx = t.y * MW + t.x;
     wallDmg[idx] = (wallDmg[idx] || 0) + 1;
     hammerFlash = 0.16;
+    hammerCd = HAMMER_CD;
+    if (hamBtn) hamBtn.classList.add("cd");
     SFX.hammer();
     if (wallDmg[idx] >= 5) {
       map[t.y][t.x] = 0;          // 变通道：实体碰撞一起消失
@@ -819,7 +822,7 @@
 
     buffT.speed = 0; buffT.slow = 0; buffT.freeze = 0;
     shields = 0; invuln = 0; lastBuffTxt = "";
-    hammers = 0; wallAim = null; hammerFlash = 0;
+    hammers = 0; wallAim = null; hammerFlash = 0; hammerCd = 0;    if (hamBtn) hamBtn.classList.remove("cd");
     wallDmg = [];
     for (var wd = 0; wd < MW * MH; wd++) wallDmg.push(0);
     if (hamBtn) hamBtn.classList.remove("on");
@@ -1016,7 +1019,7 @@
     if (buffT.slow > 0) buffT.slow = Math.max(0, buffT.slow - dt);
     if (buffT.freeze > 0) buffT.freeze = Math.max(0, buffT.freeze - dt);
     if (invuln > 0) invuln = Math.max(0, invuln - dt);
-    if (hammerFlash > 0) hammerFlash = Math.max(0, hammerFlash - dt);
+    if (hammerFlash > 0) hammerFlash = Math.max(0, hammerFlash - dt);    if (hammerCd > 0) { hammerCd = Math.max(0, hammerCd - dt); if (hammerCd === 0 && hamBtn) hamBtn.classList.remove("cd"); }
     wallAim = hammers > 0 ? targetWall() : null;
     paintBuffs();
 
