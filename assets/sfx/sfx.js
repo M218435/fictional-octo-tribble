@@ -112,6 +112,58 @@
 
   function url(file) { return base + file; }
 
+  /* ---------- WebAudio 合成（手机端兜底：不走文件、不用等解码） ---------- */
+  var AC = null;
+  function ac() {
+    if (AC) {
+      if (AC.state === "suspended") { try { AC.resume(); } catch (e) {} }
+      return AC;
+    }
+    var C = window.AudioContext || window.webkitAudioContext;
+    if (!C) return null;
+    try { AC = new C(); } catch (e) { return null; }
+    if (AC.state === "suspended") { try { AC.resume(); } catch (e) {} }
+    return AC;
+  }
+
+  var SYNTH_BASE = { click: 1180, back: 790, toggle: 900, hover: 1500 };
+  function synth(group) {
+    if (muted) return false;
+    var ctx = ac();
+    if (!ctx) return false;
+    var f = SYNTH_BASE[group];
+    if (!f) return false;
+    try {
+      var t = ctx.currentTime + 0.003;
+      var g = (GAIN[group] == null ? 0.8 : GAIN[group]);
+      var out = ctx.createGain();
+      out.gain.value = Math.max(0, Math.min(1, master * g));
+      out.connect(ctx.destination);
+
+      // 主体：快起快落的三角波，收尾削掉一点高频，听着像实体按键
+      var osc = ctx.createOscillator();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(f, t);
+      osc.frequency.exponentialRampToValueAtTime(f * 0.62, t + 0.055);
+      var env = ctx.createGain();
+      env.gain.setValueAtTime(0.0001, t);
+      env.gain.exponentialRampToValueAtTime(0.6, t + 0.004);
+      env.gain.exponentialRampToValueAtTime(0.0001, t + 0.075);
+      osc.connect(env); env.connect(out);
+      osc.start(t); osc.stop(t + 0.09);
+
+      // 边缘：一小粒噪声，补上"碰"的那一下
+      var nb = ctx.createBuffer(1, 64, ctx.sampleRate);
+      var ch = nb.getChannelData(0);
+      for (var i = 0; i < 64; i++) ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / 64, 2);
+      var ns = ctx.createBufferSource(); ns.buffer = nb;
+      var ng = ctx.createGain(); ng.gain.value = 0.16;
+      ns.connect(ng); ng.connect(out);
+      ns.start(t);
+      return true;
+    } catch (e) { return false; }
+  }
+
   function buildPool(file) {
     if (pools[file]) return pools[file];
     var arr = [];
@@ -170,7 +222,8 @@
       var pr = el.play();
       if (pr && pr.catch) {
         pr.catch(function () {
-          // 浏览器未解锁或文件不可播：静默失败，不抛错
+          // 浏览器未解锁 / 手机上文件没解出来：改用 WebAudio 现合成一个，别再静默
+          synth(group);
         });
       }
       liveCount++;
@@ -192,7 +245,7 @@
       el.volume = Math.max(0, Math.min(1, master * g));
       el.currentTime = 0;
       var pr = el.play();
-      if (pr && pr.catch) pr.catch(function () {});
+      if (pr && pr.catch) pr.catch(function () { synth(group); });
     } catch (e) { return file; }
     return file;
   }
@@ -251,6 +304,9 @@
     pick: pick,
     play: play,
     preview: preview,
+    synth: synth,
+    clickSynth: function () { return synth("click"); },
+    webAudio: function () { return !!ac(); },
     warm: function (file) { buildPool(file); return file; },
     preload: preload,
     bind: bind,
@@ -286,6 +342,7 @@
   // 首次交互解锁音频（移动端必须由用户手势触发）
   function unlockOnce() {
     var one = "";
+    try { ac(); } catch (e) {}                    // 手势里把 AudioContext 也建好，手机才有声
     try { one = play("toggle", { volume: 0.001 }); } catch (e) {}
     document.removeEventListener("pointerdown", unlockOnce, true);
     document.removeEventListener("keydown", unlockOnce, true);

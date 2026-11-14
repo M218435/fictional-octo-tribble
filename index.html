@@ -1121,7 +1121,7 @@
   }
 
   function closeGame() {
-    if (Date.now() - closeSoundAt > 400) SFX.click();
+    if (Date.now() - closeSoundAt > 400) closeTick();
     el.modal.classList.remove("open");
     el.modal.setAttribute("aria-hidden", "true");
     document.body.classList.remove("modal-open");
@@ -1168,11 +1168,15 @@
     else { try { w.focus(); } catch (e) {} }
   }
 
-  /* 关闭按钮：按下就出声（手机上等 click 会因为页面收尾而听不见） */
+  /* 关闭按钮：按下就用 WebAudio 现合成一声（手机上不依赖音频文件解码，必定有声） */
   var closeSoundAt = 0;
+  function closeTick() {
+    if (SFX.clickSynth) { if (SFX.clickSynth()) return; }
+    SFX.click();
+  }
   el.gameClose.addEventListener("pointerdown", function () {
     closeSoundAt = Date.now();
-    SFX.click();
+    closeTick();
   });
   el.gameClose.addEventListener("click", closeGame);
 
