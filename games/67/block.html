@@ -1061,7 +1061,7 @@ function tick(dt){
   if (keysDown.KeyS) fw += 1;
   if (keysDown.KeyA) sd -= 1;
   if (keysDown.KeyD) sd += 1;
-  if (joy.active){ sd += joy.dx; fw -= joy.dy; }
+  if (joy.active){ sd += joy.dx; fw += joy.dy; }
 
   var len = Math.hypot(fw, sd); if (len > 1) { fw /= len; sd /= len; }
   var fx = Math.sin(yaw), fz = -Math.cos(yaw);
