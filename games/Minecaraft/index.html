@@ -128,6 +128,8 @@
   /* ---------- 运行层 ---------- */
   .play{position:fixed;inset:0;z-index:60;display:none;flex-direction:column;background:#000;}
   .play.show{display:flex;}
+  .play.fs .pbar{display:none;}   /* 全屏时把顶栏收掉，游戏独占整窗 */
+  .play.fs #gframe{flex:1 1 auto;}
   body.playing{overflow:hidden;}
   .play .pbar{
     display:flex;align-items:center;justify-content:space-between;gap:10px;
@@ -200,7 +202,7 @@
         <button class="pbtn" id="btn-close" type="button">关闭</button>
       </span>
     </div>
-    <iframe id="gframe" title="Minecraft" allowfullscreen allow="fullscreen; pointer-lock; gamepad; autoplay; microphone"></iframe>
+    <iframe id="gframe" title="Minecraft" allowfullscreen allow="fullscreen; pointer-lock; gamepad; autoplay; microphone; screen-wake-lock; clipboard-write"></iframe>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -222,6 +224,35 @@
     { id:"1.12.2",  file:"webmc-main/1.12.2.html",   name:"1.12.2",    tag:"键鼠 · 电脑", size:25.0,  desc:"老版本，轻" },
     { id:"1.8",     file:"webmc-main/1.8.html",      name:"1.8",       tag:"键鼠 · 电脑", size:18.4,  desc:"PvP 经典版" }
   ];
+
+
+  /* ---------- 全屏兜底：游戏里按 FS 被浏览器策略拦下时，交给这一层接 ---------- */
+  /* 游戏页面是 blob 文档，requestFullscreen 在部分环境下被 permissions policy 拒掉，
+     一拒就是一条 Uncaught (in promise)。这里把它的 reject 吃掉，并通知外层进全屏。 */
+  var FS_JS = "(function(){\n"
+    + "  if(window.__rtsxFs) return; window.__rtsxFs = true;\n"
+    + "  var doc = document, P = window.parent;\n"
+    + "  function tell(on){ try{ P.postMessage({rtsx:'fs', on:!!on}, '*'); }catch(e){} }\n"
+    + "  function guard(name){\n"
+    + "    var orig = Element.prototype[name];\n"
+    + "    if(!orig) return;\n"
+    + "    Element.prototype[name] = function(){\n"
+    + "      var p;\n"
+    + "      try{ p = orig.apply(this, arguments); }\n"
+    + "      catch(e){ tell(1); return Promise.resolve(); }\n"
+    + "      if(p && p.catch) p.catch(function(){ tell(1); });\n"
+    + "      return p || Promise.resolve();\n"
+    + "    };\n"
+    + "  }\n"
+    + "  guard('requestFullscreen');\n"
+    + "  guard('webkitRequestFullscreen');\n"
+    + "  var ex = doc.exitFullscreen || doc.webkitExitFullscreen;\n"
+    + "  if(ex) doc.exitFullscreen = function(){\n"
+    + "    try{ var p = ex.call(doc); if(p && p.catch) p.catch(function(){}); }catch(e){}\n"
+    + "    tell(0);\n"
+    + "  };\n"
+    + "  doc.addEventListener('fullscreenchange', function(){ tell(!!doc.fullscreenElement); });\n"
+    + "})();\n";
 
 
   /* ---------- 触屏手柄：注入到非触屏版本里，手机也能玩 ---------- */
@@ -433,6 +464,7 @@
       setPct(1, r.buf.byteLength, r.buf.byteLength);
       var parts=[r.buf];
       if(v.id!=="pe" && wantPad()) parts.push("`n<script>"+PAD_JS+"<\/script>");
+      parts.push("`n<script>"+FS_JS+"<\/script>");
       var blob=new Blob(parts, {type:"text/html;charset=utf-8"});
       if(blobUrl) URL.revokeObjectURL(blobUrl);
       blobUrl=URL.createObjectURL(blob);
@@ -465,6 +497,7 @@
   function closePlay(){
     SFX.click();
     playEl.classList.remove("show");
+    playEl.classList.remove("fs");
     document.body.classList.remove("playing");
     frame.src="about:blank";
     if(document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(function(){});
@@ -472,6 +505,7 @@
   document.getElementById("btn-close").addEventListener("click", closePlay);
   document.getElementById("btn-full").addEventListener("click", function(){
     SFX.click();
+    if(playEl.classList.contains("fs")){ leaveBig(); return; }
     var box=playEl;
     if(document.fullscreenElement){ document.exitFullscreen && document.exitFullscreen(); return; }
     var req=box.requestFullscreen||box.webkitRequestFullscreen||box.msRequestFullscreen;
@@ -481,6 +515,33 @@
         try{ if(screen.orientation && screen.orientation.lock) screen.orientation.lock("landscape").catch(function(){}); }catch(e){}
       }).catch(function(){ toast("这个浏览器不给全屏"); });
     } else toast("这个浏览器不支持全屏，直接转横屏也能玩");
+  });
+
+  /* ---------- 接管游戏内的全屏请求（游戏里按 FS 被策略拦下时，改由这一层进全屏） ---------- */
+  function enterBig(){
+    playEl.classList.add("fs");
+    if(document.fullscreenElement) return;
+    var req=playEl.requestFullscreen||playEl.webkitRequestFullscreen;
+    if(!req) return;
+    try{
+      var p=req.call(playEl, {navigationUI:"hide"});
+      if(p && p.catch) p.catch(function(){});     // 外层也被拦就靠 .fs 铺满整窗
+    }catch(e){}
+  }
+  function leaveBig(){
+    playEl.classList.remove("fs");
+    if(document.fullscreenElement && document.exitFullscreen){
+      try{ var p=document.exitFullscreen(); if(p && p.catch) p.catch(function(){}); }catch(e){}
+    }
+  }
+  window.addEventListener("message", function(e){
+    if(!frame.contentWindow || e.source !== frame.contentWindow) return;
+    var d=e.data;
+    if(!d || d.rtsx !== "fs") return;
+    if(d.on) enterBig(); else leaveBig();
+  });
+  document.addEventListener("fullscreenchange", function(){
+    if(!document.fullscreenElement) playEl.classList.remove("fs");
   });
 
   var toastEl=document.getElementById("toast"), toastT=null;
