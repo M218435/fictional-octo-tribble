@@ -1337,7 +1337,7 @@
     mzCanvas.id = "mzMap";
     mzCanvas.style.cssText = "position:fixed;right:calc(10px + env(safe-area-inset-right));" +
       "top:calc(" + (window.innerWidth < 520 ? 96 : 54) + "px + env(safe-area-inset-top));" +
-      "width:min(168px,34vw);z-index:4;border:1px solid rgba(244,237,227,.16);border-radius:10px;" +
+      "width:min(168px,34vw);z-index:6;border:1px solid rgba(244,237,227,.16);border-radius:10px;" +
       "background:#151210;box-shadow:0 16px 34px -22px #000;display:none;pointer-events:none;";
     document.body.appendChild(mzCanvas);
     mzCtx = mzCanvas.getContext("2d");
