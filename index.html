@@ -353,7 +353,23 @@
     transition:background .16s ease, border-color .16s ease;
   }
   #game-close:hover{background:var(--bg-soft);border-color:#D9D2C5;}
-  #game-frame{flex:1 1 auto;width:100%;border:0;background:var(--bg);display:block;}
+  #game-frame{flex:1 1 auto;width:100%;border:0;background:#121110;display:block;}
+  .game-stage{position:relative;flex:1 1 auto;display:flex;min-height:0;background:#121110;}
+  /* 载入遮罩：游戏页面画出来之前先盖住，不要露白 */
+  .game-veil{
+    position:absolute;inset:0;z-index:3;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+    background:#121110;color:#8C8679;
+    font-size:12.5px;letter-spacing:.08em;
+    opacity:1;transition:opacity .22s ease;pointer-events:none;
+  }
+  .game-veil.hide{opacity:0;}
+  .game-veil .ring{
+    width:26px;height:26px;border-radius:50%;
+    border:2px solid rgba(226,145,111,.22);border-top-color:#E2916F;
+    animation:veil-spin .9s linear infinite;
+  }
+  @keyframes veil-spin{to{transform:rotate(360deg);}}
 
   /* ---------- toast ---------- */
   .toast{
@@ -616,7 +632,13 @@
         <button id="game-close" type="button">关闭</button>
       </div>
     </header>
-    <iframe id="game-frame" title="迷你游戏" allowfullscreen allow="fullscreen; pointer-lock; autoplay; gamepad; microphone"></iframe>
+    <div class="game-stage">
+      <iframe id="game-frame" title="迷你游戏" allowfullscreen allow="fullscreen; pointer-lock; autoplay; gamepad; microphone"></iframe>
+      <div class="game-veil" id="game-veil">
+        <span class="ring"></span>
+        <b id="game-veil-txt">载入中…</b>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -729,6 +751,8 @@
     gameFrame: document.getElementById("game-frame"),
     gameNewWin: document.getElementById("game-newwin"),
     gameClose: document.getElementById("game-close"),
+    gameVeil: document.getElementById("game-veil"),
+    gameVeilTxt: document.getElementById("game-veil-txt"),
     toast: document.getElementById("toast")
   };
 
@@ -1069,23 +1093,45 @@
   });
 
   /* ================= 游戏弹层 ================= */
+  var veilT = null, veilTimer = null;
+  function showVeil(title) {
+    var v = el.gameVeil, t = el.gameVeilTxt;
+    if (veilTimer) { clearTimeout(veilTimer); veilTimer = null; }
+    if (t) t.textContent = "正在载入 " + (title || "游戏") + "…";
+    if (v) v.classList.remove("hide");
+  }
+  function hideVeil(delay) {
+    var v = el.gameVeil;
+    if (!v) return;
+    if (veilTimer) clearTimeout(veilTimer);
+    veilT = setTimeout(function () { v.classList.add("hide"); }, delay == null ? 40 : delay);
+  }
+
   function openGame(file, title) {
     el.gameTitle.textContent = title || "RTSX";
+    showVeil(title);
     el.gameFrame.src = file;
     el.gameNewWin.href = file;
     el.modal.classList.add("open");
     el.modal.setAttribute("aria-hidden", "false");
     document.body.classList.add("modal-open");
     document.body.style.overflow = "hidden";
+    // 页面迟迟画不出来也别一直盖着
+    setTimeout(function () { hideVeil(0); }, 5000);
   }
 
   function closeGame() {
-    SFX.click();
+    if (Date.now() - closeSoundAt > 400) SFX.click();
     el.modal.classList.remove("open");
     el.modal.setAttribute("aria-hidden", "true");
     document.body.classList.remove("modal-open");
-    el.gameFrame.src = "about:blank";     // 卸载页面，顺带停掉游戏循环
     document.body.style.overflow = "";
+    // 留一点时间让收尾音效播完，再卸载页面
+    setTimeout(function () {
+      if (!el.modal.classList.contains("open")) el.gameFrame.src = "about:blank";
+    }, 240);
+    if (veilT) { clearTimeout(veilT); veilT = null; }
+    if (el.gameVeil) el.gameVeil.classList.remove("hide");   // 下次打开仍然从遮罩开始
   }
 
   // 音效按下即响（新窗口打开会立刻切走页面，等 click 会被吃掉）
@@ -1122,9 +1168,20 @@
     else { try { w.focus(); } catch (e) {} }
   }
 
+  /* 关闭按钮：按下就出声（手机上等 click 会因为页面收尾而听不见） */
+  var closeSoundAt = 0;
+  el.gameClose.addEventListener("pointerdown", function () {
+    closeSoundAt = Date.now();
+    SFX.click();
+  });
   el.gameClose.addEventListener("click", closeGame);
+
   el.gameFrame.addEventListener("load", function () {
     try { el.gameFrame.contentWindow.focus(); } catch (e) {}
+    // 等两帧再撤遮罩，避免露出还没画完的白底
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { hideVeil(0); });
+    });
   });
   el.modal.addEventListener("mousedown", function (e) {
     if (e.target === el.modal) closeGame();

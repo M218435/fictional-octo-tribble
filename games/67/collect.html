@@ -478,7 +478,10 @@
         collected++;
         SFX.pick(collected);
         countEl.textContent = collected;
-        if (MODE === "free" && collected >= TOTAL) return winFree();
+        if (collected >= TOTAL) {
+          if (MODE === "free") return winFree();
+          return winTimed();          // 限时赛集齐也算赢，不必干等到时间结束
+        }
       }
     }
 
@@ -496,6 +499,19 @@
     state = "end";
     SFX.win();
     showPanel("自由模式", "集齐 67", "67 个方块全部收走了，用时 " + fmt(elapsed) + "。", "再来一局");
+  }
+
+  function winTimed(){
+    state = "end";
+    SFX.win();
+    var used = (performance.now() - startedAt) / 1000;
+    var left = Math.max(0, TIME_LIMIT - used);
+    best = TOTAL;
+    try { localStorage.setItem(BEST_KEY, String(best)); } catch (e) {}
+    clockEl.textContent = fmt(left);
+    showPanel("限时模式", "全部收走",
+      "67 个全部收走，用时 " + fmt(used) + "，还剩 " + fmt(left) + "。满额通过，本机最好成绩 " + best + " 个。",
+      "再来一局");
   }
 
   function endTimed(){
