@@ -531,7 +531,7 @@
   }
 
   /* ---------------- 迷宫 ---------------- */
-  var MW = 41, MH = 41, map = [];
+  var MW = 61, MH = 61, map = [];
   function genMaze(){
     map = [];
     for (var y = 0; y < MH; y++) {
@@ -553,7 +553,9 @@
       map[cy + d[1]][cx + d[0]] = 0;
       stack.push([cx + d[0], cy + d[1]]);
     }
-    for (var k = 0; k < 10; k++) {
+    // 大图要够多"岔路口"，不然全是死胡同，跑起来像在走一条长走廊
+    var loops = Math.round(MW * MH / 60);
+    for (var k = 0; k < loops; k++) {
       var sx = 1 + Math.floor(Math.random() * (MW - 2));
       var sy = 1 + Math.floor(Math.random() * (MH - 2));
       if (map[sy][sx] === 1 && ((sx % 2 === 0 && sy % 2 === 1) || (sy % 2 === 0 && sx % 2 === 1))) map[sy][sx] = 0;
@@ -776,7 +778,7 @@
     var pool = opens.filter(function(c){
       return dist[c.y * MW + c.x] >= 5 && !(c.x === exitCell.x && c.y === exitCell.y);
     });
-    var cubeCount = Math.max(8, Math.min(22, Math.round(opens.length / 55)));
+    var cubeCount = Math.max(8, Math.min(28, Math.round(opens.length / 60)));
     for (var n = 0; n < cubeCount && pool.length; n++) {
       var pick = Math.floor(Math.random() * pool.length);
       cubes.push({ x: pool[pick].x + 0.5, y: pool[pick].y + 0.5, got: false, spin: Math.random() * 6.28 });
@@ -786,7 +788,7 @@
     hunters = [];
     var farPool = opens.filter(function(c){ return dist[c.y * MW + c.x] >= 8; });
     if (!farPool.length) farPool = opens.slice();
-    for (var h = 0; h < 4 && farPool.length; h++) {
+    for (var h = 0; h < 5 && farPool.length; h++) {
       var hp = Math.floor(Math.random() * farPool.length);
       var cell = farPool[hp];
       farPool.splice(hp, 1);
@@ -797,7 +799,7 @@
     var itemPool = opens.filter(function(c){
       return dist[c.y * MW + c.x] >= 4 && !(c.x === exitCell.x && c.y === exitCell.y);
     });
-    spawnItems(itemPool, Math.max(6, Math.round(cubes.length / 2)));
+    spawnItems(itemPool, Math.max(6, Math.min(12, Math.round(cubes.length / 2))));
 
     buffT.speed = 0; buffT.slow = 0; buffT.freeze = 0;
     shields = 0; invuln = 0; lastBuffTxt = "";
@@ -1011,7 +1013,7 @@
     strafe = Math.max(-1, Math.min(1, strafe));
 
     if (Math.abs(fwd) > 0.03 || Math.abs(strafe) > 0.03) {
-      var speed = (keys.sprint ? 3.15 : 2.2) * (buffT.speed > 0 ? 1.62 : 1);
+      var speed = (keys.sprint ? 3.4 : 2.5) * (buffT.speed > 0 ? 1.62 : 1);
       var sy = Math.sin(yaw), cy = Math.cos(yaw);
       var vx = (sy * fwd + cy * strafe) * speed;
       var vy = (cy * fwd - sy * strafe) * speed;
