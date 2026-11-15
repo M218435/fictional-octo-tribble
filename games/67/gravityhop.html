@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<link rel="icon" type="image/png" href="../../icon.png">
+<link rel="apple-touch-icon" href="../../icon.png">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>67 引力跳跃 · 67 专辑</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#12100E;color:#F6F1E8;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;}
+  #c{position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;display:block;background:#12100E;}
+  #hud{position:fixed;top:0;left:0;right:0;padding:calc(12px + env(safe-area-inset-top)) 14px 0;pointer-events:none;z-index:5;}
+  .top{display:flex;align-items:center;justify-content:space-between;}
+  .back{pointer-events:auto;color:rgba(246,241,232,.46);font-size:12px;text-decoration:none;
+    border:1px solid #2F2A24;border-radius:8px;padding:5px 10px;background:rgba(23,21,19,.6);}
+  .sc{font-family:Georgia,"Songti SC",serif;font-size:12px;color:#E2916F;letter-spacing:.1em;text-align:right;}
+  .sc b{font-size:24px;font-weight:600;display:inline-block;vertical-align:-4px;}
+  #tip{position:fixed;left:0;right:0;bottom:calc(16px + env(safe-area-inset-bottom));text-align:center;
+    font-size:12px;color:rgba(246,241,232,.44);pointer-events:none;z-index:5;}
+  #over{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(86vw,330px);
+    background:rgba(35,31,25,.95);border:1px solid #3A332B;border-radius:16px;padding:20px 20px 18px;text-align:center;z-index:9;}
+  #over h2{margin:0 0 8px;font-family:Georgia,"Songti SC",serif;font-size:20px;font-weight:600;}
+  #over p{margin:0 0 16px;font-size:12.5px;line-height:1.7;color:rgba(246,241,232,.6);}
+  #over button{border:0;border-radius:10px;padding:10px 22px;background:#E2916F;color:#241812;
+    font:600 13px system-ui,-apple-system,sans-serif;cursor:pointer;}
+  .hide{display:none;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"><div class="top"><a class="back" href="index.html">← 67 专辑</a><div class="sc"><b id="score">0</b> <span id="unit">块</span></div></div></div>
+<div id="tip">左右滑动对准平台 · 点一下起跳</div>
+<div id="over" class="hide"><h2>掉进虚空</h2><p id="ovTxt"></p><button id="again" type="button">再来一局</button></div>
+<script src="../../assets/sfx/sfx.js"></script>
+<script>
+/* ---------- 迷你 3D 引擎（WebGL1，纯色方块批次） ---------- */
+function A3(id){
+  var cv = document.getElementById(id);
+  var gl = cv.getContext("webgl", { antialias:true, alpha:false, depth:true }) || cv.getContext("experimental-webgl");
+  var NOGL=false;
+  if(!gl){
+    NOGL=true;
+    gl={createShader:function(){return{}},shaderSource:function(){},compileShader:function(){},getShaderParameter:function(){return true},
+      getShaderInfoLog:function(){return""},createProgram:function(){return{}},attachShader:function(){},linkProgram:function(){},useProgram:function(){},
+      getAttribLocation:function(){return 0},getUniformLocation:function(){return 0},createBuffer:function(){return{}},bindBuffer:function(){},
+      bufferData:function(){},enable:function(){},disable:function(){},uniformMatrix4fv:function(){},viewport:function(){},clearColor:function(){},
+      clear:function(){},enableVertexAttribArray:function(){},vertexAttribPointer:function(){},bufferSubData:function(){},drawArrays:function(){},
+      getError:function(){return 0},COLOR_BUFFER_BIT:16384,DEPTH_BUFFER_BIT:256,DEPTH_TEST:2929,CULL_FACE:2884,ARRAY_BUFFER:34962,
+      DYNAMIC_DRAW:35048,FLOAT:5126,TRIANGLES:4,VERTEX_SHADER:35633,FRAGMENT_SHADER:35632,COMPILE_STATUS:35713};
+    var nt=document.createElement("div");
+    nt.textContent="这台设备没有 WebGL，画面无法显示";
+    nt.style.cssText="position:fixed;left:0;right:0;top:46%;text-align:center;font:13px system-ui,sans-serif;color:#E2916F;z-index:6;pointer-events:none";
+    if(document.body) document.body.appendChild(nt); else window.addEventListener("load",function(){ document.body.appendChild(nt); });
+  }
+  var VS = "attribute vec3 aP;attribute vec3 aC;uniform mat4 uM;varying vec3 vC;void main(){gl_Position=uM*vec4(aP,1.0);vC=aC;}";
+  var FS = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\nvarying vec3 vC;void main(){gl_FragColor=vec4(vC,1.0);}";
+  function sh(t,s){ var o=gl.createShader(t); gl.shaderSource(o,s); gl.compileShader(o);
+    if(!gl.getShaderParameter(o,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; }
+  var P=gl.createProgram(); gl.attachShader(P,sh(gl.VERTEX_SHADER,VS)); gl.attachShader(P,sh(gl.FRAGMENT_SHADER,FS));
+  gl.linkProgram(P); gl.useProgram(P);
+  var aP=gl.getAttribLocation(P,"aP"), aC=gl.getAttribLocation(P,"aC"), uM=gl.getUniformLocation(P,"uM");
+  var MAXV=60000, pos=new Float32Array(MAXV*3), col=new Float32Array(MAXV*3), n=0;
+  var bp=gl.createBuffer(), bc=gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER,bp); gl.bufferData(gl.ARRAY_BUFFER,pos.byteLength,gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER,bc); gl.bufferData(gl.ARRAY_BUFFER,col.byteLength,gl.DYNAMIC_DRAW);
+  gl.enable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE);
+  function size(){
+    var dpr=Math.min(window.devicePixelRatio||1,2);
+    var w=Math.round((window.innerWidth||360)*dpr), h=Math.round((window.innerHeight||640)*dpr);
+    var k=1, e=2048, m=4200000;
+    if(Math.max(w,h)>e) k=Math.min(k,e/Math.max(w,h));
+    if(w*h>m) k=Math.min(k,Math.sqrt(m/(w*h)));
+    w=Math.max(1,Math.round(w*k)); h=Math.max(1,Math.round(h*k));
+    if(cv.width!==w||cv.height!==h){ cv.width=w; cv.height=h; }
+  }
+  window.addEventListener("resize",size); size();
+  var Pm=new Float32Array(16), Vm=new Float32Array(16), Mm=new Float32Array(16);
+  function persp(o,f,a,nr,f2){ var t=1/Math.tan(f/2), q=1/(nr-f2);
+    o[0]=t/a;o[1]=0;o[2]=0;o[3]=0;o[4]=0;o[5]=t;o[6]=0;o[7]=0;o[8]=0;o[9]=0;o[10]=(f2+nr)*q;o[11]=-1;
+    o[12]=0;o[13]=0;o[14]=2*f2*nr*q;o[15]=0; }
+  function look(o,ex,ey,ez,tx,ty,tz){
+    var zx=ex-tx,zy=ey-ty,zz=ez-tz,l=Math.hypot(zx,zy,zz)||1; zx/=l;zy/=l;zz/=l;
+    var xx=zz,xy=0,xz=-zx, xl=Math.hypot(xx,xy,xz)||1; xx/=xl;xz/=xl;
+    var yx=zy*xz-zz*xy, yy=zz*xx-zx*xz, yz=zx*xy-zy*xx;
+    o[0]=xx;o[1]=yx;o[2]=zx;o[3]=0; o[4]=xy;o[5]=yy;o[6]=zy;o[7]=0; o[8]=xz;o[9]=yz;o[10]=zz;o[11]=0;
+    o[12]=-(xx*ex+xy*ey+xz*ez); o[13]=-(yx*ex+yy*ey+yz*ez); o[14]=-(zx*ex+zy*ey+zz*ez); o[15]=1;
+  }
+  function mul(o,a,b){ for(var c=0;c<4;c++) for(var r=0;r<4;r++)
+    o[c*4+r]=a[r]*b[c*4]+a[4+r]*b[c*4+1]+a[8+r]*b[c*4+2]+a[12+r]*b[c*4+3]; }
+  var FACE=[
+    [0,1,0, 0,1,1, 1,1,1, 0,1,0, 1,1,1, 1,1,0, 1.00],
+    [0,0,0, 1,0,1, 0,0,1, 0,0,0, 1,0,0, 1,0,1, 0.50],
+    [1,0,0, 1,0,1, 1,1,1, 1,0,0, 1,1,1, 1,1,0, 0.86],
+    [0,0,1, 0,0,0, 0,1,0, 0,0,1, 0,1,0, 0,1,1, 0.86],
+    [0,0,1, 1,0,1, 1,1,1, 0,0,1, 1,1,1, 0,1,1, 0.72],
+    [0,0,0, 0,1,0, 1,1,0, 0,0,0, 1,1,0, 1,0,0, 0.72]
+  ];
+  function hexv(c){
+    if(typeof c!=="string") return c;
+    var s=c.replace("#",""); if(s.length===3) s=s[0]+s[0]+s[1]+s[1]+s[2]+s[2];
+    var v=parseInt(s,16); return [(v>>16&255)/255,(v>>8&255)/255,(v&255)/255];
+  }
+  var api={};
+  api.open=function(ex,ey,ez,tx,ty,tz,fov,near,far){
+    size();
+    persp(Pm,fov||1.02,cv.width/cv.height,near||0.05,far||240);
+    look(Vm,ex,ey,ez,tx,ty,tz);
+    mul(Mm,Pm,Vm);
+    gl.uniformMatrix4fv(uM,false,Mm);
+    gl.viewport(0,0,cv.width,cv.height);
+  };
+  api.clear=function(r,g,b){ gl.clearColor(r,g,b,1); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT); };
+  api.start=function(){ n=0; };
+  api.box=function(x,y,z,sx,sy,sz,c,opt){
+    if(n+36>MAXV) return;
+    var v=hexv(c), sh=(opt&&opt.shade)||1, yaw=(opt&&opt.yaw)||0;
+    var cs=Math.cos(yaw), ss=Math.sin(yaw);
+    for(var f=0;f<6;f++){
+      var fa=FACE[f], s=fa[6]*sh;
+      for(var k=0;k<6;k++){
+        var vx=fa[k*3], vy=fa[k*3+1], vz=fa[k*3+2];
+        var lx=(vx-0.5)*sx, lz=(vz-0.5)*sz;
+        pos[n*3]=x+lx*cs+lz*ss; pos[n*3+1]=y+(vy-0.5)*sy; pos[n*3+2]=z-lx*ss+lz*cs;
+        col[n*3]=v[0]*s; col[n*3+1]=v[1]*s; col[n*3+2]=v[2]*s;
+        n++;
+      }
+    }
+  };
+  api.flush=function(){
+    if(!n) return;
+    gl.bindBuffer(gl.ARRAY_BUFFER,bp); gl.bufferSubData(gl.ARRAY_BUFFER,0,pos.subarray(0,n*3));
+    gl.enableVertexAttribArray(aP); gl.vertexAttribPointer(aP,3,gl.FLOAT,false,0,0);
+    gl.bindBuffer(gl.ARRAY_BUFFER,bc); gl.bufferSubData(gl.ARRAY_BUFFER,0,col.subarray(0,n*3));
+    gl.enableVertexAttribArray(aC); gl.vertexAttribPointer(aC,3,gl.FLOAT,false,0,0);
+    gl.drawArrays(gl.TRIANGLES,0,n);
+    n=0;
+  };
+  api.project=function(x,y,z){
+    var cx=Mm[0]*x+Mm[4]*y+Mm[8]*z+Mm[12], cy=Mm[1]*x+Mm[5]*y+Mm[9]*z+Mm[13], cw=Mm[3]*x+Mm[7]*y+Mm[11]*z+Mm[15];
+    if(cw<=0.02) return null;
+    return { x:cx/cw*0.5+0.5, y:cy/cw*0.5+0.5, d:cw };
+  };
+  api.gl=gl;
+  return api;
+}
+function sfx(n,v){ try{ if(window.RTSXSFX && !RTSXSFX.isMuted()) RTSXSFX.play(n,{volume:v||1}); }catch(e){} }
+var $id=function(i){ return document.getElementById(i); };
+var TAU=Math.PI*2, clamp=function(v,a,b){ return v<a?a:(v>b?b:v); };
+var A=A3("c"), st={score:0,over:false};
+var px=0, pxT=0, py=0, vy=0, pz=0, speed=5.2, plats=[], lastZ=-6, counted=0;
+function addPlat(z){
+  var w=2.4+Math.random()*1.6;
+  plats.push({x:(Math.random()-0.5)*6.4, z:z, w:w, d:2.6+Math.random()*0.8});
+}
+function reset(){
+  px=0;pxT=0;py=0;vy=0;pz=0;speed=5.2;plats=[];lastZ=-6;counted=0;st.over=false;st.score=0;
+  for(var i=0;i<16;i++){ addPlat(lastZ); lastZ-=4.0; }
+  $id("over").classList.add("hide"); $id("score").textContent="0";
+}
+reset();
+function jump(){ if(st.over) return; if(py<=0.45){ vy=5.2; sfx("click",0.7); } }
+window.addEventListener("keydown",function(e){
+  var k=e.key.toLowerCase();
+  if(k==="arrowleft"||k==="a") pxT-=0.5;
+  if(k==="arrowright"||k==="d") pxT+=0.5;
+  if(k===" "||k==="arrowup"||k==="w"){ jump(); e.preventDefault(); }
+  if(k.indexOf("arrow")===0) e.preventDefault();
+});
+var drag=null;
+$id("c").addEventListener("pointerdown",function(e){ drag={x:e.clientX,y:e.clientY,t:performance.now()}; });
+window.addEventListener("pointermove",function(e){
+  if(!drag) return;
+  pxT+=(e.clientX-drag.x)/((window.innerWidth||360)*0.28)*1.1;
+  drag.x=e.clientX; drag.y=e.clientY;
+});
+window.addEventListener("pointerup",function(e){
+  if(!drag) return;
+  var dy=e.clientY-drag.y, t2=performance.now()-drag.t;
+  if(dy<-26||t2<260) jump();
+  drag=null;
+});
+function over(){ st.over=true; sfx("bump");
+  $id("ovTxt").textContent="掉下去了，跳过了 "+st.score+" 块平台。";
+  $id("over").classList.remove("hide"); }
+function tick(dt){
+  if(st.over) return;
+  pxT=clamp(pxT,-4.6,4.6);
+  px+=(pxT-px)*Math.min(1,dt*8);
+  pz-=speed*dt;
+  vy-=10.5*dt; py+=vy*dt;
+  var on=null;
+  for(var i=0;i<plats.length;i++){
+    var p=plats[i];
+    if(Math.abs(p.z-pz)<p.d*0.5&&Math.abs(p.x-px)<p.w*0.5+0.35) on=p;
+  }
+  if(on&&py<0.42){ py=0.42; if(vy<0) vy=0; }
+  if(py<-6){ over(); return; }
+  for(var i=plats.length-1;i>=0;i--) if(plats[i].z>pz+7) plats.splice(i,1);
+  while(lastZ>pz-56){ addPlat(lastZ); lastZ-=3.7+Math.random()*1.2; }
+  counted=Math.max(counted,Math.floor(-pz/4));
+  st.score=counted;
+  speed=Math.min(9.5,5.2+(-pz)*0.03);
+}
+function draw(){
+  A.clear(0.05,0.05,0.06);
+  A.open(px*0.62,py+4.0,pz+8.4, px*0.9,py+0.5,pz-9, 1.0, 0.05, 120);
+  A.start();
+  for(var i=0;i<plats.length;i++){
+    var p=plats[i];
+    A.box(p.x,0.0,p.z, p.w,0.5,p.d, "#7A553A");
+    A.box(p.x,-0.5,p.z, p.w*0.85,0.6,p.d*0.85, "#5A4030");
+  }
+  A.box(px,py+0.34,pz, 0.86,0.86,0.86, "#F3DCB2");
+  A.box(px,py+0.95,pz, 0.6,0.5,0.6, "#E2916F");
+  A.flush();
+}
+var last=0;
+function frame(t){ requestAnimationFrame(frame); var dt=(last?Math.min(0.05,(t-last)/1000):0.016); last=t;
+  tick(dt); draw(); $id("score").textContent=st.score; }
+requestAnimationFrame(frame);
+$id("again").addEventListener("click",reset);
+window.__ok=true;
+window.__S=function(){ return {score:st.score,over:st.over,py:Math.round(py),plats:plats.length}; };
+</script>
+</body>
+</html>
