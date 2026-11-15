@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<link rel="icon" type="image/png" href="../../icon.png">
+<link rel="apple-touch-icon" href="../../icon.png">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>67 泰拉瑞亚 · 67 专辑</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#0C0A09;color:#F6F1E8;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;}
+  #c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;}
+  .top{position:fixed;left:0;right:0;top:0;padding:calc(8px + env(safe-area-inset-top)) 10px 0;
+    display:flex;align-items:center;gap:8px;pointer-events:none;z-index:5;}
+  .back{pointer-events:auto;color:rgba(246,241,232,.5);font-size:12px;text-decoration:none;
+    border:1px solid #2F2A24;border-radius:8px;padding:5px 9px;background:rgba(23,21,19,.66);}
+  .hearts{display:flex;gap:3px;margin-left:auto;align-items:center;}
+  .h{width:13px;height:11px;border-radius:2px;background:#C4633F;box-shadow:inset 0 -2px 0 rgba(0,0,0,.25);}
+  .h.off{background:#3A322B;}
+  .clock{margin-left:8px;font-size:11px;color:rgba(246,241,232,.5);letter-spacing:.08em;}
+  #bar{position:fixed;left:0;right:0;bottom:0;padding:0 8px calc(8px + env(safe-area-inset-bottom));
+    display:flex;gap:5px;justify-content:center;z-index:6;pointer-events:none;}
+  .slot{pointer-events:auto;width:44px;height:44px;border-radius:9px;border:1px solid #332C25;
+    background:rgba(27,24,20,.9);position:relative;display:flex;align-items:center;justify-content:center;
+    font-size:17px;color:#F6F1E8;}
+  .slot.sel{border-color:#E2916F;background:rgba(43,32,25,.95);}
+  .slot .n{position:absolute;right:3px;bottom:1px;font-size:9px;color:rgba(246,241,232,.62);}
+  .pad{position:fixed;bottom:calc(62px + env(safe-area-inset-bottom));display:flex;gap:10px;z-index:6;}
+  .pad.left{left:10px;}
+  .pad.right{right:10px;}
+  .btn{width:58px;height:58px;border-radius:50%;border:1px solid #3A332B;background:rgba(27,24,20,.82);
+    color:#F6F1E8;font-size:15px;display:flex;align-items:center;justify-content:center;user-select:none;}
+  .btn:active{background:rgba(226,145,111,.35);}
+  .btn.small{width:50px;height:50px;font-size:13px;}
+  #craft{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(92vw,420px);
+    max-height:76vh;overflow:auto;background:rgba(30,26,21,.97);border:1px solid #3A332B;border-radius:14px;
+    padding:16px;z-index:9;display:none;}
+  #craft h2{margin:0 0 10px;font-family:Georgia,"Songti SC",serif;font-size:17px;}
+  #craft .r{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid #2A251F;}
+  #craft .r .nm{flex:1;font-size:12.5px;line-height:1.5;}
+  #craft .r .cs{font-size:11px;color:rgba(246,241,232,.45);}
+  #craft .r button{border:0;border-radius:8px;padding:7px 12px;background:#E2916F;color:#241812;font:600 12px system-ui; }
+  #craft .r button:disabled{background:#3A332B;color:rgba(246,241,232,.4);}
+  #toast{position:fixed;left:50%;bottom:calc(118px + env(safe-area-inset-bottom));transform:translateX(-50%);
+    background:rgba(20,17,14,.9);border:1px solid #3A332B;border-radius:10px;padding:8px 14px;
+    font-size:12px;color:#E2916F;opacity:0;transition:opacity .2s;pointer-events:none;z-index:8;}
+  #toast.on{opacity:1;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="top">
+  <a class="back" href="index.html">← 67 专辑</a>
+  <div class="hearts" id="hearts"></div>
+  <div class="clock" id="clock">白天</div>
+</div>
+
+<div id="bar"></div>
+
+<div class="pad left">
+  <div class="btn" id="bl">◀</div>
+  <div class="btn" id="br">▶</div>
+</div>
+<div class="pad right">
+  <div class="btn small" id="buse">放</div>
+  <div class="btn" id="bcraft">合成</div>
+  <div class="btn" id="bjump">跳</div>
+</div>
+
+<div id="craft"><h2>合成台</h2><div id="recipes"></div></div>
+<div id="toast"></div>
+
+<script src="../../assets/sfx/sfx.js"></script>
+<script>
+(function(){
+"use strict";
+/* ============ 常量 ============ */
+var W=520, H=190, TILE=24;
+var T={AIR:0,GRASS:1,DIRT:2,STONE:3,WOOD:4,LEAF:5,COPPER:6,IRON:7,PLANK:8,TORCH:9,BENCH:10,COAL:11,SAND:12};
+var SOLID={1:1,2:1,3:1,4:1,6:1,7:1,8:1,10:1,11:1,12:1};
+var HARD={1:0.45,2:0.5,3:1.1,4:0.7,5:0.15,6:1.35,7:1.6,8:0.6,9:0.15,10:0.8,11:1.3,12:0.4};
+var YIELD={1:"dirt",2:"dirt",3:"stone",4:"wood",6:"copper",7:"iron",8:"plank",9:"torch",10:"bench",11:"coal",12:"stone"};
+var COL={1:"#7B5B3A",2:"#6E4E30",3:"#5A5048",4:"#6B4A2E",5:"#4E6B3A",6:"#B4703F",7:"#9AA0A6",8:"#A87B4E",9:"#F2C170",10:"#8E6A45",11:"#3A3632",12:"#C8A26A"};
+var ITEMS={
+  dirt:{name:"泥土",tile:T.DIRT,place:1,icon:"#7B5B3A"},
+  stone:{name:"石块",tile:T.STONE,place:1,icon:"#6E6660"},
+  wood:{name:"木材",tile:T.WOOD,place:1,icon:"#8A5F3A"},
+  plank:{name:"木板",tile:T.PLANK,place:1,icon:"#B48757"},
+  torch:{name:"火把",tile:T.TORCH,place:1,icon:"#F2C170"},
+  bench:{name:"工作台",tile:T.BENCH,place:1,icon:"#9C7550"},
+  copper:{name:"铜矿",icon:"#C4834B"},
+  iron:{name:"铁矿",icon:"#B6BCC2"},
+  coal:{name:"煤",icon:"#4A453F"},
+  pickW:{name:"木镐",tool:"pick",power:0.55,icon:"#A87B4E"},
+  pickC:{name:"铜镐",tool:"pick",power:0.95,icon:"#D08A4E"},
+  swordW:{name:"木剑",tool:"sword",dmg:11,icon:"#B48757"},
+  swordC:{name:"铜剑",tool:"sword",dmg:19,icon:"#D08A4E"}
+};
+var RECIPES=[
+  {out:"plank",n:2,need:{wood:1},label:"木板 ×2"},
+  {out:"torch",n:3,need:{wood:1,coal:1},label:"火把 ×3"},
+  {out:"bench",n:1,need:{wood:8},label:"工作台"},
+  {out:"swordW",n:1,need:{wood:6},label:"木剑"},
+  {out:"pickW",n:1,need:{wood:4},label:"木镐"},
+  {out:"swordC",n:1,need:{wood:2,copper:4},label:"铜剑"},
+  {out:"pickC",n:1,need:{wood:2,copper:3},label:"铜镐"}
+];
+var SLOTS=["dirt","stone","wood","plank","torch","bench","pickW","swordW"];
+
+/* ============ 状态 ============ */
+var world=new Uint8Array(W*H);
+var surfaceY=new Int16Array(W);
+var changes=[];
+var inv={dirt:9,stone:0,wood:6,plank:0,torch:2,bench:0,copper:0,iron:0,coal:1,pickW:1,swordW:1,pickC:0,swordC:0};
+var sel=0, placing=false;
+var view={x:0,y:0,w:0,h:0};
+var time=0.35, dayLen=110;   // 0..1 一天
+var drops=[], mobs=[];
+var hp=100, maxHp=100, invul=0, dead=0;
+var spawn={x:0,y:0};
+var cam={x:0,y:0};
+var px=0, py=0, vx=0, vy=0, onGround=false, face=1, swing=0, walkT=0;
+var keys={l:0,r:0,j:0};
+var digTile=null, digP=0;
+var torchLights=[];
+
+function idx(x,y){ return y*W+x; }
+function get(x,y){ if(x<0||x>=W||y<0) return T.AIR; if(y>=H) return T.STONE; return world[y*W+x]; }
+function put(x,y,v){
+  if(x<0||x>=W||y<0||y>=H) return;
+  world[y*W+x]=v;
+  changes.push([y*W+x,v]);
+  if(v===T.TORCH) torchLights.push([x,y]);
+}
+function solid(x,y){ return !!SOLID[get(Math.floor(x),Math.floor(y))]; }
+
+/* ============ 世界生成 ============ */
+function rnd(a,b){ return a+Math.random()*(b-a); }
+function genWorld(dirty){
+  world.fill(0);
+  var base=Math.round(H*0.40);
+  for(var x=0;x<W;x++){
+    var sy=Math.round(base + Math.sin(x*0.031)*6 + Math.sin(x*0.0093+1.7)*13 + rnd(-1.2,1.2));
+    surfaceY[x]=sy;
+    for(var y=sy;y<H;y++){
+      var d=y-sy, t;
+      if(d===0) t=T.GRASS;
+      else if(d<4+((x*13)%5)) t=T.DIRT;
+      else if(d<6+((x*7)%6)) t=T.DIRT;
+      else t=T.STONE;
+      world[y*W+x]=t;
+    }
+  }
+  /* 洞穴 */
+  for(var i=0;i<210;i++){
+    var cx=Math.floor(rnd(4,W-4)), cy=Math.floor(rnd(base+8,H-8)), ang=rnd(0,6.28), len=Math.floor(rnd(12,60));
+    for(var s=0;s<len;s++){
+      ang+=rnd(-0.5,0.5);
+      cx+=Math.cos(ang)*1.4; cy+=Math.sin(ang)*1.4;
+      var r=Math.floor(rnd(1,2.6));
+      for(var dy=-r;dy<=r;dy++) for(var dx=-r;dx<=r;dx++){
+        var gx=Math.floor(cx+dx), gy=Math.floor(cy+dy);
+        if(gx>1&&gx<W-2&&gy>base+6&&gy<H-2&&get(gx,gy)!==T.AIR) world[gy*W+gx]=T.AIR;
+      }
+      if(cy>H-4) break;
+    }
+  }
+  /* 矿脉 */
+  var ores=[[T.COAL,120,3],[T.COPPER,70,2.6],[T.IRON,34,2.2]];
+  for(var o=0;o<ores.length;o++){
+    var tt=ores[o][0], cnt=ores[o][1], r2=ores[o][2];
+    for(var k=0;k<cnt;k++){
+      var ox=Math.floor(rnd(2,W-2)), oy=Math.floor(rnd(Math.max(base+10,Math.floor(H*0.5)),H-3));
+      for(var n=0;n<4+Math.floor(Math.random()*4);n++){
+        var tx=Math.floor(ox+rnd(-r2,r2)), ty=Math.floor(oy+rnd(-r2,r2));
+        if(tx>1&&tx<W-2&&ty>base&&ty<H-2&&get(tx,ty)===T.STONE) world[ty*W+tx]=tt;
+      }
+    }
+  }
+  /* 树 */
+  for(var tx2=3;tx2<W-3;tx2+=1){
+    if(Math.random()>0.14) continue;
+    var sy2=surfaceY[tx2];
+    if(get(tx2,sy2)!==T.GRASS) continue;
+    if(Math.abs(tx2-Math.floor(W*0.5))<7) continue;
+    var hgt=Math.floor(rnd(4,9));
+    for(var j=1;j<=hgt;j++) world[(sy2-j)*W+tx2]=T.WOOD;
+    for(var ly=-2;ly<=1;ly++) for(var lx=-2;lx<=2;lx++){
+      var lxs=tx2+lx, lys=sy2-hgt+ly;
+      if(Math.abs(lx)===2&&ly===1) continue;
+      if(lxs>0&&lxs<W-1&&lys>0&&get(lxs,lys)===T.AIR) world[lys*W+lxs]=T.LEAF;
+    }
+  }
+  /* 出生点 */
+  spawn.x=Math.floor(W*0.5); spawn.y=surfaceY[Math.floor(W*0.5)]-2;
+  changes=[]; torchLights=[];
+  if(dirty) rebuildTorches();
+  for(var cx2=0;cx2<W;cx2++) for(var cy2=0;cy2<H;cy2++){
+    if(world[cy2*W+cx2]===T.TORCH) torchLights.push([cx2,cy2]);
+  }
+}
+function rebuildTorches(){
+  torchLights=[];
+  for(var i=0;i<changes.length;i++){
+    var ii=changes[i][0];
+    if(changes[i][1]===T.TORCH) torchLights.push([ii%W,Math.floor(ii/W)]);
+  }
+}
+function resyncTorches(){
+  torchLights=[];
+  for(var i=0;i<changes.length;i++){
+    if(changes[i][1]===T.TORCH){
+      var ii=changes[i][0];
+      if(world[ii]===T.TORCH) torchLights.push([ii%W,Math.floor(ii/W)]);
+    }
+  }
+}
+
+/* ============ 存档 ============ */
+var KEY="rtsx.terraria.v1";
+function encodeWorld(){
+  var parts=[], last=world[0], n=1, i;
+  for(i=1;i<world.length;i++){
+    if(world[i]===last&&n<60000){ n++; }
+    else { parts.push(last+":"+n); last=world[i]; n=1; }
+  }
+  parts.push(last+":"+n);
+  return parts.join(",");
+}
+function decodeWorld(str){
+  var arr=str.split(","), p=0, i, j, v, n;
+  world.fill(0);
+  for(i=0;i<arr.length;i++){
+    var kv=arr[i].split(":");
+    v=+kv[0]; n=+kv[1];
+    for(j=0;j<n&&p<world.length;j++) world[p++]=v;
+  }
+  for(var x=0;x<W;x++){
+    var sy=H-1;
+    for(var y=0;y<H;y++){ if(world[y*W+x]!==0){ sy=y; break; } }
+    surfaceY[x]=sy;
+  }
+  torchLights=[];
+  for(var k=0;k<world.length;k++) if(world[k]===T.TORCH) torchLights.push([k%W, Math.floor(k/W)]);
+}
+function save(){
+  try{
+    localStorage.setItem(KEY, JSON.stringify({
+      map:encodeWorld(), inv:inv, px:px, py:py, time:time, hp:hp,
+      spawn:[spawn.x,spawn.y]
+    }));
+  }catch(e){}
+}
+function load(){
+  try{
+    var s=localStorage.getItem(KEY);
+    if(!s) return false;
+    var d=JSON.parse(s);
+    if(!d||!d.map) return false;
+    decodeWorld(d.map);
+    inv=Object.assign(inv,d.inv||{});
+    px=d.px; py=d.py; time=d.time||0.35; hp=d.hp||100;
+    if(d.spawn){ spawn.x=d.spawn[0]; spawn.y=d.spawn[1]; }
+    changes=[];
+    return true;
+  }catch(e){ return false; }
+}
+
+/* ============ 输入 ============ */
+var canvas=document.getElementById("c"), ctx=canvas.getContext("2d");
+var DPR=Math.min(window.devicePixelRatio||1,2);
+function resize(){
+  var w=window.innerWidth||360, h=window.innerHeight||640;
+  canvas.width=Math.round(w*DPR); canvas.height=Math.round(h*DPR);
+  canvas.style.width=w+"px"; canvas.style.height=h+"px";
+  view.w=canvas.width/DPR; view.h=canvas.height/DPR;
+}
+window.addEventListener("resize",resize); resize();
+
+var hold=null;
+function worldFromEvent(e){
+  var r=canvas.getBoundingClientRect();
+  var cx=(e.clientX-r.left), cy=(e.clientY-r.top);
+  return { x:cam.x + cx/TILE, y:cam.y + cy/TILE };
+}
+canvas.addEventListener("pointerdown",function(e){
+  e.preventDefault(); hold=worldFromEvent(e);
+});
+canvas.addEventListener("pointermove",function(e){
+  if(!hold) return; hold=worldFromEvent(e);
+});
+canvas.addEventListener("pointerup",function(){ hold=null; });
+canvas.addEventListener("pointercancel",function(){ hold=null; });
+canvas.addEventListener("contextmenu",function(e){ e.preventDefault(); });
+
+function bindHold(id, k){
+  var el=document.getElementById(id);
+  el.addEventListener("pointerdown",function(e){ e.preventDefault(); keys[k]=1; });
+  el.addEventListener("pointerup",function(){ keys[k]=0; });
+  el.addEventListener("pointerleave",function(){ keys[k]=0; });
+  el.addEventListener("pointercancel",function(){ keys[k]=0; });
+}
+bindHold("bl","l"); bindHold("br","r"); bindHold("bjump","j");
+document.getElementById("buse").addEventListener("click",function(){
+  placing=!placing; toast(placing?"放方块模式":"挖掘模式");
+});
+window.addEventListener("keydown",function(e){
+  var k=e.key.toLowerCase();
+  if(k==="a"||k==="arrowleft") keys.l=1;
+  if(k==="d"||k==="arrowright") keys.r=1;
+  if(k===" "||k==="w"||k==="arrowup"){ keys.j=1; e.preventDefault(); }
+  if(k>="1"&&k<="8"){ sel=+k-1; paintBar(); }
+  if(k==="e"){ $("craft").style.display = ($("craft").style.display==="block")?"none":"block"; }
+  if(k.indexOf("arrow")===0) e.preventDefault();
+});
+window.addEventListener("keyup",function(e){
+  var k=e.key.toLowerCase();
+  if(k==="a"||k==="arrowleft") keys.l=0;
+  if(k==="d"||k==="arrowright") keys.r=0;
+  if(k===" "||k==="w"||k==="arrowup") keys.j=0;
+});
+function $(id){ return document.getElementById(id); }
+
+/* ============ HUD ============ */
+function paintHearts(){
+  var h="", full=Math.ceil(hp/20);
+  for(var i=0;i<5;i++) h+='<div class="h'+(i<full?"":" off")+'"></div>';
+  $("hearts").innerHTML=h;
+}
+function paintBar(){
+  var bar=$("bar"), html="";
+  for(var i=0;i<SLOTS.length;i++){
+    var id=SLOTS[i], it=ITEMS[id], n=inv[id]||0;
+    var bd=(i===sel)?" sel":"";
+    html+='<div class="slot'+bd+'" data-i="'+i+'"><span style="color:'+(it.icon||"#ccc")+'">■</span><span class="n">'+(it.tool?"":(n>0?n:""))+'</span></div>';
+  }
+  bar.innerHTML=html;
+  [].forEach.call(bar.children,function(el){
+    el.addEventListener("pointerdown",function(){
+      sel=+el.getAttribute("data-i"); placing=false; paintBar(); sfx("click");
+    });
+  });
+}
+var toastT=0;
+function toast(msg){
+  var t=$("toast"); t.textContent=msg; t.className="on"; clearTimeout(toastT);
+  toastT=setTimeout(function(){ t.className=""; }, 1400);
+}
+function sfx(n, v){
+  try{ if(window.RTSXSFX && !RTSXSFX.isMuted()) RTSXSFX.play(n, {volume:v||1}); }catch(e){}
+}
+
+/* ============ 合成 ============ */
+function canCraft(r){
+  for(var k in r.need) if((inv[k]||0) < r.need[k]) return false;
+  return true;
+}
+function paintRecipes(){
+  var box=$("recipes"), html="";
+  for(var i=0;i<RECIPES.length;i++){
+    var r=RECIPES[i], ok=canCraft(r), need="";
+    for(var k in r.need) need += ITEMS[k].name+" "+r.need[k]+"　";
+    html+='<div class="r"><div class="nm">'+r.label+'<div class="cs">'+need+'</div></div>'+
+      '<button data-i="'+i+'"'+ (ok?"":" disabled") +'>做</button></div>';
+  }
+  box.innerHTML=html;
+  [].forEach.call(box.querySelectorAll("button"),function(b){
+    b.addEventListener("click",function(){
+      var r=RECIPES[+b.getAttribute("data-i")];
+      if(!canCraft(r)) return;
+      for(var k in r.need) inv[k]-=r.need[k];
+      inv[r.out]=(inv[r.out]||0)+r.n;
+      sfx("pop"); toast("做好 "+r.label); paintBar(); paintRecipes(); save();
+    });
+  });
+}
+$("bcraft").addEventListener("click",function(){
+  var p=$("craft");
+  p.style.display = (p.style.display==="block")?"none":"block";
+  if(p.style.display==="block") paintRecipes();
+  sfx("click");
+});
+
+/* ============ 物理 ============ */
+var PW=0.62, PH=1.75;
+function rowSolid(sx, row){
+  var lx=Math.floor(sx-PW+0.06), rx=Math.floor(sx+PW-0.06);
+  for(var x=lx;x<=rx;x++) if(solid(x,row)) return true;
+  return false;
+}
+function bodySolid(sx, sy){
+  var t=Math.floor(sy+0.05), b=Math.floor(sy+PH-0.05);
+  for(var y=t;y<=b;y++) if(rowSolid(sx,y)) return true;
+  return false;
+}
+function collideMove(nx, ny){
+  var prevY=py, r;
+  /* 水平：整身体判定 + 自动上一格台阶 */
+  if(!bodySolid(nx,py)){ px=nx; }
+  else if(onGround && !bodySolid(nx,py-1)){ py-=1; px=nx; }
+  else { vx=0; }
+  /* 竖直 */
+  if(!bodySolid(px,ny)){ py=ny; onGround=false; }
+  else if(ny>prevY){
+    r=Math.floor(ny+PH);
+    if(rowSolid(px,r)) py=r-PH-0.002;
+    vy=0; onGround=true;
+  } else {
+    r=Math.floor(ny);
+    if(rowSolid(px,r)) py=r+1;
+    vy=0;
+  }
+  if(!onGround) onGround=rowSolid(px, Math.floor(py+PH+0.02));
+}
+/* ============ 帧 ============ */
+var last=0, frameN=0;
+function step(dt){
+  time += dt/dayLen;
+  if(time>1){ time-=1; dayNight(); }
+  invul=Math.max(0,invul-dt);
+  if(dead>0){ dead-=dt; if(dead<=0) respawn(); return; }
+
+  var acc=0;
+  if(keys.l){ acc-=1; face=-1; }
+  if(keys.r){ acc+=1; face=1; }
+  var speed=4.2;
+  vx = acc*speed;
+  if(Math.abs(vx)>0.1) walkT+=dt*10; else walkT=0;
+  if(keys.j && onGround){ vy=-7.4; onGround=false; sfx("click",0.6); }
+  vy += 15.5*dt; if(vy>13) vy=13;
+
+  collideMove(px+vx*dt, py+vy*dt);
+  if(py>H-1){ px=spawn.x; py=spawn.y; hp-=10; paintHearts(); }
+
+  /* 挖掘 / 放置 */
+  if(hold){
+    var tx=Math.floor(hold.x), ty=Math.floor(hold.y);
+    var dist=Math.abs(hold.x-px)+Math.abs(hold.y-(py+0.9));
+    if(dist<5.5){
+      if(placing){
+        placeAt(tx,ty);
+      } else {
+        mineAt(tx,ty,dt);
+      }
+    }
+  } else { digTile=null; digP=0; }
+
+  /* 生物 */
+  updateMobs(dt);
+  /* 掉落物自动吸收 */
+  for(var i=drops.length-1;i>=0;i--){
+    var d=drops[i];
+    d.t+=dt;
+    var dxp=px-d.x, dyp=(py+0.9)-d.y;
+    var dd=Math.sqrt(dxp*dxp+dyp*dyp);
+    if(dd<3.0){ d.x+=dxp*dt*9; d.y+=dyp*dt*9; }
+    if(dd<0.5){ inv[d.item]=(inv[d.item]||0)+d.n; paintBar(); drops.splice(i,1); sfx("catch",0.7); }
+  }
+  if(swing>0) swing-=dt*3.2;
+  cam.x += ((px-view.w/(2*TILE)) - cam.x)*Math.min(1,dt*9);
+  cam.y += ((py-view.h/(2*TILE)) - cam.y)*Math.min(1,dt*9);
+  cam.x=Math.max(0,Math.min(W-view.w/TILE, cam.x));
+  cam.y=Math.max(0,Math.min(H-view.h/TILE, cam.y));
+  if(frameN%120===0) save();
+  frameN++;
+}
+function dayNight(){
+  if(time<0.5) return;
+  for(var i=0;i<Math.min(3,Math.floor(Math.random()*3)+1);i++) spawnMob();
+}
+function respawn(){ px=spawn.x; py=spawn.y; hp=maxHp; vy=0; invul=1.2; paintHearts(); }
+
+function mineAt(tx,ty,dt){
+  var t=get(tx,ty);
+  if(t===T.AIR){ digTile=null; digP=0; return; }
+  var dist=Math.abs(tx-px)+Math.abs(ty-py);
+  if(dist>5.2) return;
+  var tool=ITEMS[SLOTS[sel]];
+  if(tool&&tool.tool==="sword") return;
+  var power=(tool&&tool.tool==="pick")?tool.power:0.38;
+  if(!digTile||digTile[0]!==tx||digTile[1]!==ty){ digTile=[tx,ty]; digP=0; sfx("click",0.55); }
+  digP += dt*power/(HARD[t]||1);
+  if(digP>=1){
+    var drop=YIELD[t];
+    put(tx,ty,T.AIR);
+    if(drop){ var it=ITEMS[drop]; inv[drop]=(inv[drop]||0)+1; paintBar(); }
+    if(t===T.TORCH) resyncTorches();
+    digP=0; digTile=null; sfx("pop",0.8);
+  }
+}
+function placeAt(tx,ty){
+  var id=SLOTS[sel], it=ITEMS[id];
+  if(!it||!it.place||!inv[id]) { toast("这一格放不了"); placing=false; return; }
+  if(get(tx,ty)!==T.AIR) return;
+  /* 必须挨着已有方块 */
+  var nb=solid(tx-1,ty)||solid(tx+1,ty)||solid(tx,ty-1)||solid(tx,ty+1);
+  if(!nb) return;
+  /* 别把自己埋了 */
+  if(Math.abs(tx-px)<1&&Math.abs(ty-py)<2) return;
+  put(tx,ty,it.tile); inv[id]--; paintBar(); sfx("pop",0.9);
+  if(id==="torch") resyncTorches();
+  if(!inv[id]) { placing=false; }
+}
+
+/* ============ 生物 ============ */
+function spawnMob(){
+  var x=Math.floor(px + (Math.random()<0.5?-1:1)*(26+Math.random()*18));
+  if(x<3||x>W-3) return null;
+  var sy=surfaceY[x]||Math.floor(H*0.4);
+  if(Math.abs(x-px)<16) return null;
+  var m={x:x, y:sy-1.4, vx:0, vy:0, hp:22, max:22, t:0, dmg:12, kind:"slime"};
+  mobs.push(m);
+  return m;
+}
+function updateMobs(dt){
+  var night=(time>0.52||time<0.06);
+  if(night&&mobs.length<4&&Math.random()<dt*0.35) spawnMob();
+  for(var i=mobs.length-1;i>=0;i--){
+    var m=mobs[i];
+    m.t+=dt;
+    var dxp=px-m.x;
+    m.vx=(dxp>0?1:-1)*1.9;
+    m.vy+=14*dt;
+    var nx=m.x+m.vx*dt, ny=m.y+m.vy*dt;
+    if(solid(nx,m.y+m.h)){ m.vx=0; } else m.x=nx;
+    var foot=Math.floor(m.y+1.4);
+    if(solid(m.x,foot)&&m.vy>0){ m.y=foot-1.4-0.01; m.vy=0; if(m.t%0.9<0.2) m.vy=-4.6; }
+    else m.y=ny;
+    if(m.y>H-1||m.x<1||m.x>W-2){ mobs.splice(i,1); continue; }
+    /* 接触伤害 */
+    if(invul<=0 && Math.abs(m.x-px)<0.95 && Math.abs(m.y-(py+0.9))<1.3){
+      hp-=m.dmg; invul=0.9; paintHearts(); sfx("hurt");
+      if(hp<=0){ dead=1.4; hp=0; sfx("bump"); toast("倒下了……"); }
+    }
+    /* 白天/远离消失 */
+    if(m.t>60&&Math.random()<dt*0.2) mobs.splice(i,1);
+  }
+  /* 剑挥动 */
+  if(swing>0.15) return;
+}
+function useWeapon(){
+  var it=ITEMS[SLOTS[sel]];
+  if(!it||it.tool!=="sword") return false;
+  if(swing>0.2) return true;
+  swing=1;
+  sfx("click",0.9);
+  for(var i=mobs.length-1;i>=0;i--){
+    var m=mobs[i];
+    var dxp=m.x-px, dyp=m.y-(py+0.9);
+    var near=Math.abs(dxp)<2.2&&Math.abs(dyp)<1.8;
+    var dir=(face>0&&dxp>-.6)||(face<0&&dxp<.6);
+    if(near&&dir){
+      m.hp-=it.dmg; m.vy=-2.5;
+      sfx("pop");
+      if(m.hp<=0){ mobs.splice(i,1); drops.push({x:m.x, y:m.y, item:"coal", n:1, t:0}); sfx("catch"); }
+    }
+  }
+  return true;
+}
+
+/* ============ 渲染 ============ */
+function lightNow(){
+  return time<0.02||time>0.98?0.05:(time<0.16?Math.min(1,(time+0.02)/0.18):(time>0.84?Math.min(1,(1.0-time)/0.16):1.0));
+}
+function draw(){
+  var L=lightNow();
+  var skyTop = mix("#0B1520","#26384A",L), skyBot = mix("#141A20","#6E7F8C",L);
+  var g=ctx.createLinearGradient(0,0,0,view.h);
+  g.addColorStop(0,skyTop); g.addColorStop(1,skyBot);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.fillStyle=g; ctx.fillRect(0,0,view.w,view.h);
+
+  /* 星星 */
+  if(L<0.6){
+    ctx.fillStyle="rgba(246,241,232,"+(0.5-L/1.6)+")";
+    for(var s=0;s<40;s++){
+      var sxx=((s*137)%1000)/1000*view.w, syy=((s*79)%800)/800*view.h*0.6;
+      ctx.fillRect(sxx,syy,1.6,1.6);
+    }
+  }
+
+  var ox=Math.round(cam.x*TILE), oy=Math.round(cam.y*TILE);
+  var tx0=Math.floor(cam.x), ty0=Math.floor(cam.y);
+  var tx1=Math.min(W, tx0+Math.ceil(view.w/TILE)+1), ty1=Math.min(H, ty0+Math.ceil(view.h/TILE)+2);
+  /* 视野光照 */
+  var lw=tx1-tx0+1, lh=ty1-ty0+1;
+  var lm=new Float32Array(lw*lh);
+  for(var yy=0;yy<lh;yy++) for(var xx=0;xx<lw;xx++){
+    var wx=tx0+xx, wy=ty0+yy;
+    var dpt=wy-(surfaceY[Math.max(0,Math.min(W-1,wx))]||0);
+    var l=L*Math.max(0.06, 1-dpt*0.075);
+    if(get(wx,wy)===T.AIR) l=Math.max(l, L*Math.max(0.05,1-dpt*0.055));
+    lm[yy*lw+xx]=l;
+  }
+  /* 火把光照 */
+  for(var i=0;i<torchLights.length;i++){
+    var tl=torchLights[i];
+    var dx0=tl[0]-tx0, dy0=tl[1]-ty0;
+    if(dx0<-6||dx0>lw+6||dy0<-6||dy0>lh+6) continue;
+    for(var ry=-6;ry<=6;ry++) for(var rx=-6;rx<=6;rx++){
+      var nx0=dx0+rx, ny0=dy0+ry;
+      if(nx0<0||nx0>=lw||ny0<0||ny0>=lh) continue;
+      var dd=Math.sqrt(rx*rx+ry*ry);
+      var li=Math.max(0,1-dd/6.5)*1.15;
+      var ii2=ny0*lw+nx0;
+      if(li>lm[ii2]) lm[ii2]=li;
+    }
+  }
+
+  for(var y=ty0;y<ty1;y++){
+    for(var x=tx0;x<tx1;x++){
+      var t=world[y*W+x];
+      if(!t) continue;
+      var li2=lm[(y-ty0)*lw+(x-tx0)]||0;
+      var c=COL[t]||"#666";
+      ctx.fillStyle=shade(c, li2);
+      var rx0=x*TILE-ox, ry0=y*TILE-oy;
+      ctx.fillRect(rx0,ry0,TILE+1,TILE+1);
+      if(t===T.STONE||t===T.DIRT){
+        ctx.fillStyle="rgba(0,0,0,.12)";
+        ctx.fillRect(rx0+2,ry0+TILE-3,TILE-4,1);
+        ctx.fillRect(rx0+TILE-3,ry0+2,1,TILE-4);
+      }
+      if(t===T.GRASS){
+        ctx.fillStyle=shade("#5E8A46",li2);
+        ctx.fillRect(rx0,ry0,TILE+1,4);
+      }
+      if(t===T.COAL||t===T.COPPER||t===T.IRON){
+        ctx.fillStyle=shade(c,Math.min(1,li2+0.1));
+        ctx.fillRect(rx0+6,ry0+6,5,5); ctx.fillRect(rx0+13,ry0+11,4,4);
+      }
+      if(t===T.TORCH){
+        ctx.fillStyle=shade("#8E6A45",li2); ctx.fillRect(rx0+TILE/2-1,ry0+7,2,12);
+        ctx.fillStyle="rgba(255,206,120,.9)";
+        var fw=3+Math.sin(frameN*0.3+x)*1;
+        ctx.fillRect(rx0+TILE/2-2,ry0+3-fw/2,4,4+fw);
+      }
+      /* 挖掘裂痕 */
+      if(digTile&&digTile[0]===x&&digTile[1]===y&&digP>0){
+        ctx.fillStyle="rgba(0,0,0,.35)";
+        ctx.fillRect(rx0+2,ry0+2,TILE-4, Math.max(2,(TILE-4)*Math.min(1,digP)));
+      }
+    }
+  }
+
+  /* 掉落物 */
+  for(var i=drops.length-1;i>=0;i--){
+    var d=drops[i];
+    var dxx=(d.x*TILE-ox), dyy=(d.y*TILE-oy);
+    if(dxx<-20||dxx>view.w+20) continue;
+    var bob=Math.sin((frameN*0.16)+i)*2;
+    ctx.fillStyle=shade(ITEMS[d.item].icon||"#F2C170",0.95);
+    ctx.fillRect(dxx-4,dyy-4+bob,9,9);
+  }
+
+  /* 生物 */
+  for(var i=mobs.length-1;i>=0;i--){
+    var m=mobs[i];
+    var mx=(m.x*TILE-ox), my=(m.y*TILE-oy);
+    if(mx<-60||mx>view.w+60) continue;
+    var sq=Math.sin(m.t*6)*0.18;
+    ctx.fillStyle="#5F8C55";
+    ctx.beginPath();
+    ctx.ellipse(mx,my+ (1.4*TILE)/2, 0.75*TILE*(1-sq), 0.72*TILE*(1+sq), 0, 0, 6.29);
+    ctx.fill();
+    ctx.fillStyle="#22301E";
+    ctx.fillRect(mx-8,my+TILE*0.9,5,4);
+    ctx.fillRect(mx+3,my+TILE*0.9,5,4);
+    /* 血条 */
+    if(m.hp<m.max){
+      ctx.fillStyle="rgba(0,0,0,.5)"; ctx.fillRect(mx-14,my+TILE*1.5,28,3);
+      ctx.fillStyle="#C4633F"; ctx.fillRect(mx-14,my+TILE*1.5,28*(m.hp/m.max),3);
+    }
+  }
+
+  /* 玩家 */
+  var pxp=(px*TILE-ox), pyp=(py*TILE-oy);
+  var legSwing=Math.sin(walkT)*0.28;
+  ctx.fillStyle="rgba(0,0,0,.25)";
+  ctx.fillRect(pxp-11,pyp+PH*TILE-2,22,3);
+  /* 腿 */
+  ctx.fillStyle="#3F5A6E";
+  ctx.fillRect(pxp-8, pyp+PH*TILE-14+legSwing*8, 7, 14);
+  ctx.fillRect(pxp+1, pyp+PH*TILE-14-legSwing*8, 7, 14);
+  /* 身体 */
+  ctx.fillStyle="#C4633F";
+  ctx.fillRect(pxp-9, pyp+PH*TILE*0.42, 18, PH*TILE*0.34);
+  /* 头 */
+  ctx.fillStyle="#E8C39E";
+  ctx.fillRect(pxp-7, pyp+2, 14, 14);
+  /* 眼睛 */
+  ctx.fillStyle="#221A14";
+  if(face>0) ctx.fillRect(pxp+2, pyp+7, 3, 3); else ctx.fillRect(pxp-5, pyp+7, 3, 3);
+  /* 手臂 + 剑 */
+  var armY=pyp+PH*TILE*0.45;
+  ctx.fillStyle="#E8C39E";
+  var ax=pxp+(face>0?10:-22);
+  if(swing>0){
+    var sw=Math.sin((1-swing)*Math.PI)*1.2;
+    ctx.save();
+    ctx.translate(pxp, armY);
+    ctx.rotate(face>0? (sw-0.5): -(sw-0.5));
+    ctx.fillStyle="#E8C39E"; ctx.fillRect(0,-4,14,7);
+    var it=ITEMS[SLOTS[sel]];
+    if(it&&it.tool==="sword"){ ctx.fillStyle=it.icon||"#D08A4E"; ctx.fillRect(13,-3,20,5); }
+    else { ctx.fillStyle="#C9A97F"; ctx.fillRect(13,-3,14,5); }
+    ctx.restore();
+  } else {
+    ctx.fillRect(ax, armY, 12, 7);
+  }
+  /* 受伤闪 */
+  if(invul>0&&Math.floor(frameN/3)%2===0){
+    ctx.fillStyle="rgba(255,90,60,.32)";
+    ctx.fillRect(pxp-12,pyp,24,PH*TILE);
+  }
+  if(dead>0){
+    ctx.fillStyle="rgba(8,6,5,.55)"; ctx.fillRect(0,0,view.w,view.h);
+    ctx.fillStyle="#E2916F"; ctx.font="600 20px Georgia,serif"; ctx.textAlign="center";
+    ctx.fillText("倒下",view.w/2,view.h/2-8);
+    ctx.fillStyle="rgba(246,241,232,.6)"; ctx.font="12px system-ui";
+    ctx.fillText("正在出生点复活",view.w/2,view.h/2+18);
+  }
+  /* 时间显示 */
+  var hh=Math.floor(time*24), mm=Math.floor((time*24-hh)*60);
+  $("clock").textContent=(hh<6?"夜里":hh<8?"清晨":hh<17?"白天":hh<19?"黄昏":"夜里")+" "+("0"+hh).slice(-2)+":"+("0"+mm).slice(-2);
+}
+function mix(a,b,k){
+  var A=hex(a), B=hex(b);
+  return "rgb("+Math.round(A[0]+(B[0]-A[0])*k)+","+Math.round(A[1]+(B[1]-A[1])*k)+","+Math.round(A[2]+(B[2]-A[2])*k)+")";
+}
+function hex(c){ c=c.replace("#",""); if(c.length===3) c=c[0]+c[0]+c[1]+c[1]+c[2]+c[2];
+  var v=parseInt(c,16); return [v>>16&255, v>>8&255, v&255]; }
+function shade(c, k){
+  var a=hex(c);
+  k=Math.max(0,Math.min(1.35,k));
+  return "rgb("+Math.round(a[0]*Math.min(1,k))+","+Math.round(a[1]*Math.min(1,k))+","+Math.round(a[2]*Math.min(1,k))+")";
+}
+
+/* ============ 点击 = 挖 / 挥剑 ============ */
+canvas.addEventListener("pointerdown",function(e){
+  var r=canvas.getBoundingClientRect();
+  var wx=cam.x+(e.clientX-r.left)/TILE, wy=cam.y+(e.clientY-r.top)/TILE;
+  var it=ITEMS[SLOTS[sel]];
+  if(it&&it.tool==="sword"){ useWeapon(); }
+}, {passive:true});
+
+/* ============ 启动 ============ */
+genWorld(true);
+if(!load()){ px=spawn.x; py=spawn.y; }
+for(var gi=0;gi<14&&bodySolid(px,py);gi++) py-=1;
+if(px===undefined||px===null){ px=spawn.x; py=spawn.y; }
+cam.x=px-view.w/(2*TILE); cam.y=py-view.h/(2*TILE);
+paintBar(); paintHearts(); paintRecipes();
+
+function loop(t){
+  requestAnimationFrame(loop);
+  var dt = last? Math.min(0.04,(t-last)/1000) : 0.016;
+  last=t;
+  step(dt);
+  draw();
+}
+requestAnimationFrame(loop);
+
+window.__T=function(x,y){ return get(x,y); };
+window.__ENC=encodeWorld;
+window.__DEC=decodeWorld;
+window.__C=function(){ return [cam.x,cam.y]; };
+window.__K=function(){ return {l:keys.l,r:keys.r,j:keys.j,vx:vx,vy:vy,px:px,onGround:onGround}; };
+window.__ok=true;
+window.__S=function(){
+  return {x:Math.round(px), y:Math.round(py), hp:hp, mobs:mobs.length, inv:{dirt:inv.dirt,wood:inv.wood,stone:inv.stone,copper:inv.copper,plank:inv.plank}, time:+time.toFixed(2)};
+};
+})();
+</script>
+</body>
+</html>
