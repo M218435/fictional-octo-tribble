@@ -710,12 +710,16 @@ var buf = {
 var useU32 = !!(gl.getExtension("OES_element_index_uint"));
 
 function rebuild(){
-  var cap = world.size * 24;
-  if (buf.apos.length < cap){
+  /* 每个方块最多 6 面 × 4 顶点 = 24 顶点，36 索引。
+     注意要按“浮点个数 / 顶点数”的正确单位比较，并且留出余量：
+     比较错单位会导致写入静默越界，索引指向不存在的顶点，整块世界直接不画。 */
+  var needV = world.size * 24 + 8;
+  if (buf.apos.length < needV * 3){
+    var cap = Math.ceil(needV * 1.5);
     buf.apos = new Float32Array(cap * 3);
     buf.auv = new Float32Array(cap * 2);
     buf.ash = new Float32Array(cap);
-    buf.aidx = new Uint32Array(cap * 1.5);
+    buf.aidx = new Uint32Array(cap * 1.5 + 12);
   }
   var pn = 0, un = 0, sn = 0, inx = 0, vbase = 0;
 
