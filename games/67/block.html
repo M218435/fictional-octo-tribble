@@ -25,6 +25,7 @@
   .ui{position:fixed;inset:0;pointer-events:none;z-index:3;}
   .ui>*{pointer-events:auto;}
   .ui button,.ui input,.ui .bar,.ui .bottom,.ui .craftBtn,.ui .craft,.ui .tbtns,#joy{pointer-events:auto;}
+  .ui *{box-sizing:border-box;}
   .ui button,.ui input{box-sizing:border-box;}
   .ui button,.ui input,.ui .craftBtn,.ui .tbtn,.ui .mk,#joy{-webkit-tap-highlight-color:transparent;}
 
@@ -182,7 +183,7 @@
   }
   #overlay.hide{display:none;}
   .card{
-    width:min(430px,92vw);padding:26px 26px 22px;border-radius:16px;
+    width:min(430px,92vw);min-width:0;max-width:100%;padding:26px 26px 22px;border-radius:16px;
     border:1px solid var(--line);background:linear-gradient(160deg,#232019 0%,#1A1714 100%);
     box-shadow:0 40px 90px -50px #000;
   }
@@ -206,7 +207,7 @@
     display:flex;gap:8px;margin:12px 0 0;
   }
   .field input{
-    flex:1;height:40px;border-radius:10px;border:1px solid rgba(246,241,232,.16);
+    flex:1;min-width:0;height:40px;border-radius:10px;border:1px solid rgba(246,241,232,.16);
     background:rgba(0,0,0,.28);color:#F2E9DC;font:inherit;font-size:12px;padding:0 12px;
     letter-spacing:.16em;text-transform:uppercase;
   }
@@ -217,6 +218,10 @@
   #netStat.ok{color:#9ED47A;}
   #saveInfo{margin-top:2px;font-size:10.5px;color:var(--dim2);min-height:14px;}
   #saveInfo.on{color:var(--clay);}
+  .bkrow{display:flex;gap:8px;margin-top:10px;}
+  .bkrow .ghost{flex:1;height:36px;font-size:12px;}
+  #achInfo{margin-top:6px;font-size:10.5px;color:var(--dim2);min-height:14px;}
+  #achInfo.on{color:#9ED47A;}
 </style>
 </head>
 <body>
@@ -277,6 +282,12 @@
     </div>
     <div id="netStat"></div>
     <div id="saveInfo"></div>
+    <div class="bkrow">
+      <button class="ghost" id="exportBtn" type="button">导出备份</button>
+      <button class="ghost" id="importBtn" type="button">导入备份</button>
+      <input id="backupFile" type="file" accept=".json,application/json" style="display:none">
+    </div>
+    <div id="achInfo"></div>
   </div>
 </div>
 
@@ -1105,8 +1116,9 @@ function tick(dt){
   if (py < -20){
     /* 掉下去只把人送回岛顶，绝不重建岛：重建会让联机两边的世界分叉 */
     var wasNet = NET.on;
+    var unlocked = unlockAch("illusion");
     spawnOnIsland();
-    toast(wasNet ? "掉下去了，落回岛上" : "掉下去了，重新落岛");
+    if (!unlocked) toast(wasNet ? "掉下去了，落回岛上" : "掉下去了，重新落岛");
   }
 
   /* 播种计时 */
@@ -1753,10 +1765,15 @@ function hostRoom(code){
 
   NET.peer.on("open", function(){
     NET.on = true; NET.host = true; NET.room = code; NET.ready = true;
+    /* 建房用当前存档开：有存档就把它当成房间世界，朋友进来看到的是你的岛 */
+    if (!running){
+      if (!loadSave()){ newIsland(false); inv["泥"] = 2; inv["石"] = 1; }
+    }
     paintRoom();
-    netStat("房间 " + code + " 已开，等朋友进来", "ok");
+    netStat("房间 " + code + " 已开 · 世界里 " + world.size + " 块，等朋友进来", "ok");
     SFX.play("success", { volume:.7 });
     enterGame();
+    toast("朋友用同一房号加入，会看到你现在这座岛");
   });
   NET.peer.on("connection", function(c){
     NET.conns[c.peer] = c;
@@ -1879,7 +1896,7 @@ var saveT = 0;
 function saveNow(){
   try {
     localStorage.setItem("rtsx67.island.v1", JSON.stringify({
-      w: dumpWorld(), inv: inv, owned: owned, eq: equipped, t: Date.now()
+      w: dumpWorld(), inv: inv, owned: owned, eq: equipped, ach: ach, t: Date.now()
     }));
     paintSaveInfo();
     return true;
@@ -1915,8 +1932,83 @@ function loadSave(){
     for (var k in s.inv) if (k in inv) inv[k] = s.inv[k];
     for (var t in s.owned) owned[t] = true;
     if (s.eq) equipped = s.eq;
+    if (s.ach) for (var id in s.ach) if (s.ach[id]) ach[id] = true;
+    paintAch();
     return true;
   } catch(e){ return false; }
+}
+
+/* ============================== 成就 / 备份 ============================== */
+var ACHS = [
+  { id:"illusion", name:"这只是一个幻觉", desc:"主岛上望见的那些岛，跳过去只有虚空" }
+];
+var ach = {};
+
+function achById(id){
+  for (var i = 0; i < ACHS.length; i++) if (ACHS[i].id === id) return ACHS[i];
+  return null;
+}
+function unlockAch(id){
+  if (ach[id]) return false;
+  var a = achById(id); if (!a) return false;
+  ach[id] = true;
+  paintAch();
+  saveSoon();
+  toast("成就解锁 · " + a.name);
+  SFX.play("success", { volume:.8 });
+  return true;
+}
+function paintAch(){
+  var n = el("achInfo"); if (!n) return;
+  var got = 0, names = [];
+  for (var i = 0; i < ACHS.length; i++){
+    if (ach[ACHS[i].id]){ got++; names.push(ACHS[i].name); }
+  }
+  n.textContent = got ? ("成就 " + got + "/" + ACHS.length + " · " + names.join(" · ")) : ("成就 0/" + ACHS.length);
+  n.className = got ? "on" : "";
+}
+
+function exportBackup(){
+  var s = readSave();
+  if (!s || !s.w || !s.w.length){ toast("还没有存档可备份"); return; }
+  s.ach = ach; s.v = 1;
+  s.t = s.t || Date.now();
+  var blob = new Blob([JSON.stringify(s)], { type:"application/json" });
+  var url = URL.createObjectURL(blob);
+  var d = new Date();
+  var a = document.createElement("a");
+  a.href = url;
+  a.download = "67方块岛备份-" + d.getFullYear() + pad2(d.getMonth()+1) + pad2(d.getDate()) + "-" + pad2(d.getHours()) + pad2(d.getMinutes()) + ".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
+  toast("备份已导出，换设备导进去就能接着玩");
+  SFX.play("success", { volume:.7 });
+}
+
+function applyBackup(s){
+  if (!s || !s.w || !s.w.length) return false;
+  loadWorld(s.w);
+  for (var k in s.inv) if (k in inv) inv[k] = s.inv[k];
+  for (var t in s.owned) owned[t] = true;
+  if (s.eq) equipped = s.eq;
+  if (s.ach) for (var id in s.ach) if (s.ach[id]) ach[id] = true;
+  saveNow(); paintBars(); paintAch();
+  return true;
+}
+
+function importBackup(file){
+  var fr = new FileReader();
+  fr.onload = function(){
+    try {
+      var s = JSON.parse(String(fr.result));
+      if (!applyBackup(s)) throw new Error("empty");
+      enterGame();
+      toast("备份已导入 · 世界里 " + world.size + " 块");
+      SFX.play("success");
+    } catch(e){ toast("这个文件不像 67 方块岛的备份"); SFX.play("error", { volume:.5 }); }
+  };
+  fr.onerror = function(){ toast("文件读不出来"); };
+  fr.readAsText(file);
 }
 
 /* ============================== 主循环 ============================== */
@@ -1984,6 +2076,21 @@ tap(el("back"), function(){
   if (window.parent !== window) window.parent.postMessage("rtsx-close", "*");
   else location.href = "index.html";
 });
+tap(el("exportBtn"), function(){
+  SFX.play("click");
+  if (NET.on){ toast("联机中不备份，单机时再导"); return; }
+  exportBackup();
+});
+tap(el("importBtn"), function(){
+  SFX.play("click");
+  if (NET.on){ toast("先退出联机再导入备份"); return; }
+  var f = el("backupFile");
+  if (f) { f.value = ""; f.click(); }
+});
+if (el("backupFile")) el("backupFile").addEventListener("change", function(){
+  if (this.files && this.files[0]) importBackup(this.files[0]);
+});
+
 tap(el("saveBtn"), function(){
   if (NET.on){ toast("联机中不存档，单机才存"); SFX.play("error", { volume:.5 }); return; }
   if (saveNow()){
@@ -2061,7 +2168,14 @@ if (location.search.indexOf("dbg") >= 0){
     craft: function(id){ return craft(id); },
     gen: function(){ return genOnce(); },
     save: function(){ return saveNow(); },
+    loadSave: function(){ return loadSave(); },
+    reset2: function(){ newIsland(false); return world.size; },
     saveInfo: function(){ return readSave() ? { blocks:(readSave().w||[]).length, at:readSave().t } : null; },
+    ach: function(){ return { all: ACHS.map(function(a){return a.id}), got: Object.keys(ach) }; },
+    achHit: function(id){ return unlockAch(id || "illusion"); },
+    drop: function(){ py = -25; tick(0.05); return { py: py, ach: Object.keys(ach), toast: el("toast").textContent }; },
+    exportText: function(){ var s = readSave() || { w: dumpWorld(), inv: inv, owned: owned, eq: equipped }; s.ach = ach; return JSON.stringify(s); },
+    importText: function(txt){ try { return applyBackup(JSON.parse(txt)); } catch(e){ return false; } },
     netHost: function(code){ hostRoom(code); return true; },
     netJoin: function(code){ joinRoom(code); return true; },
     netReady: function(){
@@ -2109,6 +2223,7 @@ buildFarIslands();
 rebuild();
 paintBars();
 paintSaveInfo();
+paintAch();
 resize();
 render();
 
