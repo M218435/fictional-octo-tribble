@@ -215,6 +215,8 @@
   #netStat{margin-top:10px;font-size:10.5px;color:var(--dim2);min-height:14px;}
   #netStat.bad{color:#E08A66;}
   #netStat.ok{color:#9ED47A;}
+  #saveInfo{margin-top:2px;font-size:10.5px;color:var(--dim2);min-height:14px;}
+  #saveInfo.on{color:var(--clay);}
 </style>
 </head>
 <body>
@@ -227,7 +229,8 @@
     <div class="chip" id="cntChip">1 人</div>
     <div class="grow"></div>
     <button class="ic" id="snd" type="button">SFX</button>
-    <button class="ic" id="regen" type="button">换座岛</button>
+    <button class="ic" id="saveBtn" type="button">保存</button>
+    <button class="ic" id="regen" type="button">换岛</button>
   </div>
 
   <div id="cross"></div>
@@ -273,6 +276,7 @@
       <button class="ghost" id="joinBtn" type="button">加入</button>
     </div>
     <div id="netStat"></div>
+    <div id="saveInfo"></div>
   </div>
 </div>
 
@@ -1872,19 +1876,40 @@ function netTick(dt, now){
 
 /* ============================== 存档 ============================== */
 var saveT = 0;
+function saveNow(){
+  try {
+    localStorage.setItem("rtsx67.island.v1", JSON.stringify({
+      w: dumpWorld(), inv: inv, owned: owned, eq: equipped, t: Date.now()
+    }));
+    paintSaveInfo();
+    return true;
+  } catch(e){ return false; }
+}
 function saveSoon(){
   if (NET.on) return;
+  if (!running) return;   /* 还没开始玩就不要写盘，否则会把旧存档覆盖成默认岛 */
   if (saveT) return;
   saveT = setTimeout(function(){
     saveT = 0;
-    try {
-      localStorage.setItem("rtsx67.island.v1", JSON.stringify({ w: dumpWorld(), inv: inv, owned: owned, eq: equipped }));
-    } catch(e){}
+    saveNow();
   }, 900);
+}
+function readSave(){
+  try { return JSON.parse(localStorage.getItem("rtsx67.island.v1") || "null"); } catch(e){ return null; }
+}
+function pad2(v){ return (v < 10 ? "0" : "") + v; }
+function paintSaveInfo(){
+  var n = el("saveInfo"); if (!n) return;
+  var s = readSave();
+  if (!s || !s.w || !s.w.length){ n.textContent = "还没有存档，开始后会边玩边自动存"; n.className = ""; return; }
+  var d = s.t ? new Date(s.t) : null;
+  var when = d ? pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()) + " " + pad2(d.getHours()) + ":" + pad2(d.getMinutes()) : "之前";
+  n.textContent = "存档：世界里 " + s.w.length + " 块 · " + when + "（开始即接着玩）";
+  n.className = "on";
 }
 function loadSave(){
   try {
-    var s = JSON.parse(localStorage.getItem("rtsx67.island.v1") || "null");
+    var s = readSave();
     if (!s || !s.w || !s.w.length) return false;
     loadWorld(s.w);
     for (var k in s.inv) if (k in inv) inv[k] = s.inv[k];
@@ -1959,6 +1984,17 @@ tap(el("back"), function(){
   if (window.parent !== window) window.parent.postMessage("rtsx-close", "*");
   else location.href = "index.html";
 });
+tap(el("saveBtn"), function(){
+  if (NET.on){ toast("联机中不存档，单机才存"); SFX.play("error", { volume:.5 }); return; }
+  if (saveNow()){
+    toast("已保存 · 世界里 " + world.size + " 块");
+    SFX.play("success", { volume:.7 });
+    paintSaveInfo();
+  } else {
+    toast("存不进去，浏览器可能禁了本地存储");
+  }
+});
+
 tap(el("regen"), function(){
   if (NET.on && !NET.host){ toast("只有房主能换岛"); return; }
   newIsland(true);
@@ -2024,6 +2060,8 @@ if (location.search.indexOf("dbg") >= 0){
     place: function(){ return placeBlock(); },
     craft: function(id){ return craft(id); },
     gen: function(){ return genOnce(); },
+    save: function(){ return saveNow(); },
+    saveInfo: function(){ return readSave() ? { blocks:(readSave().w||[]).length, at:readSave().t } : null; },
     netHost: function(code){ hostRoom(code); return true; },
     netJoin: function(code){ joinRoom(code); return true; },
     netReady: function(){
@@ -2062,12 +2100,15 @@ if (location.search.indexOf("dbg") >= 0){
   };
 }
 
+window.addEventListener("beforeunload", function(){ if (running && !NET.on) saveNow(); });
+
 /* 首屏：默认进单机，避免一片空白 */
 newIsland(false);
 inv["泥"] = 2; inv["石"] = 1;
 buildFarIslands();
 rebuild();
 paintBars();
+paintSaveInfo();
 resize();
 render();
 
