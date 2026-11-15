@@ -20,7 +20,7 @@
     -webkit-font-smoothing:antialiased;
     overscroll-behavior:none;touch-action:none;
   }
-  #gl{position:fixed;inset:0;width:100%;height:100%;display:block;}
+  #gl{position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;display:block;background:#0c0b0a;}
 
   .ui{position:fixed;inset:0;pointer-events:none;z-index:3;}
   .ui>*{pointer-events:auto;}
@@ -569,9 +569,16 @@ function craft(id){
 
 /* ============================== WebGL ============================== */
 var cvs = el("gl");
-var gl = cvs.getContext("webgl", { antialias: true, alpha: false, powerPreference: "high-performance" })
-      || cvs.getContext("experimental-webgl");
-if (!gl) { toast("这个浏览器开不了 WebGL"); }
+var frames = 0, ctxLost = false, glFailMsg = "", safeMode = /[?&]safe=1/.test(location.search);
+var gl = null;
+try {
+  /* 以前带 powerPreference:"high-performance" + antialias，部分 Android GPU 会直接建不出上下文 */
+  gl = cvs.getContext("webgl", { antialias: false, alpha: false, depth: true, stencil: false,
+                                 premultipliedAlpha: false, preserveDrawingBuffer: false,
+                                 failIfMajorPerformanceCaveat: false })
+    || cvs.getContext("experimental-webgl")
+    || cvs.getContext("webgl");
+} catch (e) { gl = null; glFailMsg = String(e && e.message || e); }
 
 var VS_WORLD = [
 "attribute vec3 aPos;",
@@ -595,7 +602,11 @@ var VS_WORLD = [
 ].join("\n");
 
 var FS_WORLD = [
+"#ifdef GL_FRAGMENT_PRECISION_HIGH",
+"precision highp float;",
+"#else",
 "precision mediump float;",
+"#endif",
 "varying vec2 vUV;",
 "varying float vShade;",
 "varying float vFog;",
@@ -619,7 +630,11 @@ var VS_SKY = [
 ].join("\n");
 
 var FS_SKY = [
+"#ifdef GL_FRAGMENT_PRECISION_HIGH",
+"precision highp float;",
+"#else",
 "precision mediump float;",
+"#endif",
 "varying vec2 vP;",
 "uniform vec3 uTop;",
 "uniform vec3 uBot;",
@@ -658,7 +673,7 @@ function prog(vs, fs){
 
 var P_W, P_S;
 try { P_W = prog(VS_WORLD, FS_WORLD); P_S = prog(VS_SKY, FS_SKY); }
-catch (e) { console.error(e); }
+catch (e) { console.error(e); glFailMsg = String(e && e.message || e); }
 
 var L = {};
 if (P_W){
@@ -777,11 +792,16 @@ gl.bindTexture(gl.TEXTURE_2D, tex);
 var atlas = buildAtlas();
 gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, atlas);
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-gl.generateMipmap(gl.TEXTURE_2D);
+if (safeMode){
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+} else {
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  try { gl.generateMipmap(gl.TEXTURE_2D); } catch (e) {}
+}
 
 function tileUV(t){
   var c = t % ATLAS_N, r = Math.floor(t / ATLAS_N);
@@ -1369,10 +1389,29 @@ var FOG_COL = [0.72, 0.60, 0.50];
 
 function nowMs(){ return (window.performance && performance.now) ? performance.now() : Date.now(); }
 
+var DPR = Math.min(window.devicePixelRatio || 1, 2);
+function viewSize(){
+  var vv = window.visualViewport;
+  var w = (document.documentElement && document.documentElement.clientWidth) || window.innerWidth || 0;
+  var h = (document.documentElement && document.documentElement.clientHeight) || window.innerHeight || 0;
+  if (vv && vv.width && vv.height && (!vv.scale || vv.scale <= 1.01)){
+    w = Math.max(w, Math.round(vv.width)); h = Math.max(h, Math.round(vv.height));
+  }
+  if (w < 2) w = window.innerWidth || 360;
+  if (h < 2) h = window.innerHeight || 640;
+  return { w: w, h: h };
+}
 function resize(){
-  var dpr = Math.min(window.devicePixelRatio || 1, 2);
-  var w = Math.round(window.innerWidth * dpr), h = Math.round(window.innerHeight * dpr);
+  var dpr = safeMode ? 1 : DPR;
+  var v = viewSize();
+  var w = Math.round(v.w * dpr), h = Math.round(v.h * dpr);
+  /* 画布太大时部分 Android GPU 会直接黑屏：最长边 2048、总像素 420 万以内 */
+  var edge = 2048, pxMax = 4200000, k = 1;
+  if (Math.max(w, h) > edge) k = Math.min(k, edge / Math.max(w, h));
+  if (w * h > pxMax) k = Math.min(k, Math.sqrt(pxMax / (w * h)));
+  if (k < 1){ w = Math.max(1, Math.round(w * k)); h = Math.max(1, Math.round(h * k)); }
   if (cvs.width !== w || cvs.height !== h){ cvs.width = w; cvs.height = h; }
+  if (gl){ gl.viewport(0, 0, cvs.width, cvs.height); }
 }
 
 /* 带朝向的方块：绕 Y 轴旋转（头部跟着视线转） */
@@ -1635,6 +1674,7 @@ function drawClouds(now){
 
 function render(){
   if (!gl || !P_W) return;
+  frames++;
   resize();
   buildMatrices();
 
@@ -2538,7 +2578,11 @@ var crackTex = (function(){
 var P_X, LX = {};
 var VS_X = "attribute vec3 aPos;attribute vec2 aUV;uniform mat4 uVP;varying vec2 vUV;void main(){ vUV=aUV; gl_Position=uVP*vec4(aPos,1.0); }";
 var FS_X = [
+"#ifdef GL_FRAGMENT_PRECISION_HIGH",
+"precision highp float;",
+"#else",
 "precision mediump float;",
+"#endif",
 "varying vec2 vUV;",
 "uniform sampler2D uTex;",
 "uniform float uStage;",
@@ -3281,6 +3325,30 @@ function enterGame(){
   if (!IS_TOUCH) lockPointer();
 }
 
+var checkedOnce = false;
+function selfCheck(){
+  if (checkedOnce || !gl) return;
+  checkedOnce = true;
+  try {
+    var w = cvs.width, h = cvs.height;
+    if (!w || !h) return;
+    var a = new Uint8Array(4), b = new Uint8Array(4);
+    gl.readPixels(Math.floor(w * 0.5), Math.floor(h * 0.62), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, a);
+    gl.readPixels(Math.floor(w * 0.5), Math.floor(h * 0.94), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, b);
+    var same = a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
+    var dark = a[0] < 22 && a[1] < 22 && a[2] < 22;
+    if (!same && !dark) return;
+    var once = false;
+    try { once = sessionStorage.getItem("rtsx67.autosafe") === "1"; } catch (e) {}
+    if (!once && !/[?&]safe=1/.test(location.search) && !/[?&]dbg/.test(location.search)){
+      try { sessionStorage.setItem("rtsx67.autosafe", "1"); } catch (e) {}
+      location.href = location.pathname + "?safe=1";
+      return;
+    }
+    showGLProblem("画面是" + (dark ? "一片黑" : "一整块纯色") + "，改用兼容模式再试");
+  } catch (e) {}
+}
+
 function loop(t){
   requestAnimationFrame(loop);
   if (!running) return;
@@ -3300,6 +3368,7 @@ function loop(t){
 
   if (dirty) rebuild();
   render();
+  if (frames >= 14 && !checkedOnce) selfCheck();
   paintTags();
 }
 requestAnimationFrame(loop);
@@ -3409,6 +3478,55 @@ el("roomIn").addEventListener("keydown", function(e){
 });
 
 window.addEventListener("resize", function(){ resize(); });
+if (window.visualViewport) window.visualViewport.addEventListener("resize", function(){ resize(); });
+window.addEventListener("orientationchange", function(){ setTimeout(resize, 260); });
+window.addEventListener("pageshow", function(){ resize(); });
+
+/* ---------- 画不出来时的兜底（手机黑屏） ---------- */
+function showGLProblem(msg){
+  if (document.getElementById("glTip")) return;
+  var box = document.createElement("div");
+  box.id = "glTip";
+  box.style.cssText = "position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:99;width:min(86vw,360px);background:rgba(38,26,19,.96);border:1px solid rgba(226,145,111,.5);border-radius:16px;padding:18px;color:#F0D9A8;font:13px/1.7 system-ui,-apple-system,sans-serif;box-shadow:0 18px 40px rgba(0,0,0,.5)";
+  box.innerHTML = '<b style="font-size:15px">画面没能画出来</b>' +
+    '<div style="opacity:.85;margin:6px 0 10px">' + msg + '</div>' +
+    '<div style="opacity:.72;font-size:12px;margin-bottom:12px">多半是手机浏览器关了硬件加速、开着省电模式，或者显卡显存不够。</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+    '<button id="glRetry" style="flex:1;min-width:100px;border:0;border-radius:10px;padding:9px 0;background:#E2916F;color:#241812;font:600 13px system-ui;cursor:pointer">重试</button>' +
+    '<button id="glSafe" style="flex:1;min-width:100px;border:1px solid rgba(240,217,168,.4);border-radius:10px;padding:9px 0;background:rgba(240,217,168,.12);color:#F0D9A8;font:600 13px system-ui;cursor:pointer">兼容模式</button>' +
+    '</div>';
+  document.body.appendChild(box);
+  el("glRetry").onclick = function(){ box.remove(); location.reload(); };
+  el("glSafe").onclick = function(){ box.remove(); location.href = location.pathname + "?safe=1"; };
+}
+cvs.addEventListener("webglcontextlost", function(e){
+  e.preventDefault(); ctxLost = true; frames = 0;
+  toast("显卡把画面收走了，正在恢复");
+  setTimeout(function(){ location.reload(); }, 700);
+}, false);
+if (!gl) showGLProblem("这台浏览器没能建立 WebGL 上下文" + (glFailMsg ? "（" + glFailMsg + "）" : ""));
+else if (!P_W) showGLProblem("着色器没编译通过" + (glFailMsg ? "（" + String(glFailMsg).slice(0, 120) + "）" : ""));
+setTimeout(function(){
+  if (!gl || !P_W || ctxLost) return;
+  if (frames === 0){ safeMode = true; resize(); toast("画面没出来，已切到兼容模式"); }
+}, 2600);
+(function(){
+  if (!/[?&]diag=1/.test(location.search)) return;
+  var box = document.createElement("div");
+  box.style.cssText = "position:fixed;left:8px;bottom:168px;z-index:97;background:rgba(22,16,12,.86);color:#F0D9A8;font:11px/1.5 ui-monospace,monospace;padding:7px 9px;border-radius:10px;white-space:pre;max-width:76vw;overflow:hidden";
+  document.body.appendChild(box);
+  setInterval(function(){
+    var rn = "?", mx = "?";
+    try {
+      var ext = gl && gl.getExtension("WEBGL_debug_renderer_info");
+      rn = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)).slice(0, 44) : "?";
+      mx = gl ? gl.getParameter(gl.MAX_TEXTURE_SIZE) : "-";
+    } catch (e) {}
+    box.textContent = "屏幕 " + window.innerWidth + "x" + window.innerHeight + " · 画布 " + cvs.width + "x" + cvs.height +
+      "\ndpr " + (window.devicePixelRatio || 1) + " · frames " + frames + " · lost " + (ctxLost ? 1 : 0) + " · safe " + (safeMode ? 1 : 0) +
+      "\ngl " + (gl ? "ok" : "null") + " · maxTex " + mx + "\n" + rn;
+  }, 700);
+})();
 
 /* ============================== 调试接口 ============================== */
 if (location.search.indexOf("dbg") >= 0){
