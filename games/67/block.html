@@ -70,6 +70,14 @@
   #mineBar.on{opacity:1;}
   #mineFill{display:block;height:100%;width:0;background:var(--clay);}
 
+  .timechip{font-variant-numeric:tabular-nums;}
+  .timechip.warn{color:#F0A27C;border-color:rgba(240,162,124,.5);}
+  #quests{position:absolute;right:12px;top:56px;width:206px;display:flex;flex-direction:column;gap:4px;pointer-events:none;}
+  #quests .q{background:rgba(14,11,9,.46);border:1px solid rgba(246,241,232,.10);border-radius:8px;padding:4px 7px;font-size:10px;color:#D9D0C4;letter-spacing:.02em;}
+  #quests .q b{color:var(--clay);font-weight:600;margin-right:4px;}
+  #quests .qp{display:block;height:2px;margin-top:3px;background:rgba(246,241,232,.14);border-radius:2px;overflow:hidden;}
+  #quests .qp u{display:block;height:100%;background:var(--clay);text-decoration:none;}
+  .tbtn.hit{background:rgba(217,119,87,.30);border-color:rgba(217,119,87,.7);color:#FFF3EA;}
   #tags{position:absolute;inset:0;pointer-events:none;overflow:hidden;}
   .tag{
     position:absolute;transform:translate(-50%,-100%);
@@ -118,6 +126,9 @@
     box-shadow:0 24px 60px -34px #000;
   }
   .craft.open{display:block;}
+  .qlist{display:flex;flex-direction:column;gap:5px;margin:6px 0 2px;}
+  .qrow{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10.5px;color:#D9D0C4;}
+  .qrow b{color:var(--clay);font-weight:600;white-space:nowrap;}
   .craft h3{margin:0 0 8px;font-family:Georgia,"Songti SC",serif;font-size:14px;font-weight:600;letter-spacing:.02em;}
   .craft .mats{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
   .craft .mats span{font-size:10px;color:var(--dim);padding:2px 6px;border-radius:6px;background:rgba(246,241,232,.07);}
@@ -259,6 +270,10 @@
   #nameRow input{width:100%;height:38px;border-radius:10px;border:1px solid rgba(246,241,232,.16);
     background:rgba(0,0,0,.28);color:#F2E9DC;font:inherit;font-size:12.5px;padding:0 12px;}
   @media (pointer:coarse){
+    #roomChip, #cntChip{display:none;}
+    #timeChip{font-size:10px;padding:0 8px;}
+    #quests{top:52px;right:10px;width:170px;gap:3px;}
+    #quests .q{font-size:9.5px;padding:3px 6px;}
     #hearts{top:54px;left:12px;}
     #chatLog{bottom:186px;left:12px;max-width:64vw;font-size:11.5px;}
     #chatWrap{bottom:186px;width:88vw;}
@@ -274,6 +289,7 @@
     <button class="ic" id="back" type="button">←</button>
     <div class="chip" id="roomChip">单人 · 空岛</div>
     <div class="chip" id="cntChip">1 人</div>
+    <div class="chip timechip" id="timeChip">白天 88s</div>
     <div class="grow"></div>
     <button class="ic" id="snd" type="button">SFX</button>
     <button class="ic" id="chatBtn" type="button">聊</button>
@@ -282,6 +298,7 @@
   </div>
 
   <div id="hearts"></div>
+  <div id="quests"></div>
   <div id="chatLog"></div>
   <div id="chatWrap"><input id="chatIn" maxlength="60" placeholder="说点什么，回车发送" autocomplete="off" spellcheck="false"></div>
   <div id="hurt"></div>
@@ -306,6 +323,7 @@
       <button class="tbtn" id="tBreak" type="button">挖</button>
       <button class="tbtn" id="tPlace" type="button">放</button>
       <button class="tbtn" id="tJump" type="button">跳</button>
+      <button class="tbtn hit" id="tHit" type="button">打</button>
     </div>
   </div>
 </div>
@@ -314,12 +332,12 @@
   <div class="card">
     <div class="kicker">Single Block Island</div>
     <h1>67 方块岛</h1>
-    <p>整座岛从一块 67 方块长起来。中间那台播种机每隔几秒在边上长出新方块，全是 67 系列。挖下来的材料能合成 67 工具，换成更快的镐和锤。</p>
+    <p>整座岛从一块 67 方块长起来。中间的播种机每隔几秒长出新方块。白天挖料、合成 67 工具、顺手做任务；天黑了幽影方块会摸上来，用镐子或金剑把它们打散，掉的铁、金、肉捡起来就能用。</p>
     <div class="keys">
       <b>WASD</b> 移动 · <b>空格</b> 跳 · <b>Shift</b> 冲刺<br>
       <b>左键</b> 长按挖方块 · <b>右键</b> 放方块<br>
-      <b>1–8</b> 选方块 · <b>E</b> 背包 · <b>T</b> 聊天 · <b>Esc</b> 松鼠标<br>
-      手机：<b>左摇杆</b> 走 · <b>右侧拖动</b> 转视角 · 右下 <b>挖 / 放 / 跳</b> · 顶栏 <b>聊</b>
+      <b>1–8</b> 选方块 · <b>E</b> 背包 · <b>T</b> 聊天 · <b>F</b> 挥击 · <b>Esc</b> 松鼠标<br>
+      手机：<b>左摇杆</b> 走 · <b>右侧拖动</b> 转视角 · 右下 <b>挖 / 放 / 跳 / 打</b> · 顶栏 <b>聊</b>
     </div>
     <div class="row">
       <button class="go" id="soloStart" type="button">单机开始</button>
@@ -504,14 +522,15 @@ var onGround = false;
 var keysDown = {};
 
 /* ============================== 背包 / 工具 ============================== */
-var inv = { "泥":0, "草":0, "石":0, "木":0, "铁":0, "金":0, "玻璃":0, "黑曜":0, "灯":0 };
+var inv = { "泥":0, "草":0, "石":0, "木":0, "铁":0, "金":0, "玻璃":0, "黑曜":0, "灯":0, "肉":0 };
 var TOOLS = [
-  { id:"hand",  name:"空手",     power:0.9, cost:null },
-  { id:"wpick", name:"67 木镐",  power:1.9, cost:{ "木":3 } },
-  { id:"spick", name:"67 石镐",  power:2.7, cost:{ "木":1, "石":3 } },
-  { id:"ipick", name:"67 铁镐",  power:3.9, cost:{ "铁":2, "石":2 } },
-  { id:"gham",  name:"67 金锤",  power:6.2, cost:{ "金":3, "铁":1 } },
-  { id:"lampk", name:"67 灯镐",  power:3.0, cost:{ "金":1, "玻璃":1 } }
+  { id:"hand",  name:"空手",     power:0.9, cost:null,             dmg:7 },
+  { id:"wpick", name:"67 木镐",  power:1.9, cost:{ "木":3 },        dmg:8 },
+  { id:"spick", name:"67 石镐",  power:2.7, cost:{ "木":1, "石":3 }, dmg:10 },
+  { id:"ipick", name:"67 铁镐",  power:3.9, cost:{ "铁":2, "石":2 }, dmg:14 },
+  { id:"gham",  name:"67 金锤",  power:6.2, cost:{ "金":3, "铁":1 }, dmg:19 },
+  { id:"lampk", name:"67 灯镐",  power:3.0, cost:{ "金":1, "玻璃":1 }, dmg:11 },
+  { id:"gsword",name:"67 金剑",  power:1.6, cost:{ "金":2, "铁":2 }, dmg:24 }
 ];
 var owned = { "hand": true };
 var equipped = "hand";
@@ -519,7 +538,12 @@ var selBlock = B.dirt;
 
 function toolPower(){ for (var i = 0; i < TOOLS.length; i++) if (TOOLS[i].id === equipped) return TOOLS[i].power; return 0.9; }
 function toolName(){ for (var i = 0; i < TOOLS.length; i++) if (TOOLS[i].id === equipped) return TOOLS[i].name; return "空手"; }
-function addMat(m, n){ if (!m) return; inv[m] = (inv[m] || 0) + (n || 1); paintBars(); }
+function addMat(m, n){
+  if (!m) return;
+  inv[m] = (inv[m] || 0) + (n || 1);
+  if (m === "铁") questProgress("iron", n || 1);
+  paintBars();
+}
 function canCraft(r){
   if (!r.cost) return false;
   for (var k in r.cost) if ((inv[k] || 0) < r.cost[k]) return false;
@@ -536,6 +560,8 @@ function craft(id){
   equipped = id;
   paintBars(); paintCraft();
   SFX.play("success", { volume: .8 });
+  unlockAch("smith");
+  questProgress("craft", 1);
   toast("合成了 " + r.name);
   saveSoon();
   return true;
@@ -577,9 +603,10 @@ var FS_WORLD = [
 "uniform vec3 uTint;",
 "uniform vec3 uFogCol;",
 "uniform float uAlpha;",
+"uniform float uDayL;",
 "void main(){",
 "  vec4 c = texture2D(uTex, vUV);",
-"  vec3 col = c.rgb * vShade * uTint;",
+"  vec3 col = c.rgb * vShade * uTint * uDayL;",
 "  col = mix(col, uFogCol, vFog);",
 "  gl_FragColor = vec4(col, uAlpha);",
 "}"
@@ -646,6 +673,7 @@ if (P_W){
   L.uFogB = gl.getUniformLocation(P_W, "uFogB");
   L.uEye = gl.getUniformLocation(P_W, "uEye");
   L.uAlpha = gl.getUniformLocation(P_W, "uAlpha");
+  L.uDayL = gl.getUniformLocation(P_W, "uDayL");
 }
 var LS = {};
 if (P_S){
@@ -955,6 +983,7 @@ document.addEventListener("mousedown", function(e){
   if (overlayOpen()) return;
   if (e.button === 0){
     mouse.down = true;
+    attackSwing();
     if (!locked && !IS_TOUCH) { lockPointer(); return; }
   }
   if (e.button === 2 && (locked || IS_TOUCH)){
@@ -972,6 +1001,7 @@ window.addEventListener("keydown", function(e){
   if (overlayOpen()) return;
   if (e.code === "KeyT"){ e.preventDefault(); openChat(); return; }
   if (e.code === "KeyE"){ e.preventDefault(); toggleBag(); return; }
+  if (e.code === "KeyF"){ e.preventDefault(); attackSwing(); return; }
   keysDown[e.code] = true;
   if (e.code === "Escape" && document.exitPointerLock) document.exitPointerLock();
   var d = e.code;
@@ -1117,6 +1147,7 @@ var draggingLook = false, lookId = -1, lastLX = 0, lastLY = 0;
   press(el("tBreak"), function(){ mouse.down = true; }, function(){ mouse.down = false; mining = null; });
   press(el("tPlace"), function(){ placeBlock(); });
   press(el("tJump"), function(){ if (onGround){ vy = 7.4; onGround = false; } });
+press(el("tHit"), function(){ hitHeld = true; attackSwing(); }, function(){ hitHeld = false; });
 })();
 
 
@@ -1137,6 +1168,25 @@ function tick(dt){
   invulnT = Math.max(0, invulnT - dt);
   if (nowMs() - lastHurtAt > 6000) hp = Math.min(HPMAX, hp + dt * 0.6);
   if (hp !== lastHpShown){ lastHpShown = hp; paintHearts(); }
+  dayT += dt;
+  var di = dayInfo();
+  if (di.night > 0.6 && !nightFlag){
+    nightFlag = true;
+    toast("天黑了 · 幽影方块开始出没");
+    SFX.play("glitch", { volume: .4 });
+  }
+  if (nightFlag && di.night < 0.4){
+    nightFlag = false;
+    nightsSurvived++;
+    heal(Math.round(HPMAX * 0.35));
+    toast("你活过了第 " + nightsSurvived + " 夜，回了点血");
+    unlockAch("survivor");
+    questProgress("night", 1);
+    if (NET.on && NET.host) bcast({ k:"ni", n:nightsSurvived });
+    saveSoon();
+  }
+  hudT += dt;
+  if (hudT > 0.35){ hudT = 0; paintTime(di); }
 
   var speed = (keysDown.ShiftLeft || keysDown.ShiftRight) ? 5.6 : 3.9;
   var fw = 0, sd = 0;
@@ -1205,6 +1255,8 @@ function tick(dt){
   if (!NET.on || NET.host) stepAnimals(dt);
   syncAnimals(dt);
   stepParticles(dt);
+  stepMobs(dt);
+  stepDrops(dt);
   for (var ai = 0; ai < animals.length; ai++){
     var an = animals[ai];
     if (Math.hypot(an.x - px, an.z - pz) < 2.0){ if (unlockAch("herd")) toast("这只 67 生物对你哼了一声"); break; }
@@ -1272,6 +1324,7 @@ function breakBlock(x, y, z){
   SFX.play("glitch", { volume:.3 });
   netSendBlock(x, y, z, 0);
   minedTotal++;
+  questProgress("mine", 1);
   if (minedTotal >= 25) unlockAch("digger");
   saveSoon();
   return true;
@@ -1301,6 +1354,7 @@ function placeBlock(){
   var under = 0, uy = p.y;
   while (getB(p.x, uy, p.z) && under < 8){ under++; uy--; }
   if (under >= 3) unlockAch("builder");
+  questProgress("place", 1);
   paintBars(); saveSoon();
   return true;
 }
@@ -1585,7 +1639,12 @@ function render(){
   buildMatrices();
 
   gl.viewport(0, 0, cvs.width, cvs.height);
-  gl.clearColor(0.16, 0.13, 0.11, 1);
+  var di = dayInfo();
+  var skyT = skyTopCol(di), skyB = skyBotCol(di);
+  var fc = fogCol(di);
+  FOG_COL[0] = fc[0]; FOG_COL[1] = fc[1]; FOG_COL[2] = fc[2];
+  gl.useProgram(P_W); gl.uniform1f(L.uDayL, di.light);
+  gl.clearColor(skyB[0] * 0.62, skyB[1] * 0.62, skyB[2] * 0.66, 1);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
   /* 天空 */
@@ -1593,8 +1652,8 @@ function render(){
   gl.useProgram(P_S);
   gl.bindBuffer(gl.ARRAY_BUFFER, skyBuf);
   gl.enableVertexAttribArray(LS.aP); gl.vertexAttribPointer(LS.aP, 2, gl.FLOAT, false, 0, 0);
-  gl.uniform3f(LS.uTop, 0.13, 0.14, 0.17);
-  gl.uniform3f(LS.uBot, 0.78, 0.55, 0.40);
+  gl.uniform3f(LS.uTop, skyT[0], skyT[1], skyT[2]);
+  gl.uniform3f(LS.uBot, skyB[0], skyB[1], skyB[2]);
 
   /* 太阳：固定世界方向，按相机投影出屏幕坐标 */
   var sunDx = 0.50, sunDy = 0.34, sunDz = -0.80;
@@ -1605,7 +1664,7 @@ function render(){
   var cwp = mVP[3]*ex + mVP[7]*ey + mVP[11]*ez + mVP[15];
   if (cwp > 0.1){
     gl.uniform2f(LS.uSun, cxp / cwp, cyp / cwp);
-    gl.uniform1f(LS.uSunOn, 1.0);
+    gl.uniform1f(LS.uSunOn, di.light > 0.5 ? 1.0 : 0.0);
   } else {
     gl.uniform2f(LS.uSun, 4.0, 4.0);
     gl.uniform1f(LS.uSunOn, 0.0);
@@ -1635,6 +1694,8 @@ function render(){
 
   drawFarIslands();
   drawAnimals();
+  drawMobs();
+  drawDrops();
   drawHighlight();
   drawCrack();
   drawAvatars();
@@ -1934,6 +1995,34 @@ function onNetData(data, conn){
     if (!NET.host) applyAnimals(m.a || []);
     return;
   }
+
+  if (m.k === "mo"){
+    if (!NET.host) applyMobPack(m.a || []);
+    return;
+  }
+  if (m.k === "mh"){
+    if (NET.host){
+      for (var mi = 0; mi < mobs.length; mi++){
+        if (mobs[mi].id !== m.id) continue;
+        mobs[mi].hp -= (m.dmg || 6); mobs[mi].flash = 1;
+        if (mobs[mi].hp <= 0) killMob(mobs[mi]);
+        break;
+      }
+    }
+    return;
+  }
+  if (m.k === "mk"){
+    if (!NET.host){
+      spawnParticles(m.x - 0.3, m.y + 0.3, m.z - 0.3, B.obsi, 10);
+      addMat(m.mat, m.n || 1);
+        toast("队友打散了幽影 · " + m.mat + "×" + (m.n || 1));
+    }
+    return;
+  }
+  if (m.k === "ni"){
+    if (!NET.host && typeof m.n === "number") nightsSurvived = m.n;
+    return;
+  }
 }
 
 function hostRoom(code){
@@ -2081,7 +2170,9 @@ var saveT = 0;
 function saveNow(){
   try {
     localStorage.setItem("rtsx67.island.v1", JSON.stringify({
-      w: dumpWorld(), inv: inv, owned: owned, eq: equipped, ach: ach, hb: hotbar, hp: Math.round(hp), t: Date.now()
+      w: dumpWorld(), inv: inv, owned: owned, eq: equipped, ach: ach, hb: hotbar, hp: Math.round(hp),
+      kills: mobKills, nights: nightsSurvived, qd: questDone, dt2: Math.round(dayT),
+      q: quests.map(function(q){ return [q.t, q.need, q.cur]; }), t: Date.now()
     }));
     paintSaveInfo();
     return true;
@@ -2120,9 +2211,26 @@ function loadSave(){
     if (s.ach) for (var id in s.ach) if (s.ach[id]) ach[id] = true;
     if (s.hb && s.hb.length === 8) hotbar = s.hb.slice();
     if (typeof s.hp === "number") hp = Math.max(1, Math.min(HPMAX, s.hp));
+    restoreSide(s);
     paintAch();
     return true;
   } catch(e){ return false; }
+}
+
+/* 存档里的战斗/任务进度 */
+function restoreSide(s){
+  if (typeof s.kills === "number") mobKills = s.kills;
+  if (typeof s.nights === "number") nightsSurvived = s.nights;
+  if (typeof s.qd === "number") questDone = s.qd;
+  if (typeof s.dt2 === "number") dayT = s.dt2;
+  if (s.q && s.q.length){
+    quests = [];
+    for (var i = 0; i < s.q.length; i++){
+      var a = s.q[i], k = questKind(a[0]);
+      quests.push({ t:a[0], need:a[1], cur:a[2], rw:k.rw, txt:k.txt(a[1]) });
+    }
+    paintQuests();
+  }
 }
 
 /* ============================== 成就 / 备份 ============================== */
@@ -2131,7 +2239,10 @@ var ACHS = [
   { id:"digger",   name:"第一把铲子",     desc:"累计挖掉 25 块 67 方块" },
   { id:"smith",    name:"开工了",         desc:"合成第一把 67 镐" },
   { id:"herd",     name:"摸到一只",       desc:"走到 67 生物旁边两格内" },
-  { id:"builder",  name:"搭到三层高",     desc:"把方块叠到自己脚下三层以上" }
+  { id:"builder",  name:"搭到三层高",     desc:"把方块叠到自己脚下三层以上" },
+  { id:"slayer",   name:"第一次开打",     desc:"打散第一只幽影方块" },
+  { id:"survivor", name:"守住了这一夜",   desc:"活过第一个夜晚" },
+  { id:"quester",  name:"任务机器",       desc:"完成 3 个任务" }
 ];
 var ach = {};
 
@@ -2185,7 +2296,8 @@ function applyBackup(s){
   if (s.ach) for (var id in s.ach) if (s.ach[id]) ach[id] = true;
   if (s.hb && s.hb.length === 8) hotbar = s.hb.slice();
   if (typeof s.hp === "number") hp = Math.max(1, Math.min(HPMAX, s.hp));
-  saveNow(); paintBars(); paintAch(); paintHearts();
+  restoreSide(s);
+  saveNow(); paintBars(); paintAch(); paintHearts(); paintQuests();
   return true;
 }
 
@@ -2244,7 +2356,12 @@ function hurt(dmg, why){
   if (hp <= 0) setTimeout(die, 120);
 }
 function die(){
-  hp = HPMAX; invulnT = 1.2; paintHearts();
+  hp = HPMAX; invulnT = 1.4; paintHearts();
+  /* 倒下时把夜怪赶走，别一睁眼又被围殴 */
+  for (var i = mobs.length - 1; i >= 0; i--){
+    spawnParticles(mobs[i].x - 0.3, mobs[i].y + 0.3, mobs[i].z - 0.3, B.obsi, 5);
+    mobs.splice(i, 1);
+  }
   spawnOnIsland();
   toast("你倒下了，落回岛顶");
 }
@@ -2668,6 +2785,12 @@ function paintBag(){
     tools += '<div class="cell' + (equipped === t.id ? " here" : "") + '" data-tool="' + t.id + '">'
       + '<span>' + t.name + '</span><b class="n">' + t.power.toFixed(1) + "</b></div>";
   }
+  var qhtml = "<h4>任务</h4><div class=\"qlist\">";
+  for (var qi = 0; qi < quests.length; qi++){
+    var qq = quests[qi];
+    qhtml += "<div class=\"qrow\"><span>" + qq.txt + "</span><b>" + Math.min(qq.cur, qq.need) + "/" + qq.need + "</b></div>";
+  }
+  qhtml += "</div>";
   var rows = "";
   for (var r = 0; r < TOOLS.length; r++){
     var tt = TOOLS[r];
@@ -2683,12 +2806,13 @@ function paintBag(){
   p.innerHTML = "<h3>背包 · 第 " + (selSlot + 1) + " 格</h3>"
     + '<h4>材料（点一下就放进当前格子）</h4><div class="grid">' + cells + "</div>"
     + '<h4>工具</h4><div class="grid">' + tools + "</div>"
-    + "<h3 style=\"margin-top:16px\">合成 67 工具</h3>" + rows;
+    + qhtml + "<h3 style=\"margin-top:16px\">合成 67 工具</h3>" + rows;
   var cs = p.querySelectorAll(".cell[data-mat]");
   for (var ci = 0; ci < cs.length; ci++){
     (function(cell){
       tap(cell, function(){
         var mat = cell.getAttribute("data-mat");
+        if (mat === "肉"){ eatMat(mat); paintBag(); return; }
         if ((inv[mat] || 0) <= 0){ toast("没有" + mat); return; }
         var blk = matBlock(mat);
         if (!blk) return;
@@ -2718,6 +2842,431 @@ function toggleBag(force){
   var open = force === undefined ? !p.classList.contains("open") : !!force;
   p.classList.toggle("open", open);
   if (open){ paintBag(); if (document.pointerLockElement) document.exitPointerLock(); }
+}
+
+/* ============================== 昼夜 ============================== */
+var DAYLEN = 150, dayT = 8, nightFlag = false;
+/* 0-96 白天 / 96-110 黄昏 / 110-140 夜晚 / 140-150 黎明 */
+function dayInfo(){
+  var t = ((dayT % DAYLEN) + DAYLEN) % DAYLEN;
+  if (t < 96) return { n:"白天", light:1.0, night:0 };
+  if (t < 110){ var k = (t - 96) / 14; return { n:"黄昏", light:1.0 - k * 0.64, night:k * 0.45 }; }
+  if (t < 140) return { n:"夜晚", light:0.36, night:1.0 };
+  var k2 = (t - 140) / 10;
+  return { n:"黎明", light:0.36 + k2 * 0.64, night:1.0 - k2 };
+}
+function skyTopCol(d){
+  return [0.13 + (0.025 - 0.13) * d.night, 0.14 + (0.035 - 0.14) * d.night, 0.17 + (0.075 - 0.17) * d.night];
+}
+function skyBotCol(d){
+  var warm = Math.sin(Math.min(1, d.night) * Math.PI);
+  return [0.78 + (0.10 - 0.78) * d.night + warm * 0.06,
+          0.55 + (0.11 - 0.55) * d.night + warm * 0.03,
+          0.40 + (0.19 - 0.40) * d.night];
+}
+function fogCol(d){
+  return [0.72 + (0.12 - 0.72) * d.night, 0.60 + (0.13 - 0.60) * d.night, 0.50 + (0.18 - 0.50) * d.night];
+}
+var hudT = 0;
+function paintTime(d){
+  var n = el("timeChip"); if (!n) return;
+  var t = ((dayT % DAYLEN) + DAYLEN) % DAYLEN;
+  var rest = 0;
+  if (t < 96) rest = Math.ceil(96 - t);
+  else if (t < 110) rest = Math.ceil(110 - t);
+  else if (t < 140) rest = Math.ceil(140 - t);
+  else rest = Math.ceil(DAYLEN - t);
+  n.textContent = d.n + " " + rest + "s";
+  n.className = "chip timechip" + (d.night > 0.5 ? " warn" : "");
+}
+
+/* ============================== 夜怪 ============================== */
+var MOB_KINDS = {
+  shade: { id:"shade", name:"幽影方块", hp:30, speed:2.05, dmg:9,  size:0.78, color:"#3A3140", eyes:"#F6C070", drop:[["铁",1,1],["金",0.3,1]] },
+  brute: { id:"brute", name:"重影方块", hp:62, speed:1.35, dmg:16, size:1.18, color:"#241D2C", eyes:"#E2916F", drop:[["金",1,1],["黑曜",0.8,1]] }
+};
+function mobKind(id){ return MOB_KINDS[id] || MOB_KINDS.shade; }
+var MAXMOB = 8, mobs = [], mobSeq = 0, mobSpawnT = 0, mobKills = 0, nightsSurvived = 0;
+var attackCd = 0, hitHeld = false, swingT = 0, mobSyncT = 0, atkTry = 0, atkOk = 0;
+
+var mobBuf = {
+  pos: gl.createBuffer(), uv: gl.createBuffer(), sh: gl.createBuffer(), idx: gl.createBuffer(),
+  apos: new Float32Array(MAXMOB * 3 * 6 * 4 * 3), auv: new Float32Array(MAXMOB * 3 * 6 * 4 * 2),
+  ash: new Float32Array(MAXMOB * 3 * 6 * 4), aidx: new Uint32Array(MAXMOB * 3 * 6 * 6), n: 0
+};
+
+function farthestSpot(){
+  var best = null, bd = -1;
+  world.forEach(function(v, k){
+    if (v === B.gen) return;
+    var p = k.split(","), x = +p[0], y = +p[1], z = +p[2];
+    if (getB(x, y + 1, z) || getB(x, y + 2, z)) return;
+    var d = Math.hypot(x + 0.5 - px, z + 0.5 - pz);
+    if (d > bd){ bd = d; best = { x:x + 0.5, y:y + 1, z:z + 0.5 }; }
+  });
+  return best;
+}
+function spawnMob(){
+  /* 先要远一点的位置；岛还小就退而求其次，取离玩家最远的格子 */
+  var sp = randomIslandSpot(6) || randomIslandSpot(3.5) || farthestSpot();
+  if (!sp) return null;
+  var kd = (nightsSurvived >= 2 && Math.random() < 0.30) ? MOB_KINDS.brute : MOB_KINDS.shade;
+  mobSeq++;
+  var m = {
+    id: (kd.id === "brute" ? "b" : "s") + mobSeq,
+    kind: kd.id, x: sp.x, y: sp.y, z: sp.z, hp: kd.hp, max: kd.hp,
+    flash: 0, atk: 1.5, bob: Math.random() * 6, yaw: 0
+  };
+  mobs.push(m);
+  spawnParticles(sp.x - 0.3, sp.y + 0.2, sp.z - 0.3, B.obsi, 6);
+  SFX.play("glitch", { volume: .18 });
+  return m;
+}
+
+function stepMobs(dt){
+  attackCd = Math.max(0, attackCd - dt);
+  swingT = Math.max(0, swingT - dt);
+  var d = dayInfo();
+  var auth = !NET.on || NET.host;
+
+  /* 天亮散掉 */
+  if (d.night < 0.22 && mobs.length){
+    for (var i = mobs.length - 1; i >= 0; i--){
+      spawnParticles(mobs[i].x - 0.3, mobs[i].y + 0.3, mobs[i].z - 0.3, B.obsi, 5);
+      mobs.splice(i, 1);
+    }
+  }
+
+  if (auth && d.night > 0.55){
+    mobSpawnT += dt;
+    var want = Math.min(MAXMOB, 2 + Math.floor(nightsSurvived * 0.6) + (nightsSurvived >= 2 ? 1 : 0));
+    if (mobSpawnT > 4.0 && mobs.length < want){ mobSpawnT = 0; spawnMob(); }
+  } else if (!auth || d.night <= 0.55) mobSpawnT = 0;
+
+  for (var j = mobs.length - 1; j >= 0; j--){
+    var m = mobs[j], kd = mobKind(m.kind);
+    m.bob += dt * 3.2;
+    m.flash = Math.max(0, m.flash - dt * 2.4);
+    m.atk = Math.max(0, m.atk - dt);
+    var dx = px - m.x, dz = pz - m.z, dist = Math.hypot(dx, dz);
+    if (dist > 32){ mobs.splice(j, 1); continue; }
+    if (!auth) continue;
+
+    if (dist < 1.35){
+      m.yaw = Math.atan2(dx, dz);
+      if (m.atk <= 0){
+        m.atk = 0.95;
+        hurt(kd.dmg, kd.name + "撞了你一下");
+        var kb = 0.28;
+        if (!boxBlocked(px + dx / (dist || 1) * -kb, py, pz)) px -= dx / (dist || 1) * kb;
+        if (!boxBlocked(px, py, pz + dz / (dist || 1) * -kb)) pz -= dz / (dist || 1) * kb;
+      }
+      continue;
+    }
+
+    var sp2 = kd.speed * dt;
+    var nx = m.x + dx / dist * sp2, nz = m.z + dz / dist * sp2;
+    m.yaw = Math.atan2(dx, dz);
+    var cellX = Math.floor(nx), cellZ = Math.floor(nz), feet = Math.floor(m.y + 0.05);
+    if (getB(cellX, feet, cellZ)){
+      var up = topBlockAt(cellX, cellZ);
+      if (up !== null && (up + 1) - m.y <= 1.15 && !getB(cellX, up + 1, cellZ)){
+        m.x = nx; m.z = nz; m.y = up + 1;
+      }
+    } else {
+      var ty = topBlockAt(cellX, cellZ);
+      if (ty !== null && (ty + 1) - m.y <= 1.15 && !getB(cellX, ty + 1, cellZ)){
+        m.x = nx; m.z = nz; m.y = ty + 1;
+      } else {
+        /* 脚下是虚空也照样漂过来，不然被击退到岛外就永远卡住 */
+        m.x = nx; m.z = nz;
+      }
+    }
+  }
+
+  if (auth) syncMobs(dt);
+  /* 按住左键 / 打键：能打到就一直挥 */
+  if ((mouse.down || hitHeld) && attackCd <= 0 && mobsInFront(3.4, 0.42).length) attackSwing();
+}
+
+function mobPack(){
+  var a = [];
+  for (var i = 0; i < mobs.length; i++){
+    var m = mobs[i];
+    a.push([m.id, +m.x.toFixed(2), +m.y.toFixed(2), +m.z.toFixed(2), +m.yaw.toFixed(2), Math.round(m.hp)]);
+  }
+  return a;
+}
+function syncMobs(dt){
+  if (!NET.on || !NET.host) return;
+  mobSyncT += dt;
+  if (mobSyncT < 0.35) return;
+  mobSyncT = 0;
+  bcast({ k:"mo", a: mobPack() });
+}
+function applyMobPack(list){
+  mobs.length = 0;
+  for (var i = 0; i < list.length; i++){
+    var r = list[i];
+    var kd = mobKind(String(r[0]).charAt(0) === "b" ? "brute" : "shade");
+    mobs.push({ id:r[0], kind:kd.id, x:r[1], y:r[2], z:r[3], yaw:r[4], hp:r[5], max:kd.hp, flash:0, atk:0, bob:Math.random()*6 });
+  }
+}
+
+/* 近身攻击 */
+function weaponDmg(){
+  for (var i = 0; i < TOOLS.length; i++) if (TOOLS[i].id === equipped) return TOOLS[i].dmg || 6;
+  return 6;
+}
+function mobsInFront(range, cosLimit){
+  var d = lookDir(), out = [];
+  for (var i = 0; i < mobs.length; i++){
+    var m = mobs[i], dx = m.x - px, dz = m.z - pz;
+    var dist = Math.hypot(dx, dz);
+    if (dist > range || dist < 0.001) continue;
+    if ((dx * d.x + dz * d.z) / dist < cosLimit) continue;
+    if (Math.abs(m.y - py) > 2.3) continue;
+    out.push({ m:m, dist:dist });
+  }
+  out.sort(function(a, b){ return a.dist - b.dist; });
+  return out;
+}
+function attackSwing(){
+  atkTry++;
+  if (attackCd > 0) return false;
+  var list = mobsInFront(3.4, 0.42);
+  if (!list.length) return false;
+  attackCd = 0.42; swingT = 0.2; atkOk++;
+  var m = list[0].m, kd = mobKind(m.kind);
+  var dmg = weaponDmg();
+  if (NET.on && !NET.host){ bcast({ k:"mh", id: m.id, dmg: dmg }); }
+  m.hp -= dmg; m.flash = 1;
+  var dx = m.x - px, dz = m.z - pz, dd = Math.hypot(dx, dz) || 1;
+  var kx = m.x + dx / dd * 0.32, kz = m.z + dz / dd * 0.32;
+  if (topBlockAt(Math.floor(kx), Math.floor(kz)) !== null){ m.x = kx; m.z = kz; }
+  spawnParticles(m.x - 0.25, m.y + 0.35, m.z - 0.25, B.obsi, 4);
+  SFX.play("catch", { volume: .45 });
+  if (m.hp <= 0) killMob(m);
+  return true;
+}
+function killMob(m){
+  var idx = mobs.indexOf(m); if (idx < 0) return false;
+  mobs.splice(idx, 1);
+  var kd = mobKind(m.kind);
+  spawnParticles(m.x - 0.35, m.y + 0.35, m.z - 0.35, B.obsi, 16);
+  SFX.play("score", { volume: .6 });
+  mobKills++;
+  questProgress("kill", 1);
+  toast(kd.name + "散成了方块");
+  var first = kd.drop[0];
+  for (var i = 0; i < kd.drop.length; i++){
+    var dr = kd.drop[i];
+    if (Math.random() <= dr[1]){
+      if (i === 0) spawnDrop(m.x, m.y + 0.45, m.z, dr[0], Math.max(1, Math.round(dr[2] || 1)));
+      else addMat(dr[0], Math.max(1, Math.round(dr[2] || 1)));
+    }
+  }
+  spawnDrop(m.x + 0.3, m.y + 0.45, m.z - 0.25, "肉", 1);
+  if (!ach.slayer) unlockAch("slayer");
+  if (NET.on && NET.host) bcast({ k:"mk", x: m.x, y: m.y, z: m.z, mat: first[0], n: 1 });
+  saveSoon();
+  return true;
+}
+
+function drawMobs(){
+  if (!mobs.length) return;
+  var pn = 0, un = 0, sn = 0, inx = 0, vb = 0, i;
+  for (i = 0; i < mobs.length; i++){
+    var m = mobs[i], kd = mobKind(m.kind), s = kd.size;
+    var bob = Math.sin(m.bob) * 0.05;
+    var fx = Math.sin(m.yaw), fz = Math.cos(m.yaw);
+    var b0 = { pn:pn, un:un, sn:sn, inx:inx, vb:vb };
+    pushBox(mobBuf, b0, m.x - s * 0.5, m.y + 0.03 + bob, m.z - s * 0.5, s, s * 1.16, s, 1.0);
+    pn = b0.pn; un = b0.un; sn = b0.sn; inx = b0.inx; vb = b0.vb;
+    for (var e = 0; e < 2; e++){
+      var side = e === 0 ? -1 : 1;
+      var ex = m.x + fx * s * 0.5 + fz * side * s * 0.2;
+      var ez = m.z + fz * s * 0.5 - fx * side * s * 0.2;
+      var b1 = { pn:pn, un:un, sn:sn, inx:inx, vb:vb };
+      pushBox(mobBuf, b1, ex - 0.075, m.y + s * 0.78 + bob, ez - 0.075, 0.15, 0.13, 0.15, 1.0);
+      pn = b1.pn; un = b1.un; sn = b1.sn; inx = b1.inx; vb = b1.vb;
+    }
+  }
+  gl.bindBuffer(gl.ARRAY_BUFFER, mobBuf.pos); gl.bufferData(gl.ARRAY_BUFFER, mobBuf.apos.subarray(0, pn), gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER, mobBuf.uv); gl.bufferData(gl.ARRAY_BUFFER, mobBuf.auv.subarray(0, un), gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER, mobBuf.sh); gl.bufferData(gl.ARRAY_BUFFER, mobBuf.ash.subarray(0, sn), gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mobBuf.idx);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, useU32 ? mobBuf.aidx.subarray(0, inx) : new Uint16Array(mobBuf.aidx.subarray(0, inx)), gl.DYNAMIC_DRAW);
+
+  gl.useProgram(P_W);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.uniform1i(L.uTex, 0);
+  gl.uniformMatrix4fv(L.uVP, false, mVP);
+  gl.uniform1f(L.uAlpha, 1.0);
+  gl.uniform3fv(L.uFogCol, FOG_COL);
+  gl.uniform1f(L.uFogA, FOG_A); gl.uniform1f(L.uFogB, FOG_B);
+  gl.uniform3f(L.uEye, px, py + EYE, pz);
+  gl.bindBuffer(gl.ARRAY_BUFFER, mobBuf.pos); gl.enableVertexAttribArray(L.aPos); gl.vertexAttribPointer(L.aPos, 3, gl.FLOAT, false, 0, 0);
+  gl.bindBuffer(gl.ARRAY_BUFFER, mobBuf.uv); gl.enableVertexAttribArray(L.aUV); gl.vertexAttribPointer(L.aUV, 2, gl.FLOAT, false, 0, 0);
+  gl.bindBuffer(gl.ARRAY_BUFFER, mobBuf.sh); gl.enableVertexAttribArray(L.aShade); gl.vertexAttribPointer(L.aShade, 1, gl.FLOAT, false, 0, 0);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mobBuf.idx);
+  var stride = (useU32 ? 4 : 2) * 36;
+  for (i = 0; i < mobs.length; i++){
+    var mm = mobs[i], mk = mobKind(mm.kind);
+    var rgb = hex2rgb(mk.color), f = mm.flash;
+    gl.uniform3f(L.uTint, rgb[0] + f * 0.85, rgb[1] + f * 0.85, rgb[2] + f * 0.85);
+    gl.drawElements(gl.TRIANGLES, 36, useU32 ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT, stride * (i * 3));
+    var er = hex2rgb(mk.eyes);
+    gl.uniform3f(L.uTint, er[0] * 2.2, er[1] * 2.0, er[2] * 1.6);
+    gl.drawElements(gl.TRIANGLES, 72, useU32 ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT, stride * (i * 3 + 1));
+  }
+  gl.uniform3f(L.uTint, 1, 1, 1);
+}
+
+/* ============================== 掉落物 ============================== */
+var MAXDROP = 26, DROPS = [];
+var drBuf = {
+  pos: gl.createBuffer(), uv: gl.createBuffer(), sh: gl.createBuffer(), idx: gl.createBuffer(),
+  apos: new Float32Array(MAXDROP * 6 * 4 * 3), auv: new Float32Array(MAXDROP * 6 * 4 * 2),
+  ash: new Float32Array(MAXDROP * 6 * 4), aidx: new Uint32Array(MAXDROP * 6 * 6)
+};
+function spawnDrop(x, y, z, mat, n){
+  if (DROPS.length >= MAXDROP) DROPS.shift();
+  DROPS.push({
+    x:x, y:y, z:z, mat:mat, n:n || 1,
+    vx:(Math.random() - 0.5) * 1.5, vy:1.2 + Math.random() * 1.1, vz:(Math.random() - 0.5) * 1.5,
+    bob:Math.random() * 6, life:55
+  });
+}
+function stepDrops(dt){
+  for (var i = DROPS.length - 1; i >= 0; i--){
+    var d = DROPS[i];
+    d.life -= dt; d.bob += dt * 4.2;
+    if (d.life <= 0){ DROPS.splice(i, 1); continue; }
+    d.vy -= 9 * dt;
+    var ny = d.y + d.vy * dt;
+    if (d.vy < 0 && getB(Math.floor(d.x), Math.floor(ny - 0.12), Math.floor(d.z))){
+      d.vy = 0; ny = Math.floor(ny - 0.12) + 1.12; d.vx *= 0.7; d.vz *= 0.7;
+    }
+    d.y = ny; d.x += d.vx * dt; d.z += d.vz * dt;
+    if (Math.hypot(d.x - px, d.z - pz) < 1.5 && Math.abs(d.y - py) < 2.4){
+      addMat(d.mat, d.n);
+      toast("捡到 " + d.mat + "×" + d.n);
+      SFX.play("click", { volume: .5 });
+      DROPS.splice(i, 1);
+    }
+  }
+}
+function drawDrops(){
+  if (!DROPS.length) return;
+  var pn = 0, un = 0, sn = 0, inx = 0, vb = 0, i;
+  for (i = 0; i < DROPS.length; i++){
+    var d = DROPS[i], bob = Math.sin(d.bob) * 0.07;
+    var b0 = { pn:pn, un:un, sn:sn, inx:inx, vb:vb };
+    pushBox(drBuf, b0, d.x - 0.11, d.y - 0.11 + bob, d.z - 0.11, 0.22, 0.22, 0.22, 1.0);
+    pn = b0.pn; un = b0.un; sn = b0.sn; inx = b0.inx; vb = b0.vb;
+  }
+  gl.bindBuffer(gl.ARRAY_BUFFER, drBuf.pos); gl.bufferData(gl.ARRAY_BUFFER, drBuf.apos.subarray(0, pn), gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER, drBuf.uv); gl.bufferData(gl.ARRAY_BUFFER, drBuf.auv.subarray(0, un), gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER, drBuf.sh); gl.bufferData(gl.ARRAY_BUFFER, drBuf.ash.subarray(0, sn), gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, drBuf.idx);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, useU32 ? drBuf.aidx.subarray(0, inx) : new Uint16Array(drBuf.aidx.subarray(0, inx)), gl.DYNAMIC_DRAW);
+  gl.useProgram(P_W);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.uniform1i(L.uTex, 0);
+  gl.uniformMatrix4fv(L.uVP, false, mVP);
+  gl.uniform1f(L.uAlpha, 1.0);
+  gl.uniform3fv(L.uFogCol, FOG_COL);
+  gl.uniform1f(L.uFogA, FOG_A); gl.uniform1f(L.uFogB, FOG_B);
+  gl.uniform3f(L.uEye, px, py + EYE, pz);
+  gl.bindBuffer(gl.ARRAY_BUFFER, drBuf.pos); gl.enableVertexAttribArray(L.aPos); gl.vertexAttribPointer(L.aPos, 3, gl.FLOAT, false, 0, 0);
+  gl.bindBuffer(gl.ARRAY_BUFFER, drBuf.uv); gl.enableVertexAttribArray(L.aUV); gl.vertexAttribPointer(L.aUV, 2, gl.FLOAT, false, 0, 0);
+  gl.bindBuffer(gl.ARRAY_BUFFER, drBuf.sh); gl.enableVertexAttribArray(L.aShade); gl.vertexAttribPointer(L.aShade, 1, gl.FLOAT, false, 0, 0);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, drBuf.idx);
+  var stride = (useU32 ? 4 : 2) * 36;
+  for (i = 0; i < DROPS.length; i++){
+    var blk = matBlock(DROPS[i].mat);
+    var col = blk ? (TILE_COL[BD[blk].tiles[0]] || "#CCC") : "#C86A5C";
+    var rgb2 = hex2rgb(col);
+    gl.uniform3f(L.uTint, Math.min(1.2, rgb2[0] * 1.15), Math.min(1.2, rgb2[1] * 1.15), Math.min(1.2, rgb2[2] * 1.15));
+    gl.drawElements(gl.TRIANGLES, 36, useU32 ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT, stride * i);
+  }
+  gl.uniform3f(L.uTint, 1, 1, 1);
+}
+
+/* ============================== 任务 ============================== */
+var QUEST_KINDS = [
+  { t:"mine",  base:16, short:"挖矿", txt:function(n){ return "挖掉 " + n + " 块方块"; }, rw:{ "石":3 } },
+  { t:"place", base:12, short:"搭建", txt:function(n){ return "放下 " + n + " 块方块"; }, rw:{ "木":3 } },
+  { t:"kill",  base:2,  short:"清夜", txt:function(n){ return "打散 " + n + " 只幽影"; }, rw:{ "铁":1 } },
+  { t:"iron",  base:4,  short:"攒铁", txt:function(n){ return "累计攒到 " + n + " 块铁"; }, rw:{ "金":1 } },
+  { t:"night", base:1,  short:"守夜", txt:function(n){ return "活过 " + n + " 个夜晚"; }, rw:{ "黑曜":1 } },
+  { t:"craft", base:1,  short:"合成", txt:function(n){ return "合成 " + n + " 件 67 工具"; }, rw:{ "玻璃":2 } }
+];
+var quests = [], questDone = 0, questLog = [];
+function questKind(t){
+  for (var i = 0; i < QUEST_KINDS.length; i++) if (QUEST_KINDS[i].t === t) return QUEST_KINDS[i];
+  return QUEST_KINDS[0];
+}
+function rollQuest(){
+  var kinds = QUEST_KINDS.slice();
+  for (var i = 0; i < quests.length; i++){
+    for (var j = kinds.length - 1; j >= 0; j--) if (kinds[j].t === quests[i].t) kinds.splice(j, 1);
+  }
+  if (!kinds.length) kinds = QUEST_KINDS.slice();
+  var k = kinds[Math.floor(Math.random() * kinds.length)];
+  var need = Math.max(1, Math.round(k.base * (1 + questDone * 0.3)));
+  return { t:k.t, need:need, cur:0, rw:k.rw, txt:k.txt(need) };
+}
+function initQuests(){
+  quests = [];
+  for (var i = 0; i < 3; i++) quests.push(rollQuest());
+  paintQuests();
+}
+function questProgress(type, amount){
+  var changed = false;
+  for (var i = 0; i < quests.length; i++){
+    var q = quests[i];
+    if (q.t !== type) continue;
+    q.cur += (amount || 1); changed = true;
+    if (q.cur >= q.need){ completeQuest(i); changed = true; }
+  }
+  if (changed) paintQuests();
+}
+function completeQuest(i){
+  var q = quests[i]; if (!q) return;
+  var rw = Object.keys(q.rw)[0];
+  addMat(rw, q.rw[rw]);
+  questDone++;
+  toast("任务完成：" + q.txt + " → " + rw + "×" + q.rw[rw]);
+  questLog.push(q.txt);
+  SFX.play("success", { volume: .7 });
+  if (questDone >= 3) unlockAch("quester");
+  quests[i] = rollQuest();
+  paintQuests(); saveSoon();
+}
+function paintQuests(){
+  var box = el("quests"); if (!box) return;
+  var html = "";
+  for (var i = 0; i < quests.length; i++){
+    var q = quests[i], k = questKind(q.t);
+    var pct = Math.min(100, Math.round(q.cur / q.need * 100));
+    html += '<div class="q"><b>' + k.short + "</b><span>" + q.txt + "</span>"
+      + '<i class="qp"><u style="width:' + pct + '%"></u></i></div>';
+  }
+  box.innerHTML = html;
+}
+
+/* 吃肉回血 */
+function eatMat(mat){
+  if (mat !== "肉") return false;
+  if ((inv["肉"] || 0) <= 0){ toast("没有肉了，去打幽影"); return false; }
+  inv["肉"] -= 1;
+  heal(Math.round(HPMAX * 0.3));
+  toast("吃了块 67 肉，回了点血");
+  SFX.play("score", { volume: .45 });
+  paintBars();
+  return true;
 }
 
 /* ============================== 主循环 ============================== */
@@ -2898,6 +3447,24 @@ if (location.search.indexOf("dbg") >= 0){
     reset2: function(){ newIsland(false); return world.size; },
     hp: function(){ return { hp: Math.round(hp), max: HPMAX }; },
     hurt: function(n){ hurt(n || 10, "测试伤害"); return Math.round(hp); },
+    mobs: function(){ return mobs.map(function(m){ return { id:m.id, k:m.kind, hp:Math.round(m.hp), x:+m.x.toFixed(2), z:+m.z.toFixed(2) }; }); },
+    addMob: function(kind, x, y, z){ var kd = mobKind(kind || "shade"); mobSeq++; mobs.push({ id:(kd.id === "brute" ? "b" : "s") + mobSeq, kind:kd.id, x:x, y:y, z:z, hp:kd.hp, max:kd.hp, flash:0, atk:1, bob:0, yaw:0 }); render(); return mobs.length; },
+    attack: function(){ return attackSwing(); },
+    hitMob: function(n){ for (var i = 0; i < (n || 1); i++){ attackCd = 0; attackSwing(); } return mobs.length; },
+    night: function(on){ dayT = on ? 118 : 20; nightFlag = false; paintTime(dayInfo()); render(); return dayInfo(); },
+    dayTo: function(t){ dayT = t; return dayInfo(); },
+    mobHp: function(){ return mobs.map(function(m){ return { id:m.id, hp:Math.round(m.hp) }; }); },
+    probe: function(){ var d = lookDir(); var m = mobs[0]; if (!m) return null; var dx = m.x - px, dz = m.z - pz, dist = Math.hypot(dx, dz); return { cd:+attackCd.toFixed(3), try:atkTry, ok:atkOk, md:!!mouse.down, hh:!!hitHeld, dist:+dist.toFixed(2), dot:+(((dx * d.x + dz * d.z) / dist) || 0).toFixed(3), my:+m.y.toFixed(2), py:+py.toFixed(2), mz:+m.z.toFixed(2), front: mobsInFront(3.0, 0.55).length, ground: topBlockAt(Math.floor(m.x), Math.floor(m.z)) }; },
+    questLog: function(){ return questLog.slice(-8); },
+    time: function(){ return dayInfo(); },
+    drops: function(){ return DROPS.map(function(d){ return { m:d.mat, n:d.n, x:+d.x.toFixed(2), z:+d.z.toFixed(2) }; }); },
+    addDrop: function(mat, n){ spawnDrop(px + 0.5, py + 0.7, pz - 0.5, mat || "铁", n || 1); render(); return DROPS.length; },
+    quests: function(){ return quests.map(function(q){ return { t:q.t, cur:q.cur, need:q.need }; }); },
+    questAdd: function(t, n){ questProgress(t, n || 1); return this.quests(); },
+    qdone: function(){ return questDone; },
+    nights: function(){ return nightsSurvived; },
+    kills: function(){ return mobKills; },
+    eat: function(m){ return eatMat(m || "肉"); },
     animals: function(){ return animals.map(function(a){ return { k:a.kind, x:+a.x.toFixed(2), z:+a.z.toFixed(2) }; }); },
     speak: function(t){ sendChatTest(t); return true; },
     chat: function(){ return chatLines.slice(-5); },
@@ -2973,6 +3540,8 @@ buildFarIslands();
 rebuild();
 paintBars();
 paintHearts();
+initQuests();
+paintTime(dayInfo());
 paintBag();
 paintSaveInfo();
 paintAch();
