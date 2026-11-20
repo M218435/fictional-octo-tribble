@@ -613,7 +613,7 @@ function drawObjects(vp,eye,clipOn,clipY,isRefl){
     var o=objs[i], mc=modelCache[o.k];
     if(!mc) continue;
     var sc=o.scale||1, c=Math.cos(o.yaw||0), sn=Math.sin(o.yaw||0);
-    var bob=(o.k==="duck")?Math.sin(t*1.1+(o.ph||0))*0.012:0;
+    var bob=(o.k==="duck")?Math.sin(t*1.1+(o.ph||0))*0.012*sc:0;
     var m=new Float32Array([c*sc,0,-sn*sc,0,
                             0,sc,0,0,
                             sn*sc,0,c*sc,0,
@@ -852,7 +852,7 @@ function buildWorldMesh(){
     if(Math.random()>0.22) continue;
     var dx=x*CELL+CELL*0.5+(Math.random()-0.5)*1.4;
     var dz=z*CELL+CELL*0.5+(Math.random()-0.5)*1.4;
-    objs.push({k:"duck",x:dx,y:WATER_Y-0.07,z:dz,yaw:Math.random()*6.283,scale:1.0,ph:Math.random()*6.283});
+    objs.push({k:"duck",x:dx,y:WATER_Y-0.12,z:dz,yaw:Math.random()*6.283,scale:1.9,ph:Math.random()*6.283});
     if(true) continue;   /* 下面旧的程序化鸭子不再生成 */
     var dy=WATER_Y-0.1;
     var yel=[0.98,0.80,0.16], org=[0.95,0.55,0.12];
@@ -875,7 +875,7 @@ function buildWorldMesh(){
     if(Math.random()>0.14) continue;
     var sx=x*CELL+CELL*0.5+(Math.random()-0.5)*2.2;
     var sz=z*CELL+CELL*0.5+(Math.random()-0.5)*2.2;
-    objs.push({k:"sign",x:sx,y:0,z:sz,yaw:Math.random()*6.283,scale:1.0,ph:0});
+    objs.push({k:"sign",x:sx,y:0,z:sz,yaw:Math.random()*6.283,scale:1.5,ph:0});
     if(true) continue;   /* 旧的程序化地滑牌不再生成 */
     var yl=[0.99,0.87,0.16];
     quad([sx-0.30,0,sz+0.10],[sx+0.30,0,sz+0.10],[sx+0.26,0.92,sz-0.14],[sx-0.26,0.92,sz-0.14],[0,0,1],[0,0,1,1],yl,5);
@@ -1567,8 +1567,8 @@ function addDemoProps(){
   var rx=Math.cos(player.yaw), rz=-Math.sin(player.yaw);
   function P2(dx,dz){ return [player.x+ax*2.4+rx*dx, player.z+az*2.4+rz*dz]; }
   var p1=P2(-0.8,0), p2=P2(0.8,0.1);
-  objs.push({k:"duck",x:p1[0],y:0,z:p1[1],yaw:player.yaw+3.14,scale:1.0,ph:0});
-  objs.push({k:"sign",x:p2[0],y:0,z:p2[1],yaw:player.yaw+3.14,scale:1.0,ph:0});
+  objs.push({k:"duck",x:p1[0],y:0,z:p1[1],yaw:player.yaw+3.14,scale:1.9,ph:0});
+  objs.push({k:"sign",x:p2[0],y:0,z:p2[1],yaw:player.yaw+3.14,scale:1.5,ph:0});
 }
 window.__WARP=function(i){ keyTaken[i]=true; collected++; updateKeyHud(); };
 })();
