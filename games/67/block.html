@@ -194,7 +194,8 @@
   }
   #overlay.hide{display:none;}
   .card{
-    width:min(430px,92vw);min-width:0;max-width:100%;padding:26px 26px 22px;border-radius:16px;
+    /* 92vw + overlay 的 20px 边距在 390px 宽的手机上会溢出，右侧按钮被切掉 */
+    width:min(430px,100%);min-width:0;max-width:100%;padding:26px 26px 22px;border-radius:16px;
     border:1px solid var(--line);background:linear-gradient(160deg,#232019 0%,#1A1714 100%);
     box-shadow:0 40px 90px -50px #000;
   }
