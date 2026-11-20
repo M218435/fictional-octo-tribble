@@ -2067,6 +2067,11 @@ function onNetData(data, conn){
 
 function hostRoom(code){
   if (!window.Peer){ netStat("联机库没加载上，只能单机", "bad"); return; }
+  if (NET.peer && !NET.on){
+    /* 上一次还在连，别叠着开第二个 peer（同房号会撞 unavailable-id） */
+    netStat("正在连服务器…稍等一下", "bad");
+    return;
+  }
   var id = "rtsx67-" + code.toLowerCase();
   netStat("正在建房…");
   try {
@@ -2076,7 +2081,18 @@ function hostRoom(code){
     ] } });
   } catch(e){ netStat("建房失败：" + e.message, "bad"); return; }
 
+  /* 连不上就别一直卡在“正在建房…”：8 秒没 open 就收干净，提示先单机 */
+  clearTimeout(NET._th);
+  NET._th = setTimeout(function(){
+    if (NET.on) return;
+    netStat("联机服务器没连上，先单机开始；想联机再点一次建房", "bad");
+    toast("联机服务器没连上，先单机玩");
+    try { if (NET.peer) NET.peer.destroy(); } catch(e) {}
+    NET.peer = null;
+  }, 8000);
+
   NET.peer.on("open", function(){
+    clearTimeout(NET._th);
     NET.on = true; NET.host = true; NET.room = code; NET.ready = true;
     /* 建房用当前存档开：有存档就把它当成房间世界，朋友进来看到的是你的岛 */
     if (!running){
@@ -2103,8 +2119,13 @@ function hostRoom(code){
     });
   });
   NET.peer.on("error", function(e){
+    clearTimeout(NET._th);
     if (e.type === "unavailable-id") netStat("这房号有人用了，换一个", "bad");
     else netStat("联机出错：" + (e.type || e.message), "bad");
+    if (e.type === "network" || e.type === "server-error" || e.type === "unavailable-id"){
+      try { NET.peer.destroy(); } catch(err) {}
+      NET.peer = null;
+    }
   });
 }
 
@@ -2118,10 +2139,20 @@ function joinRoom(code){
     ] } });
   } catch(e){ netStat("连接失败：" + e.message, "bad"); return; }
 
+  clearTimeout(NET._tj);
+  NET._tj = setTimeout(function(){
+    if (NET.on) return;
+    netStat("连不上房主（10 秒）：房号对吗？房主那边要显示“房间已开”。", "bad");
+    try { if (NET.peer) NET.peer.destroy(); } catch(e) {}
+    NET.peer = null;
+  }, 10000);
+
   NET.peer.on("open", function(){
+    clearTimeout(NET._tj);
     var c = NET.peer.connect("rtsx67-" + code.toLowerCase(), { reliable: true });
     NET.conn = c;
     c.on("open", function(){
+      clearTimeout(NET._tj);
       NET.on = true; NET.host = false; NET.room = code; NET.ready = true;
       send(c, { k:"hi", n: myName });
       paintRoom();
@@ -3319,33 +3350,54 @@ var lastT = 0, running = false, freeCam = false;
 function enterGame(){
   el("overlay").classList.add("hide");
   paintBars(); paintRoom();
+  resize();
   running = true;
   lastT = 0;
+  _glBlank = 0;
   SFX.play("score", { volume:.5 });
   if (!IS_TOUCH) lockPointer();
+  /* 建房 / 加入是异步回调里进来的，浏览器不给自动锁鼠标 -> 给一个“点一下画面”的引导 */
+  if (!IS_TOUCH){
+    setTimeout(function(){
+      if (locked || !running) return;
+      toast("点一下画面：锁定鼠标后就能转视角");
+      var once = function(){
+        window.removeEventListener("pointerdown", once, true);
+        window.removeEventListener("keydown", once, true);
+        lockPointer();
+      };
+      window.addEventListener("pointerdown", once, true);
+      window.addEventListener("keydown", once, true);
+    }, 350);
+  }
 }
 
-var checkedOnce = false;
+var _glBlank = 0, _glReported = false;
 function selfCheck(){
-  if (checkedOnce || !gl) return;
-  checkedOnce = true;
+  if (!running || !gl || ctxLost || _glReported) return;
   try {
+    if (gl.isContextLost()){ _glReported = true; showGLProblem("显卡上下文丢了"); return; }
     var w = cvs.width, h = cvs.height;
     if (!w || !h) return;
-    var a = new Uint8Array(4), b = new Uint8Array(4);
-    gl.readPixels(Math.floor(w * 0.5), Math.floor(h * 0.62), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, a);
-    gl.readPixels(Math.floor(w * 0.5), Math.floor(h * 0.94), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, b);
-    var same = a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
-    var dark = a[0] < 22 && a[1] < 22 && a[2] < 22;
-    if (!same && !dark) return;
-    var once = false;
-    try { once = sessionStorage.getItem("rtsx67.autosafe") === "1"; } catch (e) {}
-    if (!once && !/[?&]safe=1/.test(location.search) && !/[?&]dbg/.test(location.search)){
-      try { sessionStorage.setItem("rtsx67.autosafe", "1"); } catch (e) {}
-      location.href = location.pathname + "?safe=1";
-      return;
+    /* 6x6 采样，只有“连续好几帧几乎全黑”才算真没画出来。
+       旧版只比屏幕中间上下两个像素，一样就自动跳 ?safe=1 —— 正对墙面/地面时会误判，
+       一跳转就把玩家直接甩回开始界面。 */
+    var distinct = {}, minL = 999, maxL = -1, one = new Uint8Array(4);
+    for (var yi = 0; yi < 6; yi++) for (var xi = 0; xi < 6; xi++){
+      gl.readPixels(Math.floor(w * (xi + 0.5) / 6), Math.floor(h * (yi + 0.5) / 6), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, one);
+      var L = one[0] * 0.299 + one[1] * 0.587 + one[2] * 0.114;
+      if (L < minL) minL = L;
+      if (L > maxL) maxL = L;
+      distinct[one[0] + "," + one[1] + "," + one[2]] = 1;
     }
-    showGLProblem("画面是" + (dark ? "一片黑" : "一整块纯色") + "，改用兼容模式再试");
+    var ncol = 0;
+    for (var dk in distinct) ncol++;
+    var err = gl.getError();
+    if (err !== gl.NO_ERROR && err !== gl.INVALID_OPERATION){
+      _glReported = true; showGLProblem("绘制出错（GL " + err + "）"); return;
+    }
+    if (ncol <= 1 && maxL < 34) _glBlank++; else _glBlank = 0;
+    if (_glBlank >= 6){ _glReported = true; showGLProblem("连续几帧全黑，画面确实没画出来"); }
   } catch (e) {}
 }
 
@@ -3368,7 +3420,7 @@ function loop(t){
 
   if (dirty) rebuild();
   render();
-  if (frames >= 14 && !checkedOnce) selfCheck();
+  if (running && frames >= 20 && (frames % 25) === 0) selfCheck();
   paintTags();
 }
 requestAnimationFrame(loop);
@@ -3483,6 +3535,22 @@ window.addEventListener("orientationchange", function(){ setTimeout(resize, 260)
 window.addEventListener("pageshow", function(){ resize(); });
 
 /* ---------- 画不出来时的兜底（手机黑屏） ---------- */
+function applySafeMode(){
+  try {
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    var at = buildAtlas();
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, at);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    atlas = at;
+  } catch (e) {}
+  safeMode = true;
+  resize();
+  dirty = true;
+  _glBlank = 0; _glReported = false;
+  toast("已切到兼容模式（不用重载，接着玩）");
+}
 function showGLProblem(msg){
   if (document.getElementById("glTip")) return;
   var box = document.createElement("div");
@@ -3497,7 +3565,7 @@ function showGLProblem(msg){
     '</div>';
   document.body.appendChild(box);
   el("glRetry").onclick = function(){ box.remove(); location.reload(); };
-  el("glSafe").onclick = function(){ box.remove(); location.href = location.pathname + "?safe=1"; };
+  el("glSafe").onclick = function(){ box.remove(); applySafeMode(); };
 }
 cvs.addEventListener("webglcontextlost", function(e){
   e.preventDefault(); ctxLost = true; frames = 0;
@@ -3508,7 +3576,8 @@ if (!gl) showGLProblem("这台浏览器没能建立 WebGL 上下文" + (glFailMs
 else if (!P_W) showGLProblem("着色器没编译通过" + (glFailMsg ? "（" + String(glFailMsg).slice(0, 120) + "）" : ""));
 setTimeout(function(){
   if (!gl || !P_W || ctxLost) return;
-  if (frames === 0){ safeMode = true; resize(); toast("画面没出来，已切到兼容模式"); }
+  /* 只有“已经开局却一帧都没画出来”才降画质；还没点开始的时候 frames 本来就是 0 */
+  if (running && frames === 0) applySafeMode();
 }, 2600);
 (function(){
   if (!/[?&]diag=1/.test(location.search)) return;
