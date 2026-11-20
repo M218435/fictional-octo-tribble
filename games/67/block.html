@@ -35,7 +35,7 @@
     background:linear-gradient(180deg,rgba(10,8,7,.62),rgba(10,8,7,0));
   }
   .ic{
-    height:30px;min-width:30px;padding:0 10px;border-radius:9px;
+    height:30px;min-width:30px;padding:0 10px;border-radius:9px;flex:0 0 auto;white-space:nowrap;
     border:1px solid rgba(246,241,232,.16);background:rgba(26,22,19,.72);
     color:#E8DFD2;font:inherit;font-size:11.5px;letter-spacing:.04em;cursor:pointer;
     backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
@@ -45,8 +45,12 @@
     display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:9px;
     border:1px solid rgba(246,241,232,.12);background:rgba(26,22,19,.66);
     font-size:11px;color:var(--dim);cursor:default;
+    white-space:nowrap;flex:0 1 auto;min-width:0;
     backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
   }
+  #roomChip{max-width:min(320px,40vw);flex:0 0 auto;}
+  #roomChip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:0 1 auto;}
+  @media (max-width:440px){ .bar{gap:6px;} .ic{padding:0 7px;font-size:10.5px;} #cntChip{display:none;} }
   .chip b{color:var(--clay);letter-spacing:.14em;font-weight:600;}
   .chip.live{border-color:rgba(217,119,87,.5);}
   .grow{flex:1;}
@@ -273,8 +277,7 @@
   @media (pointer:coarse){
     #cntChip{display:none;}
     /* 手机端以前把房号 chip 一起隐藏了 -> 房主看不到房号，别人自然加不进来 */
-    #roomChip{display:flex;max-width:36vw;padding:0 8px;font-size:11px;cursor:pointer;}
-    #roomChip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    #roomChip{display:flex;max-width:38vw;padding:0 8px;font-size:11px;cursor:pointer;}
     #timeChip{font-size:10px;padding:0 8px;}
     #quests{top:52px;right:10px;width:170px;gap:3px;}
     #quests .q{font-size:9.5px;padding:3px 6px;}
@@ -2252,10 +2255,9 @@ function paintRoom(){
   try { coarse = !!(window.matchMedia && window.matchMedia("(pointer:coarse)").matches); } catch(e){}
   if (NET.on) {
     var pn = Object.keys(NET.remotes || {}).length;
-    var tail = NET.host ? (" · " + (1 + pn) + " 人") : "";
-    chip.innerHTML = coarse
-      ? '<span>房号 <b>' + NET.room + '</b>' + tail + '</span>'
-      : '<span>' + (NET.host ? "房主 · 房号 " : "房 · 房号 ") + "<b>" + NET.room + "</b>" + tail + " · 点复制</span>";
+    var tight = coarse || innerWidth < 430;
+    var tail = NET.host ? (tight ? "" : " · " + (1 + pn) + " 人") : (tight ? "" : " · 点复制");
+    chip.innerHTML = '<span>房号 <b>' + NET.room + '</b>' + tail + '</span>';
     chip.classList.add("live");
   } else {
     chip.innerHTML = '<span>单人 · 空岛</span>';
