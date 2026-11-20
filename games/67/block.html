@@ -286,6 +286,17 @@
     #chatWrap{bottom:186px;width:88vw;}
     #bag{max-height:52vh;}
   }
+  /* 窄屏最后生效：顶栏与快捷栏都压在一行 */
+  @media (max-width:440px){
+    .bar{gap:6px;}
+    .ic{padding:0 7px;font-size:10.5px;}
+    #cntChip{display:none;}
+    .hotbar{flex-wrap:nowrap;gap:3px;}
+    .slot{width:34px;height:34px;border-radius:8px;font-size:8px;}
+    .slot .sw{width:15px;height:15px;margin-bottom:1px;}
+    .slot .n{font-size:8px;right:3px;bottom:2px;}
+    .slot .k{font-size:8px;}
+  }
 </style>
 </head>
 <body>
