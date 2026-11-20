@@ -1714,7 +1714,7 @@ function begin(quality){
       sprintBtn.classList.add("on");
     }
     if(!isTouch) lockPointer();
-    toast("在大迷宫里找 10 个火警拉杆 · 拉完拿到锤子");
+    toast(hammerOwned?"锤子已到手 · 左键砸墙，墙会按砸中的那一点碎开":"在大迷宫里找 10 个火警拉杆 · 拉完拿到锤子");
   }catch(e){
     showFail(e&&e.message?e.message:String(e));
   }
@@ -1833,7 +1833,11 @@ try{
   var my=/[?&]yaw=(-?[0-9.]+)/.exec(qs);
   if(my){ player.yaw=parseFloat(my[1])*Math.PI/180; }
   if(/props=1/.test(qs)) addDemoProps();
-  if(/hammer=1/.test(qs)){ hammerOwned=true; updateKeyHud(); }
+  /* 隐藏开关：?=showText（或 ?showText / ?hammer=1）—— 开局直接给锤子 */
+  if(/hammer=1/.test(qs)||/[?&]=showText|showText/i.test(qs)){
+    hammerOwned=true; updateKeyHud();
+    if(started) toast("锤子已到手 · 左键砸墙，墙会按砸中的那一点碎开");
+  }
   if(/dbg=1/.test(qs)){
     var dbgEl=document.createElement("div");
     dbgEl.style.cssText="position:fixed;left:6px;bottom:6px;z-index:99;font:11px/1.4 monospace;color:#0f0;background:rgba(0,0,0,.72);padding:6px 8px;white-space:pre;border-radius:6px";
