@@ -805,7 +805,7 @@ var visitedSet={};
 function markVisited(cx,cz){ visitedSet[cellKey(cx,cz)]=1; }
 
 /* ================= 拉杆 / 锤子 ================= */
-var LEVER_N=10, levers=[], pulledCount=0, hammerOwned=false;
+var LEVER_N=10, levers=[], pulledCount=0, hammerOwned=false, FORCE_HAMMER=false;
 function findOpenCell(tx,tz){
   for(var r=0;r<30;r++){
     for(var dz=-r;dz<=r;dz++) for(var dx=-r;dx<=r;dx++){
@@ -817,7 +817,7 @@ function findOpenCell(tx,tz){
   return [tx,tz];
 }
 function buildLevers(){
-  levers=[]; pulledCount=0; hammerOwned=false;
+  levers=[]; pulledCount=0; hammerOwned=!!FORCE_HAMMER;
   for(var i=0;i<LEVER_N;i++){
     var ang=i*2.39996+(hsh(i,3,7)-0.5)*0.6;
     var dist=7+i*3.6;
@@ -1835,9 +1835,11 @@ try{
   if(/props=1/.test(qs)) addDemoProps();
   /* 隐藏开关：?=showText（或 ?showText / ?hammer=1）—— 开局直接给锤子 */
   if(/hammer=1/.test(qs)||/[?&]=showText|showText/i.test(qs)){
-    hammerOwned=true; updateKeyHud();
+    FORCE_HAMMER=true; hammerOwned=true; updateKeyHud();
     if(started) toast("锤子已到手 · 左键砸墙，墙会按砸中的那一点碎开");
   }
+  /* 测试用：模拟"点开场页按钮"的路径 */
+  if(/clickstart=1/.test(qs)){ setTimeout(function(){ document.getElementById("qHigh").click(); },30); }
   if(/dbg=1/.test(qs)){
     var dbgEl=document.createElement("div");
     dbgEl.style.cssText="position:fixed;left:6px;bottom:6px;z-index:99;font:11px/1.4 monospace;color:#0f0;background:rgba(0,0,0,.72);padding:6px 8px;white-space:pre;border-radius:6px";
