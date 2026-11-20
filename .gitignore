@@ -11,3 +11,9 @@ _mz.html
 # 备份
 *.bak
 *.orig
+
+# 本地环境与临时工作区（不部署）
+.venv/
+_work/
+__pycache__/
+*.pyc
