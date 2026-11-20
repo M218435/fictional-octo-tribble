@@ -270,7 +270,10 @@
   #nameRow input{width:100%;height:38px;border-radius:10px;border:1px solid rgba(246,241,232,.16);
     background:rgba(0,0,0,.28);color:#F2E9DC;font:inherit;font-size:12.5px;padding:0 12px;}
   @media (pointer:coarse){
-    #roomChip, #cntChip{display:none;}
+    #cntChip{display:none;}
+    /* 手机端以前把房号 chip 一起隐藏了 -> 房主看不到房号，别人自然加不进来 */
+    #roomChip{display:flex;max-width:36vw;padding:0 8px;font-size:11px;cursor:pointer;}
+    #roomChip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
     #timeChip{font-size:10px;padding:0 8px;}
     #quests{top:52px;right:10px;width:170px;gap:3px;}
     #quests .q{font-size:9.5px;padding:3px 6px;}
@@ -351,6 +354,7 @@
       <button class="ghost" id="joinBtn" type="button">加入</button>
     </div>
     <div id="netStat"></div>
+    <div id="netHint" style="font-size:10.5px;line-height:1.7;color:#8E8578;margin:2px 0 4px">联机：房主点「建房」，开局后顶部会显示房号（手机也有，点一下复制邀请链接）；朋友填这个房号点「加入」。</div>
     <div id="saveInfo"></div>
     <div class="bkrow">
       <button class="ghost" id="exportBtn" type="button">导出备份</button>
@@ -2077,7 +2081,10 @@ function hostRoom(code){
   try {
     NET.peer = new Peer(id, { debug: 0, config: { iceServers: [
       { urls: "stun:stun.l.google.com:19302" },
-      { urls: "stun:global.stun.twilio.com:3478" }
+      { urls: "stun:global.stun.twilio.com:3478" },
+      { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+      { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+      { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
     ] } });
   } catch(e){ netStat("建房失败：" + e.message, "bad"); return; }
 
@@ -2085,11 +2092,11 @@ function hostRoom(code){
   clearTimeout(NET._th);
   NET._th = setTimeout(function(){
     if (NET.on) return;
-    netStat("联机服务器没连上，先单机开始；想联机再点一次建房", "bad");
+    netStat("联机服务器 12 秒没回应（学校/公司网络常拦 PeerJS），先单机玩；换个网络再点建房试试", "bad");
     toast("联机服务器没连上，先单机玩");
     try { if (NET.peer) NET.peer.destroy(); } catch(e) {}
     NET.peer = null;
-  }, 8000);
+  }, 12000);
 
   NET.peer.on("open", function(){
     clearTimeout(NET._th);
@@ -2100,10 +2107,11 @@ function hostRoom(code){
       if (!animals.length) spawnAnimals(5);
     }
     paintRoom();
+    try { if (el("roomIn")) el("roomIn").value = code; } catch(e){}
     netStat("房间 " + code + " 已开 · 世界里 " + world.size + " 块，等朋友进来", "ok");
     SFX.play("success", { volume:.7 });
     enterGame();
-    toast("朋友用同一房号加入，会看到你现在这座岛");
+    toast("房号 " + code + " · 发给朋友，用同一房号加入");
   });
   NET.peer.on("connection", function(c){
     NET.conns[c.peer] = c;
@@ -2135,7 +2143,10 @@ function joinRoom(code){
   try {
     NET.peer = new Peer({ debug: 0, config: { iceServers: [
       { urls: "stun:stun.l.google.com:19302" },
-      { urls: "stun:global.stun.twilio.com:3478" }
+      { urls: "stun:global.stun.twilio.com:3478" },
+      { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+      { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+      { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
     ] } });
   } catch(e){ netStat("连接失败：" + e.message, "bad"); return; }
 
@@ -2173,14 +2184,38 @@ function joinRoom(code){
   });
 }
 
+function copyRoomCode(){
+  if (!NET.on || !NET.room){ toast("还没开房间"); return; }
+  var code = NET.room;
+  var txt = "67 方块岛 房号 " + code + " · 打开直接进：https://hhh.l2.ink/games/67/block.html?room=" + code;
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(txt).then(
+        function(){ toast("房号 " + code + " 已复制 · 发给朋友加入"); },
+        function(){ toast("房号 " + code + "（浏览器拦了复制，手抄一下）"); }
+      );
+      return;
+    }
+  } catch(e){}
+  try {
+    var ta = document.createElement("textarea");
+    ta.value = txt; ta.style.cssText = "position:fixed;left:-9999px;top:0";
+    document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove();
+    toast("房号 " + code + " 已复制 · 发给朋友加入");
+  } catch(e2){ toast("房号 " + code); }
+}
 function paintRoom(){
   var chip = el("roomChip");
   if (!chip) return;
+  var coarse = false;
+  try { coarse = !!(window.matchMedia && window.matchMedia("(pointer:coarse)").matches); } catch(e){}
   if (NET.on) {
-    chip.innerHTML = (NET.host ? "房主 · 房号 <b>" : "房 · 房号 <b>") + NET.room + "</b>";
+    chip.innerHTML = coarse
+      ? '<span>房号 <b>' + NET.room + '</b></span>'
+      : '<span>' + (NET.host ? "房主 · 房号 " : "房 · 房号 ") + "<b>" + NET.room + "</b> · 点复制</span>";
     chip.classList.add("live");
   } else {
-    chip.innerHTML = "单人 · 空岛";
+    chip.innerHTML = '<span>单人 · 空岛</span>';
     chip.classList.remove("live");
   }
   paintCounts();
@@ -3514,6 +3549,7 @@ tap(el("snd"), function(e, node){
 });
 el("snd").style.opacity = SFX.on() ? 1 : .5;
 
+tap(el("roomChip"), function(){ copyRoomCode(); });
 tap(el("createBtn"), function(){
   SFX.play("click");
   var v = (el("roomIn").value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
@@ -3533,6 +3569,14 @@ window.addEventListener("resize", function(){ resize(); });
 if (window.visualViewport) window.visualViewport.addEventListener("resize", function(){ resize(); });
 window.addEventListener("orientationchange", function(){ setTimeout(resize, 260); });
 window.addEventListener("pageshow", function(){ resize(); });
+(function(){
+  /* 邀请链接：?room=ABCDE 打开就把房号填好，点一下「加入」即可 */
+  var m = /[?&]room=([A-Za-z0-9]{2,5})/.exec(location.search);
+  if (!m) return;
+  var code = m[1].toUpperCase(), ri = el("roomIn");
+  if (ri){ ri.value = code; }
+  netStat("房号 " + code + " 已经填好，点「加入」进入", "ok");
+})();
 
 /* ---------- 画不出来时的兜底（手机黑屏） ---------- */
 function applySafeMode(){
@@ -3654,6 +3698,7 @@ if (location.search.indexOf("dbg") >= 0){
     eat: function(m){ return eatMat(m || "肉"); },
     animals: function(){ return animals.map(function(a){ return { k:a.kind, x:+a.x.toFixed(2), z:+a.z.toFixed(2) }; }); },
     speak: function(t){ sendChatTest(t); return true; },
+    fakeRoom: function(code){ NET.on = true; NET.host = true; NET.room = String(code || "T1ABC").toUpperCase(); NET.ready = true; paintRoom(); return NET.room; },
     chat: function(){ return chatLines.slice(-5); },
     parts: function(){ return PARTS.length; },
     mineStart: function(x, y, z, frac){
