@@ -2108,6 +2108,7 @@ function hostRoom(code){
       if (!animals.length) spawnAnimals(5);
     }
     paintRoom();
+    keepScreenAwake(true);
     try { if (el("roomIn")) el("roomIn").value = code; } catch(e){}
     netStat("房间 " + code + " 已开 · 世界里 " + world.size + " 块，等朋友进来", "ok");
     SFX.play("success", { volume:.7 });
@@ -2116,6 +2117,7 @@ function hostRoom(code){
   });
   NET.peer.on("connection", function(c){
     NET.conns[c.peer] = c;
+    c.on("error", function(err){ netStat("和对方的通道出错：" + ((err && err.type) || "") + "，让他重连一次", "bad"); });
     c.on("data", function(d){ onNetData(d, c); });
     c.on("close", function(){
       if (NET.remotes[c.peer]){
@@ -2125,7 +2127,13 @@ function hostRoom(code){
         paintCounts();
       }
       delete NET.conns[c.peer];
+      paintRoom();
     });
+  });
+  NET.peer.on("disconnected", function(){
+    if (!NET.on) return;
+    netStat("和信令服务器断开了，正在自动重连…", "bad");
+    tryReconnect();
   });
   NET.peer.on("error", function(e){
     clearTimeout(NET._th);
@@ -2138,6 +2146,36 @@ function hostRoom(code){
   });
 }
 
+var _reTimer = null;
+function tryReconnect(){
+  if (_reTimer || !NET.peer) return;
+  var tries = 0;
+  _reTimer = setInterval(function(){
+    tries++;
+    if (!NET.peer){ clearInterval(_reTimer); _reTimer = null; return; }
+    if (!NET.peer.disconnected){ clearInterval(_reTimer); _reTimer = null; return; }
+    try { NET.peer.reconnect(); } catch(e){}
+    if (tries >= 5){
+      clearInterval(_reTimer); _reTimer = null;
+      netStat("重连失败：让朋友重新点「加入」，房号还是 " + (NET.room || "原房号"), "bad");
+    }
+  }, 2000);
+}
+var _wakeLock = null;
+function keepScreenAwake(on){
+  try {
+    if (on && navigator.wakeLock && navigator.wakeLock.request && !_wakeLock){
+      navigator.wakeLock.request("screen").then(function(l){ _wakeLock = l; }, function(){});
+    } else if (!on && _wakeLock && _wakeLock.release){
+      _wakeLock.release(); _wakeLock = null;
+    }
+  } catch(e){}
+}
+document.addEventListener("visibilitychange", function(){
+  if (document.visibilityState !== "visible") return;
+  resize();
+  if (NET.on && NET.peer && NET.peer.disconnected) tryReconnect();
+});
 function joinRoom(code){
   if (!window.Peer){ netStat("联机库没加载上，只能单机", "bad"); return; }
   netStat("正在连…");
@@ -2173,6 +2211,7 @@ function joinRoom(code){
       enterGame();
     });
     c.on("data", function(d){ onNetData(d, c); });
+    c.on("error", function(err){ netStat("连接出错：" + ((err && err.type) || "ice") + "，检查网络后再点加入", "bad"); });
     c.on("close", function(){
       NET.on = false;
       toast("和房主断开了，转成单机");
@@ -2211,9 +2250,11 @@ function paintRoom(){
   var coarse = false;
   try { coarse = !!(window.matchMedia && window.matchMedia("(pointer:coarse)").matches); } catch(e){}
   if (NET.on) {
+    var pn = Object.keys(NET.remotes || {}).length;
+    var tail = NET.host ? (" · " + (1 + pn) + " 人") : "";
     chip.innerHTML = coarse
-      ? '<span>房号 <b>' + NET.room + '</b></span>'
-      : '<span>' + (NET.host ? "房主 · 房号 " : "房 · 房号 ") + "<b>" + NET.room + "</b> · 点复制</span>";
+      ? '<span>房号 <b>' + NET.room + '</b>' + tail + '</span>'
+      : '<span>' + (NET.host ? "房主 · 房号 " : "房 · 房号 ") + "<b>" + NET.room + "</b>" + tail + " · 点复制</span>";
     chip.classList.add("live");
   } else {
     chip.innerHTML = '<span>单人 · 空岛</span>';
