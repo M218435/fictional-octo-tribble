@@ -139,7 +139,7 @@ var DBG_REFL=/refl=1/.test(QS), DBG_NOWATER=/nowater=1/.test(QS), DBG_GRID=/grid
 var DPR=1, VW=1, VH=1, QUALITY=1;   /* 1 = 高画质, 0 = 流畅 */
 function resize(){
   var w=window.innerWidth||360, h=window.innerHeight||640;
-  var maxDpr=(QUALITY?1.5:1.0);
+  var maxDpr=(QUALITY?2.0:1.4);
   DPR=Math.min(maxDpr,window.devicePixelRatio||1);
   VW=Math.floor(w*DPR); VH=Math.floor(h*DPR);
   canvas.width=VW; canvas.height=VH;
@@ -208,7 +208,11 @@ function program(vsSrc,fsSrc){
   var nu=gl.getProgramParameter(p,gl.ACTIVE_UNIFORMS);
   for(var i=0;i<nu;i++){
     var info=gl.getActiveUniform(p,i);
-    o.u[info.name]=gl.getUniformLocation(p,info.name);
+    var loc=gl.getUniformLocation(p,info.name);
+    o.u[info.name]=loc;
+    /* 数组 uniform 的 active 名字带 [0]，额外登记一个不带下标的名字 */
+    var nm=info.name.replace(/\[0\]$/,"");
+    if(nm!==info.name) o.u[nm]=loc;
   }
   var na=gl.getProgramParameter(p,gl.ACTIVE_ATTRIBUTES);
   for(var j=0;j<na;j++){
@@ -231,7 +235,7 @@ void main(){
 var FS_MAIN=`#version 300 es
 precision highp float;
 in vec3 vPos; in vec3 vNor; in vec2 vUV; in vec3 vCol; in float vMat;
-uniform sampler2D uTex; uniform sampler2D uCaus;
+uniform sampler2D uTex; uniform sampler2D uCaus; uniform sampler2D uNorm;
 uniform vec3 uCam; uniform float uTime; uniform float uWaterY;
 uniform vec3 uAmbTop; uniform vec3 uAmbBot; uniform vec3 uFogCol; uniform float uFogDen;
 uniform vec4 uLP[8]; uniform vec3 uLC[8]; uniform int uLN;
@@ -241,6 +245,13 @@ void main(){
   if(uClipOn>0.5 && vPos.y < uClipY) discard;
   vec3 N=normalize(vNor);
   if(!gl_FrontFacing) N=-N;
+  /* 瓷砖法线：灰缝凹槽 + 倒角，正视也能看出砖的立体 */
+  vec3 nm=texture(uNorm,vUV).xyz*2.0-1.0;
+  vec3 Tg,Bt;
+  if(abs(N.y)>0.7){ Tg=vec3(1,0,0); Bt=vec3(0,0,1); }
+  else if(abs(N.x)>0.7){ Tg=vec3(0,0,1); Bt=vec3(0,1,0); }
+  else { Tg=vec3(1,0,0); Bt=vec3(0,1,0); }
+  N=normalize(N+Tg*nm.x*0.45+Bt*nm.y*0.45);
   vec3 V=normalize(uCam-vPos);
   vec3 base=texture(uTex,vUV).rgb*vCol;
   int mat=int(vMat+0.5);
@@ -256,8 +267,8 @@ void main(){
   amb*=0.80+0.26*clamp(vPos.y/3.2,0.0,1.4);
   vec3 lit=base*amb;
   float shin=90.0; float specK=0.34;
-  if(mat==3){ shin=240.0; specK=1.45; lit*=0.72; }
-  if(mat==2){ lit=base*2.9; }
+  if(mat==3){ shin=260.0; specK=1.55; lit*=0.74; }
+  if(mat==2){ lit=base*2.1; }
   for(int i=0;i<8;i++){
     if(i>=uLN) break;
     vec3 d=uLP[i].xyz-vPos;
@@ -288,17 +299,17 @@ void main(){
   vec2 rip=vec2(
     sin(vUV.x*5.5+uTime*0.85)+sin(vUV.y*9.0-uTime*0.6),
     cos(vUV.y*6.5+uTime*0.75)+cos(vUV.x*11.0-uTime*0.45)
-  )*0.0042;
+  )*0.0022;
   vec3 refl=texture(uRefl,clamp(uv+rip,0.001,0.999)).rgb;
   float fres=pow(1.0-max(dot(normalize(uCam-vPos),vec3(0.0,1.0,0.0)),0.0),3.4);
   vec3 col=mix(uWaterCol,refl,clamp(0.05+fres*0.95,0.0,1.0));
   float sp=pow(max(refl.r,refl.g)*0.8,10.0);
   col+=vec3(0.85,0.95,1.0)*sp*0.35;
   /* 流动的粼光：两层不同频率的正弦叠加 */
-  float sh=sin(vUV.x*3.1+uTime*1.35)*sin(vUV.y*4.7-uTime*1.05);
-  sh+=sin(vUV.x*8.3-uTime*0.7)*sin(vUV.y*7.1+uTime*0.9)*0.6;
-  sh=pow(max(sh,0.0),6.0);
-  col+=vec3(0.62,0.92,1.0)*sh*0.55*(0.35+fres);
+  float sh=sin(vUV.x*5.6+uTime*1.15)*sin(vUV.y*7.2-uTime*0.95);
+  sh+=sin(vUV.x*11.0-uTime*0.6)*sin(vUV.y*9.4+uTime*0.8)*0.6;
+  sh=pow(max(sh,0.0),8.0);
+  col+=vec3(0.62,0.92,1.0)*sh*0.10*(0.30+fres);
   oCol=vec4(col,0.62);
 }`;
 
@@ -338,13 +349,24 @@ uniform float uBloomK; uniform float uTime; uniform vec2 uRes;
 out vec4 oCol;
 void main(){
   vec3 c=texture(uScene,vUV).rgb;
+  /* 轻度锐化，抵消放大与 mip 带来的发糊 */
+  vec2 tx=vec2(1.0/uRes.x,1.0/uRes.y);
+  vec3 nb=texture(uScene,vUV+vec2(tx.x,0)).rgb+texture(uScene,vUV-vec2(tx.x,0)).rgb
+         +texture(uScene,vUV+vec2(0,tx.y)).rgb+texture(uScene,vUV-vec2(0,tx.y)).rgb;
+  c+=(c-nb*0.25)*0.42;
   c+=texture(uBloom,vUV).rgb*uBloomK;
-  c*=1.16;
+  /* 校色：先补饱和与对比，再给暗部压青、亮部加暖 */
+  float lum=dot(c,vec3(0.299,0.587,0.114));
+  c=mix(vec3(lum),c,1.16);
+  c=(c-0.5)*1.10+0.5;
+  vec3 shC=vec3(0.010,0.030,0.044), hiC=vec3(0.050,0.026,0.004);
+  c+=mix(shC,hiC,smoothstep(0.22,0.88,lum));
+  c*=1.02;
   c=c/(1.0+c*0.55);
   float vig=1.0-0.30*pow(length((vUV-0.5)*vec2(1.18,1.0)),2.1);
   c*=clamp(vig,0.0,1.0);
   float g=fract(sin(dot(vUV*uRes+uTime*7.0,vec2(12.9898,78.233)))*43758.5453);
-  c+=(g-0.5)*0.022;
+  c+=(g-0.5)*0.010;
   c+=vec3(0.010,0.018,0.020);
   oCol=vec4(c,1.0);
 }`;
@@ -379,34 +401,90 @@ gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW
 
 /* ================= 程序纹理 ================= */
 function tileTexture(){
+  var s=1024, cv=document.createElement("canvas"); cv.width=s; cv.height=s;
+  var x=cv.getContext("2d");
+  var n=4, step=s/n, gw=8;           /* 每张 4×4 块砖，砖 ≈39cm */
+  /* 底：灰缝颜色 */
+  x.fillStyle="#cbd4d3"; x.fillRect(0,0,s,s);
+  for(var i=0;i<n;i++) for(var j=0;j<n;j++){
+    var px=i*step+gw, py=j*step+gw, w=step-gw*2, h=step-gw*2;
+    /* 每块砖基色略有差别 */
+    var base=241-j*1+Math.round((Math.random()-0.5)*11);
+    /* 釉面：斜向明暗渐变，模拟灯光在砖面上的反光 */
+    var grd=x.createLinearGradient(px,py,px+w,py+h);
+    grd.addColorStop(0,"rgb("+(base+5)+","+(base+8)+","+(base+7)+")");
+    grd.addColorStop(0.42,"rgb("+base+","+(base+3)+","+(base+2)+")");
+    grd.addColorStop(1,"rgb("+(base-9)+","+(base-6)+","+(base-5)+")");
+    x.fillStyle=grd; x.fillRect(px,py,w,h);
+    /* 斜边：上/左受光，下/右倒角 */
+    x.fillStyle="rgba(255,255,255,.42)"; x.fillRect(px,py,w,3);
+    x.fillStyle="rgba(255,255,255,.22)"; x.fillRect(px,py,3,h);
+    x.fillStyle="rgba(104,124,128,.34)"; x.fillRect(px,py+h-4,w,4);
+    x.fillStyle="rgba(96,116,120,.30)"; x.fillRect(px+w-4,py,4,h);
+    /* 砖内的细微脏污 */
+    for(var q=0;q<5;q++){
+      var rx=px+Math.random()*w, ry=py+Math.random()*h, rr=6+Math.random()*22;
+      var g2=x.createRadialGradient(rx,ry,0,rx,ry,rr);
+      g2.addColorStop(0,"rgba(150,168,166,"+(0.05+Math.random()*0.09)+")");
+      g2.addColorStop(1,"rgba(150,168,166,0)");
+      x.fillStyle=g2; x.beginPath(); x.arc(rx,ry,rr,0,6.3); x.fill();
+    }
+  }
+  /* 灰缝里的深浅不匀 + 一点积水高光 */
+  for(var k=0;k<n;k++){
+    x.strokeStyle="rgba(140,156,156,.18)"; x.lineWidth=1.0;
+    x.beginPath(); x.moveTo(k*step+gw*0.5,0); x.lineTo(k*step+gw*0.5,s); x.stroke();
+    x.beginPath(); x.moveTo(0,k*step+gw*0.5); x.lineTo(s,k*step+gw*0.5); x.stroke();
+  }
+  /* 大块水渍，跨砖，压在灰缝上 */
+  for(var q2=0;q2<26;q2++){
+    var rx2=Math.random()*s, ry2=Math.random()*s, rr2=26+Math.random()*120;
+    var g3=x.createRadialGradient(rx2,ry2,0,rx2,ry2,rr2);
+    g3.addColorStop(0,"rgba(158,178,176,"+(0.06+Math.random()*0.10)+")");
+    g3.addColorStop(0.6,"rgba(170,190,188,0.03)");
+    g3.addColorStop(1,"rgba(170,190,188,0)");
+    x.fillStyle=g3; x.beginPath(); x.arc(rx2,ry2,rr2,0,6.3); x.fill();
+  }
+  return cv;
+}
+/* 由高度图算法线贴图：灰缝是凹槽，倒角靠模糊做出来 */
+function tileHeight(){
   var s=512, cv=document.createElement("canvas"); cv.width=s; cv.height=s;
   var x=cv.getContext("2d");
-  x.fillStyle="#f3f4f0"; x.fillRect(0,0,s,s);
-  var n=8, step=s/n;
+  var n=4, step=s/n, gw=Math.round(8*s/1024);
+  x.fillStyle="#2e2e2e"; x.fillRect(0,0,s,s);          /* 灰缝最低 */
   for(var i=0;i<n;i++) for(var j=0;j<n;j++){
-    var g=Math.floor(238+Math.random()*12)-j*1;
-    x.fillStyle="rgb("+(g-4)+","+(g+2)+","+(g+3)+")";
-    x.fillRect(i*step+1,j*step+1,step-2,step-2);
-    /* 高光斜边 */
-    x.fillStyle="rgba(255,255,255,.16)";
-    x.fillRect(i*step+1,j*step+1,step-2,3);
-    x.fillStyle="rgba(96,120,124,.22)";
-    x.fillRect(i*step+1,j*step+step-6,step-2,5);
+    var px=i*step+gw, py=j*step+gw, w=step-gw*2, h=step-gw*2;
+    x.fillStyle="#f2f2f2"; x.fillRect(px,py,w,h);
   }
-  /* 灰缝 */
-  x.strokeStyle="rgba(118,138,140,.78)"; x.lineWidth=4;
-  for(var k=0;k<=n;k++){
-    x.beginPath(); x.moveTo(k*step,0); x.lineTo(k*step,s); x.stroke();
-    x.beginPath(); x.moveTo(0,k*step); x.lineTo(s,k*step); x.stroke();
+  /* 用模糊把硬边变成倒角坡度，法线才有立体感 */
+  var tmp=cv;
+  var cv2=document.createElement("canvas"); cv2.width=s; cv2.height=s;
+  var x2=cv2.getContext("2d");
+  try{ x2.filter="blur("+Math.max(2,Math.round(3*s/512))+"px)"; }catch(e){}
+  x2.drawImage(tmp,0,0);
+  return cv2;
+}
+function normalFromHeight(hcv,strength){
+  var w=hcv.width, h=hcv.height;
+  var sd=hcv.getContext("2d").getImageData(0,0,w,h).data;
+  var cv=document.createElement("canvas"); cv.width=w; cv.height=h;
+  var ctx=cv.getContext("2d");
+  var img=ctx.createImageData(w,h);
+  function V(x,y){ return sd[((y+h)%h*w+(x+w)%w)*4]/255.0; }
+  for(var y=0;y<h;y++) for(var x=0;x<w;x++){
+    var dx=(V(x+1,y)-V(x-1,y))*0.5;
+    var dy=(V(x,y+1)-V(x,y-1))*0.5;
+    var nx=-dx*strength, ny=-dy*strength, nz=1.0;
+    var l=Math.sqrt(nx*nx+ny*ny+1.0);
+    nx/=l; ny/=l; nz/=l;
+    var o=(y*w+x)*4;
+    img.data[o]  =Math.round((nx*0.5+0.5)*255);
+    img.data[o+1]=Math.round((ny*0.5+0.5)*255);
+    img.data[o+2]=Math.round((nz*0.5+0.5)*255);
+    img.data[o+3]=255;
   }
-  /* 污渍 */
-  for(var q=0;q<22;q++){
-    var rx=Math.random()*s, ry=Math.random()*s, rr=8+Math.random()*54;
-    var grd=x.createRadialGradient(rx,ry,0,rx,ry,rr);
-    grd.addColorStop(0,"rgba(150,175,168,0.16)");
-    grd.addColorStop(1,"rgba(150,175,168,0)");
-    x.fillStyle=grd; x.beginPath(); x.arc(rx,ry,rr,0,6.3); x.fill();
-  }
+  ctx.putImageData(img,0,0);
   return cv;
 }
 function causticTexture(){
@@ -448,6 +526,7 @@ function mkTex(cvs,mip){
 }
 var texTile=mkTex(tileTexture(),true);
 var texCaus=mkTex(causticTexture(),true);
+var texNorm=mkTex(normalFromHeight(tileHeight(),1.5),true);
 
 /* ================= 世界参数 ================= */
 var GX=15, GZ=15, CELL=6.0, WALL_H=4.5, WATER_Y=-0.26, POOL_FLOOR=-1.12;
@@ -591,9 +670,9 @@ function buildWorldMesh(){
     var isPool=pool[ci(x,z)]===1;
     var fy=isPool?POOL_FLOOR:0;
     /* 地面 */
-    hquad(x0,z0,x1,z1,fy,[0,1,0],UVS,[0.86,0.90,0.90],0);
+    hquad(x0,z0,x1,z1,fy,[0,1,0],UVS,[0.97,0.99,0.98],3);
     /* 天花 */
-    hquad(x0,z0,x1,z1,WALL_H,[0,-1,0],UVS,[0.80,0.85,0.86],0);
+    hquad(x0,z0,x1,z1,WALL_H,[0,-1,0],UVS,[0.90,0.94,0.94],0);
     /* 墙：邻格封闭 → 整面墙 */
     for(dir=0;dir<4;dir++){
       var d=dirs[dir];
@@ -602,13 +681,13 @@ function buildWorldMesh(){
       if(!nOpen){
         var ny0=fy, ny1=WALL_H;
         if(d[0]===1){
-          quad([x1,ny0,z1],[x1,ny0,z0],[x1,ny1,z0],[x1,ny1,z1],[-1,0,0],[z1/UVS,0,z0/UVS,WALL_H/UVS],[0.90,0.94,0.94],0);
+          quad([x1,ny0,z1],[x1,ny0,z0],[x1,ny1,z0],[x1,ny1,z1],[-1,0,0],[z1/UVS,0,z0/UVS,WALL_H/UVS],[0.95,0.98,0.97],0);
         } else if(d[0]===-1){
           quad([x0,ny0,z0],[x0,ny0,z1],[x0,ny1,z1],[x0,ny1,z0],[1,0,0],[z0/UVS,0,z1/UVS,WALL_H/UVS],[0.90,0.94,0.94],0);
         } else if(d[1]===1){
-          quad([x0,ny0,z1],[x1,ny0,z1],[x1,ny1,z1],[x0,ny1,z1],[0,0,-1],[x0/UVS,0,x1/UVS,WALL_H/UVS],[0.88,0.92,0.92],0);
+          quad([x0,ny0,z1],[x1,ny0,z1],[x1,ny1,z1],[x0,ny1,z1],[0,0,-1],[x0/UVS,0,x1/UVS,WALL_H/UVS],[0.93,0.96,0.95],0);
         } else {
-          quad([x1,ny0,z0],[x0,ny0,z0],[x0,ny1,z0],[x1,ny1,z0],[0,0,1],[x1/UVS,0,x0/UVS,WALL_H/UVS],[0.88,0.92,0.92],0);
+          quad([x1,ny0,z0],[x0,ny0,z0],[x0,ny1,z0],[x1,ny1,z0],[0,0,1],[x1/UVS,0,x0/UVS,WALL_H/UVS],[0.93,0.96,0.95],0);
         }
         collWalls.push({
           x0: d[0]===1?x1-WALL_T/2: d[0]===-1?x0-WALL_T/2:x0,
@@ -620,7 +699,7 @@ function buildWorldMesh(){
         /* 相邻池底落差 → 一级台阶面 */
         var yy0=Math.min(fy, pool[ci(nx,nz)]===1?POOL_FLOOR:0);
         var yy1=Math.max(fy, pool[ci(nx,nz)]===1?POOL_FLOOR:0);
-        var ccol=[0.84,0.89,0.89];
+        var ccol=[0.94,0.97,0.96];
         if(d[0]===1) quad([x1,yy0,z1],[x1,yy0,z0],[x1,yy1,z0],[x1,yy1,z1],[-1,0,0],[z1/UVS,0,z0/UVS,yy1/UVS],ccol,0);
         else if(d[0]===-1) quad([x0,yy0,z0],[x0,yy0,z1],[x0,yy1,z1],[x0,yy1,z0],[1,0,0],[z0/UVS,0,z1/UVS,yy1/UVS],ccol,0);
         else if(d[1]===1) quad([x0,yy0,z1],[x1,yy0,z1],[x1,yy1,z1],[x0,yy1,z1],[0,0,-1],[x0/UVS,0,x1/UVS,yy1/UVS],ccol,0);
@@ -636,7 +715,7 @@ function buildWorldMesh(){
     if(lightsOn[ci(x,z)]){
       var cxm=x0+CELL*0.5, czm=z0+CELL*0.5;
       hquad(cxm-0.65,czm-0.65,cxm+0.65,czm+0.65,WALL_H-0.03,[0,-1,0],1.0,[1.0,0.98,0.9],2);
-      addLight(cxm,WALL_H-0.42,czm, 1.32,1.24,1.08, 15.0);
+      addLight(cxm,WALL_H-0.42,czm, 1.02,0.97,0.86, 13.0);
     }
   }
   /* 百叶窗：墙上的光缝 */
@@ -1168,13 +1247,15 @@ function drawWorldMesh(p,vp,eye,clipOn,clipY,isRefl){
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,texTile);
   gl.uniform1i(p.u.uCaus,1);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,texCaus);
+  gl.uniform1i(p.u.uNorm,3);
+  gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D,texNorm);
   gl.uniform3fv(p.u.uCam,new Float32Array(eye));
   gl.uniform1f(p.u.uTime,(performance.now()-T0)/1000);
   gl.uniform1f(p.u.uWaterY,WATER_Y);
-  gl.uniform3f(p.u.uAmbTop,0.66,0.66,0.63);
-  gl.uniform3f(p.u.uAmbBot,0.36,0.37,0.37);
+  gl.uniform3f(p.u.uAmbTop,0.44,0.45,0.44);
+  gl.uniform3f(p.u.uAmbBot,0.25,0.26,0.27);
   gl.uniform3f(p.u.uFogCol,0.66,0.74,0.74);
-  gl.uniform1f(p.u.uFogDen,isRefl?0.012:0.0095);
+  gl.uniform1f(p.u.uFogDen,isRefl?0.010:0.0075);
   gl.uniform1f(p.u.uClipY,clipY);
   gl.uniform1f(p.u.uClipOn,clipOn?1:0);
   var n=pickLights(eye);
