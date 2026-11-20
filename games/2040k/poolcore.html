@@ -914,9 +914,28 @@ function clearGeom(){ cutFaces=0; P=[]; Nn=[]; U=[]; C=[]; Mt=[]; waterVerts=[];
 var HOLE_DEPTH=0.28;      /* 凹腔深度：比墙厚更深，斜着看才看得出是洞 */
 function ptOf(axis,p,s,y){ return axis===0 ? [p,y,s] : [s,y,p]; }
 function tri3(a,b,c,n,ua,ub,uc,col,m){
+  /* 统一绕序：几何面朝 n 的一侧必须是正面，否则 gl_FrontFacing 反了会把法线/砖缝法线贴图翻过来 -> 整块墙发白发糊 */
+  var ex=b[0]-a[0], ey=b[1]-a[1], ez=b[2]-a[2];
+  var fx=c[0]-a[0], fy=c[1]-a[1], fz=c[2]-a[2];
+  var gx=ey*fz-ez*fy, gy=ez*fx-ex*fz, gz=ex*fy-ey*fx;
+  if(gx*n[0]+gy*n[1]+gz*n[2]<0){
+    var t=b; b=c; c=t; var tu=ub; ub=uc; uc=tu;
+  }
   vtx(a[0],a[1],a[2],n[0],n[1],n[2],ua[0],ua[1],col[0],col[1],col[2],m);
   vtx(b[0],b[1],b[2],n[0],n[1],n[2],ub[0],ub[1],col[0],col[1],col[2],m);
   vtx(c[0],c[1],c[2],n[0],n[1],n[2],uc[0],uc[1],col[0],col[1],col[2],m);
+}
+/* 门框断面如果被洞打中，就整条拆掉，别留一道悬空的薄片 */
+function capHit(pa,c,a,b,y0,y1){
+  for(var i=0;i<holes.length;i++){
+    var h=holes[i], dp=pa===0?h.x-c:h.z-c;
+    if(Math.abs(dp)>h.r) continue;
+    var cs=pa===0?h.z:h.x;
+    var ds=cs<a?a-cs:(cs>b?cs-b:0);
+    var dy=h.y<y0?y0-h.y:(h.y>y1?h.y-y1:0);
+    if(Math.sqrt(ds*ds+dy*dy+dp*dp)<h.r*0.92) return true;
+  }
+  return false;
 }
 function emitCap(pa,c,a,b,y0,y1,n,col){
   var A=ptOf(pa,c,a,y0), B=ptOf(pa,c,b,y0), Cq=ptOf(pa,c,b,y1), D=ptOf(pa,c,a,y1);
@@ -936,70 +955,101 @@ function innN(axis,ca,sa){
 function holeR(h,a){ return h.r*(1.0+0.16*Math.sin(3.0*a+(h.s1||0))+0.08*Math.sin(7.0*a+(h.s2||0))); }
 function emitFace(axis,p,s0,s1,y0,y1,n,col){
   var vis=[-n[0],-n[1],-n[2]];
-  var best=null,bd=1e9;
+  var cand=[];
   for(var i=0;i<holes.length;i++){
     var h=holes[i];
-    var dp=axis===0 ? h.x-p : h.z-p;
+    var dp=axis===0?h.x-p:h.z-p;
     if(Math.abs(dp)>h.r*0.85) continue;
-    var cs=axis===0 ? h.z : h.x;
-    if(h.y+h.r<y0||h.y-h.r>y1) continue;
-    if(cs+h.r<s0-0.08||cs-h.r>s1+0.08) continue;
-    var rho=Math.sqrt(Math.max(0.0004,h.r*h.r-dp*dp));
-    var pad=0.10+0.26*rho;
-    if(cs+rho+pad<s0+0.02||cs-rho-pad>s1-0.02) continue;
-    if(Math.abs(dp)<bd){ bd=Math.abs(dp); best={h:h,cs:cs,cy:h.y,rho:rho}; }
+    var cs=axis===0?h.z:h.x;
+    if(cs+h.r<s0-0.06||cs-h.r>s1+0.06) continue;
+    if(h.y+h.r<y0-0.06||h.y-h.r>y1+0.06) continue;
+    cand.push({h:h,cs:cs,cy:h.y,rho:Math.sqrt(Math.max(0.0004,h.r*h.r-dp*dp)),d:Math.abs(dp)});
   }
-  if(!best){ emitRect(axis,p,s0,s1,y0,y1,vis,col); return; }
-  var q=best; cutFaces++;
-  var pd0=0.10+0.26*q.rho;
-  var bs0=Math.max(s0,q.cs-q.rho-pd0), bs1=Math.min(s1,q.cs+q.rho+pd0);
-  var by0=Math.max(y0,q.cy-q.rho-pd0), by1=Math.min(y1,q.cy+q.rho+pd0);
-  if(bs1-bs0<0.02||by1-by0<0.02){ emitRect(axis,p,s0,s1,y0,y1,vis,col); return; }
-  emitRect(axis,p,s0,bs0,y0,y1,vis,col);
-  emitRect(axis,p,bs1,s1,y0,y1,vis,col);
-  emitRect(axis,p,bs0,bs1,y0,by0,vis,col);
-  emitRect(axis,p,bs0,bs1,by1,y1,vis,col);
-  /* 环带：外圈贴着 bbox 边界，内圈是不规则洞缘 */
-  var N=40, seg=[];
-  for(var i2=0;i2<=N;i2++){
-    var a=i2/N*Math.PI*2, ca=Math.cos(a), sa=Math.sin(a);
-    var t1=Math.abs(ca)<1e-6?1e9:(ca>0?(bs1-q.cs)/ca:(bs0-q.cs)/ca);
-    var t2=Math.abs(sa)<1e-6?1e9:(sa>0?(by1-q.cy)/sa:(by0-q.cy)/sa);
-    var t=Math.min(t1,t2);
-    var os=q.cs+ca*t, oy=q.cy+sa*t;
-    var rr=holeR(q.h,a);
-    var is=q.cs+ca*rr, iy=q.cy+sa*rr;
-    is=Math.max(s0,Math.min(s1,is)); iy=Math.max(y0,Math.min(y1,iy));
-    seg.push([os,oy,is,iy,ca,sa]);
+  if(!cand.length){ emitRect(axis,p,s0,s1,y0,y1,vis,col); return; }
+  cand.sort(function(a,b){ return a.d-b.d; });
+  var rects=[[s0,s1,y0,y1]];
+  for(var ci=0;ci<cand.length;ci++){
+    var q=cand[ci];
+    var pad0=0.05+0.12*q.rho;
+    var qa0=q.cs-q.rho-pad0, qa1=q.cs+q.rho+pad0;
+    var qb0=q.cy-q.rho-pad0, qb1=q.cy+q.rho+pad0;
+    var next=[];
+    for(var ri=0;ri<rects.length;ri++){
+      var R=rects[ri];
+      if(qa1<=R[0]||qa0>=R[1]||qb1<=R[2]||qb0>=R[3]){ next.push(R); continue; }
+      var bs0=Math.max(R[0],qa0), bs1=Math.min(R[1],qa1);
+      var by0=Math.max(R[2],qb0), by1=Math.min(R[3],qb1);
+      if(bs0>R[0]) next.push([R[0],bs0,R[2],R[3]]);
+      if(bs1<R[1]) next.push([bs1,R[1],R[2],R[3]]);
+      if(by0>R[2]) next.push([bs0,bs1,R[2],by0]);
+      if(by1<R[3]) next.push([bs0,bs1,by1,R[3]]);
+      if(bs1-bs0<0.03||by1-by0<0.03){ next.push([bs0,bs1,by0,by1]); continue; }
+      cutFaces++;
+      var seg=[];
+      var ex0=bs0, ex1=bs1, ey0=by0, ey1=by1;
+      var W2=ex1-ex0, H2=ey1-ey0, per2=2*(W2+H2);
+      var N=Math.max(32,Math.min(72,Math.round(per2/0.07)));
+      var eds=[[ex0,ey1,ex1,ey1],[ex1,ey1,ex1,ey0],[ex1,ey0,ex0,ey0],[ex0,ey0,ex0,ey1]];
+      var pts=[];
+      for(var e3=0;e3<4;e3++){
+        var E3=eds[e3], len3=Math.abs(E3[2]-E3[0])+Math.abs(E3[3]-E3[1]);
+        var steps3=Math.max(1,Math.round(N*len3/per2));
+        for(var j3=0;j3<steps3;j3++){
+          var tt3=j3/steps3;
+          pts.push([E3[0]+(E3[2]-E3[0])*tt3, E3[1]+(E3[3]-E3[1])*tt3]);
+        }
+      }
+      pts.push([pts[0][0],pts[0][1]]);
+      for(var i2=0;i2<pts.length;i2++){
+        var os=pts[i2][0], oy=pts[i2][1];
+        var ia=Math.atan2(oy-q.cy, os-q.cs);
+        var rr=holeR(q.h,ia);
+        var is=q.cs+Math.cos(ia)*rr, iy=q.cy+Math.sin(ia)*rr;
+        var cl=0;
+        if(is<R[0]||is>R[1]||iy<R[2]||iy>R[3]){
+          is=Math.max(R[0],Math.min(R[1],is)); iy=Math.max(R[2],Math.min(R[3],iy)); cl=1;
+        }
+        seg.push([os,oy,is,iy,Math.cos(ia),Math.sin(ia),cl]);
+      }
+      var NSEG=seg.length-1;
+      for(var i3=0;i3<NSEG;i3++){
+        var s=seg[i3], e=seg[i3+1];
+        var A=ptOf(axis,p,s[0],s[1]), B=ptOf(axis,p,e[0],e[1]), Cq2=ptOf(axis,p,e[2],e[3]), D=ptOf(axis,p,s[2],s[3]);
+        tri3(A,B,Cq2,vis,[s[0]/UVS,s[1]/UVS],[e[0]/UVS,e[1]/UVS],[e[2]/UVS,e[3]/UVS],col,0);
+        tri3(A,Cq2,D,vis,[s[0]/UVS,s[1]/UVS],[e[2]/UVS,e[3]/UVS],[s[2]/UVS,s[3]/UVS],col,0);
+      }
+      var cutC=[0.74,0.75,0.74], botC=[0.33,0.34,0.35];
+      var pd=p+(axis===0?n[0]:n[2])*HOLE_DEPTH;
+      for(var i4=0;i4<NSEG;i4++){
+        var s2=seg[i4], e2=seg[i4+1];
+        var a1=ptOf(axis,p, s2[2],s2[3]), b1=ptOf(axis,p, e2[2],e2[3]);
+        var a2=ptOf(axis,pd,s2[2],s2[3]), b2=ptOf(axis,pd,e2[2],e2[3]);
+        var n1=innN(axis,s2[4],s2[5]), n2=innN(axis,e2[4],e2[5]);
+        vtx(a1[0],a1[1],a1[2],n1[0],n1[1],n1[2],0,0,cutC[0],cutC[1],cutC[2],5);
+        vtx(b1[0],b1[1],b1[2],n2[0],n2[1],n2[2],0,0,cutC[0],cutC[1],cutC[2],5);
+        vtx(b2[0],b2[1],b2[2],n2[0],n2[1],n2[2],0,1,cutC[0],cutC[1],cutC[2],5);
+        vtx(a1[0],a1[1],a1[2],n1[0],n1[1],n1[2],0,0,cutC[0],cutC[1],cutC[2],5);
+        vtx(b2[0],b2[1],b2[2],n2[0],n2[1],n2[2],0,1,cutC[0],cutC[1],cutC[2],5);
+        vtx(a2[0],a2[1],a2[2],n1[0],n1[1],n1[2],0,1,cutC[0],cutC[1],cutC[2],5);
+      }
+      var cen=ptOf(axis,pd,q.cs,q.cy);
+      for(var i5=0;i5<NSEG;i5++){
+        var s3=seg[i5], e3=seg[i5+1];
+        if(s3[6]&&e3[6]) continue;
+        tri3(cen, ptOf(axis,pd,s3[2],s3[3]), ptOf(axis,pd,e3[2],e3[3]), vis,[0,0],[0,0],[0,0],botC,5);
+      }
+    }
+    rects=next;
   }
-  for(var i3=0;i3<N;i3++){
-    var s=seg[i3], e=seg[i3+1];
-    var A=ptOf(axis,p,s[0],s[1]), B=ptOf(axis,p,e[0],e[1]), Cq2=ptOf(axis,p,e[2],e[3]), D=ptOf(axis,p,s[2],s[3]);
-    tri3(A,B,Cq2,vis,[s[0]/UVS,s[1]/UVS],[e[0]/UVS,e[1]/UVS],[e[2]/UVS,e[3]/UVS],col,0);
-    tri3(A,Cq2,D,vis,[s[0]/UVS,s[1]/UVS],[e[2]/UVS,e[3]/UVS],[s[2]/UVS,s[3]/UVS],col,0);
+  for(var rj=0;rj<rects.length;rj++){
+    var R2=rects[rj];
+    /* 两洞之间残留的细条：四面都不贴面边界、又窄得像根线，留着会像悬空薄片，直接并进破坏区 */
+    var w2=R2[1]-R2[0], h2=R2[3]-R2[2];
+    var interior=(R2[0]>s0+1e-4 && R2[1]<s1-1e-4 && R2[2]>y0+1e-4 && R2[3]<y1-1e-4);
+    if(interior && (w2<0.11||h2<0.11)) continue;
+    emitRect(axis,p,R2[0],R2[1],R2[2],R2[3],vis,col);
   }
-  /* 洞壁：从墙面往里凹 15cm，切面是哑光石灰色；洞底压暗 */
-  var cutC=[0.74,0.75,0.74], botC=[0.33,0.34,0.35];
-  var pd=p+(axis===0?n[0]:n[2])*HOLE_DEPTH;
-  for(var i4=0;i4<N;i4++){
-    var s2=seg[i4], e2=seg[i4+1];
-    var a1=ptOf(axis,p, s2[2],s2[3]), b1=ptOf(axis,p, e2[2],e2[3]);
-    var a2=ptOf(axis,pd,s2[2],s2[3]), b2=ptOf(axis,pd,e2[2],e2[3]);
-    var n1=innN(axis,s2[4],s2[5]), n2=innN(axis,e2[4],e2[5]);
-    vtx(a1[0],a1[1],a1[2],n1[0],n1[1],n1[2],0,0,cutC[0],cutC[1],cutC[2],5);
-    vtx(b1[0],b1[1],b1[2],n2[0],n2[1],n2[2],0,0,cutC[0],cutC[1],cutC[2],5);
-    vtx(b2[0],b2[1],b2[2],n2[0],n2[1],n2[2],0,1,cutC[0],cutC[1],cutC[2],5);
-    vtx(a1[0],a1[1],a1[2],n1[0],n1[1],n1[2],0,0,cutC[0],cutC[1],cutC[2],5);
-    vtx(b2[0],b2[1],b2[2],n2[0],n2[1],n2[2],0,1,cutC[0],cutC[1],cutC[2],5);
-    vtx(a2[0],a2[1],a2[2],n1[0],n1[1],n1[2],0,1,cutC[0],cutC[1],cutC[2],5);
-  }
-  var cen=ptOf(axis,pd,q.cs,q.cy);
-  for(var i5=0;i5<N;i5++){
-    var s3=seg[i5], e3=seg[i5+1];
-    tri3(cen, ptOf(axis,pd,s3[2],s3[3]), ptOf(axis,pd,e3[2],e3[3]), vis,[0,0],[0,0],[0,0],botC,5);
-  }
-}
-function buildWallFace(x,z,x0,x1,z0,z1,d,y0,y1){
+}function buildWallFace(x,z,x0,x1,z0,z1,d,y0,y1){
   var axis=d[0]!==0?0:1;
   var sgn=d[0]!==0?d[0]:d[1];
   var edge=axis===0?(sgn===1?x1:x0):(sgn===1?z1:z0);
@@ -1013,11 +1063,11 @@ function buildWallFace(x,z,x0,x1,z0,z1,d,y0,y1){
   var ca2=Math.min(ta,tb), cb2=Math.max(ta,tb);
   var ccol=[0.92,0.95,0.95];
   if(axis===0){
-    if(cellOpen(x,z-1)) emitCap(1,z0,ca2,cb2,y0,y1,[0,0,-1],ccol);
-    if(cellOpen(x,z+1)) emitCap(1,z1,ca2,cb2,y0,y1,[0,0,1],ccol);
+    if(cellOpen(x,z-1)&&!capHit(1,z0,ca2,cb2,y0,y1)) emitCap(1,z0,ca2,cb2,y0,y1,[0,0,-1],ccol);
+    if(cellOpen(x,z+1)&&!capHit(1,z1,ca2,cb2,y0,y1)) emitCap(1,z1,ca2,cb2,y0,y1,[0,0,1],ccol);
   } else {
-    if(cellOpen(x-1,z)) emitCap(0,x0,ca2,cb2,y0,y1,[-1,0,0],ccol);
-    if(cellOpen(x+1,z)) emitCap(0,x1,ca2,cb2,y0,y1,[1,0,0],ccol);
+    if(cellOpen(x-1,z)&&!capHit(0,x0,ca2,cb2,y0,y1)) emitCap(0,x0,ca2,cb2,y0,y1,[-1,0,0],ccol);
+    if(cellOpen(x+1,z)&&!capHit(0,x1,ca2,cb2,y0,y1)) emitCap(0,x1,ca2,cb2,y0,y1,[1,0,0],ccol);
   }
 }
 function buildWorldMesh(ccx,ccz){
