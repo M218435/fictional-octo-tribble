@@ -1973,6 +1973,7 @@ function onNetData(data, conn){
       tagFor(conn.peer);
       bcast({ k:"p", id:conn.peer, n: rm.name, x:rm.x, y:rm.y, z:rm.z, ry:rm.yaw, color: rm.color }, conn.peer);
       paintCounts();
+      paintRoom();
       toast(rm.name + " 进来搭岛了");
       SFX.play("toggle", { volume:.6 });
     }
@@ -2192,10 +2193,10 @@ function joinRoom(code){
   clearTimeout(NET._tj);
   NET._tj = setTimeout(function(){
     if (NET.on) return;
-    netStat("连不上房主（10 秒）：房号对吗？房主那边要显示“房间已开”。", "bad");
+    netStat("连不上房主（15 秒）：房号对吗？房主那边要显示「房间已开」。", "bad");
     try { if (NET.peer) NET.peer.destroy(); } catch(e) {}
     NET.peer = null;
-  }, 10000);
+  }, 15000);
 
   NET.peer.on("open", function(){
     clearTimeout(NET._tj);
