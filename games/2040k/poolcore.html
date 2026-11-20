@@ -308,21 +308,34 @@ uniform vec2 uRes; uniform float uTime; uniform vec3 uCam; uniform vec3 uWaterCo
 out vec4 oCol;
 void main(){
   vec2 uv=gl_FragCoord.xy/uRes;
-  vec2 rip=vec2(
-    sin(vUV.x*5.5+uTime*0.85)+sin(vUV.y*9.0-uTime*0.6),
-    cos(vUV.y*6.5+uTime*0.75)+cos(vUV.x*11.0-uTime*0.45)
-  )*0.0022;
+  /* 三层波：大浪 + 碎涟漪 + 细纹 */
+  float t=uTime;
+  float w1=sin(vUV.x*4.2+t*0.85)*cos(vUV.y*3.4-t*0.55);
+  float w2=sin((vUV.x*1.3+vUV.y)*8.0+t*1.45);
+  float w3=cos((vUV.y*1.7-vUV.x)*11.5-t*1.9);
+  vec2 rip=vec2(w1*0.75+w2*0.42+w3*0.16, -w1*0.5+w2*0.34-w3*0.2)*0.0105;
   vec3 refl=texture(uRefl,clamp(uv+rip,0.001,0.999)).rgb;
-  float fres=pow(1.0-max(dot(normalize(uCam-vPos),vec3(0.0,1.0,0.0)),0.0),3.4);
-  vec3 col=mix(uWaterCol,refl,clamp(0.05+fres*0.95,0.0,1.0));
-  float sp=pow(max(refl.r,refl.g)*0.8,10.0);
-  col+=vec3(0.85,0.95,1.0)*sp*0.35;
-  /* 流动的粼光：两层不同频率的正弦叠加 */
-  float sh=sin(vUV.x*5.6+uTime*1.15)*sin(vUV.y*7.2-uTime*0.95);
-  sh+=sin(vUV.x*11.0-uTime*0.6)*sin(vUV.y*9.4+uTime*0.8)*0.6;
-  sh=pow(max(sh,0.0),8.0);
-  col+=vec3(0.62,0.92,1.0)*sh*0.10*(0.30+fres);
-  oCol=vec4(col,0.62);
+  /* 反射里近处是黑的（水下被裁）——太黑就退回静水色，不然整池像水泥板 */
+  float rl=dot(refl,vec3(0.299,0.587,0.114));
+  vec3 sky=mix(uWaterCol*1.35, refl, smoothstep(0.030,0.20,rl));
+  float ndv=max(dot(normalize(uCam-vPos),vec3(0.0,1.0,0.0)),0.0);
+  float fres=pow(1.0-ndv,3.0);
+  vec3 col=mix(uWaterCol,sky,clamp(0.10+fres*0.80,0.0,0.92));
+  /* 水面起伏的明暗带，让静水也有形 */
+  col*=1.0+0.14*w1+0.08*w2+0.05*w3;
+  /* 灯条拉长的高光 */
+  float sp=pow(max(refl.r,refl.g),12.0);
+  col+=vec3(0.86,0.96,1.0)*sp*0.38;
+  /* 流动粼光 */
+  float sh=sin(vUV.x*5.6+t*1.15)*sin(vUV.y*7.2-t*0.95);
+  sh+=sin(vUV.x*11.0-t*0.6)*sin(vUV.y*9.4+t*0.8)*0.6;
+  sh+=sin((vUV.x+vUV.y)*16.0+t*1.7)*0.4;
+  sh=pow(max(sh,0.0),6.0);
+  col+=vec3(0.60,0.94,1.0)*sh*0.20*(0.35+fres);
+  /* 贴墙一圈暗接触线 */
+  float edge=min(min(vUV.x,1.0-vUV.x),min(vUV.y,1.0-vUV.y));
+  col*=mix(0.70,1.0,smoothstep(0.0,0.045,edge));
+  oCol=vec4(col,0.68);
 }`;
 
 var VS_QUAD=`#version 300 es
@@ -1331,13 +1344,14 @@ function drawScene(vp,eye,clipOn,clipY){
   if(waterCount>0 && !DBG_NOWATER){
     gl.useProgram(progWater.p);
     gl.uniformMatrix4fv(progWater.u.uVP,false,vp.vp);
+    gl.uniformMatrix4fv(progWater.u.uM,false,IDENT4);
     gl.uniform1i(progWater.u.uTex||progWater.u.uRefl,2);
     gl.activeTexture(gl.TEXTURE2);
     gl.bindTexture(gl.TEXTURE_2D,W_refl.tex);
     gl.uniform2f(progWater.u.uRes,W_scene.w,W_scene.h);
     gl.uniform1f(progWater.u.uTime,(performance.now()-T0)/1000);
     gl.uniform3fv(progWater.u.uCam,new Float32Array(eye));
-    gl.uniform3f(progWater.u.uWaterCol,0.26,0.70,0.82);
+    gl.uniform3f(progWater.u.uWaterCol,0.13,0.50,0.60);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
     gl.depthMask(false);
