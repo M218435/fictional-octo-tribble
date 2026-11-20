@@ -272,6 +272,13 @@ void main(){
   vec3 V=normalize(uCam-vPos);
   /* 4/5 号材质不走瓷砖贴图：道具用自己的固有色，才不会糊成一团 */
   vec3 base=(mat==4||mat==5)?vCol:texture(uTex,vUV).rgb*vCol;
+  /* 竖向 AO：墙根贴地、墙顶贴天花板都压暗一点，墙才不像一张纸 */
+  if(mat==0&&abs(N.y)<0.6){
+    float ao=1.0;
+    ao*=0.45+0.55*clamp(vPos.y/0.45,0.0,1.0);
+    ao*=0.80+0.20*clamp((4.5-vPos.y)/0.26,0.0,1.0);
+    base*=ao;
+  }
   float under=step(vPos.y, uWaterY-0.02);
   if(under>0.5){
     vec2 cuv=vUV*0.22+vec2(uTime*0.017,uTime*0.013);
@@ -843,7 +850,7 @@ function nearestLever(){
 }
 
 /* ================= 破坏 / 碎片 ================= */
-var holes=[], HMAX=16;
+var holes=[], HMAX=16, cutFaces=0;
 var frags=[], FRAG_MAX=56, FRAG_LIFE=10.0;
 var swingT=-9, lastSmash=-9;
 /* ================= 几何 ================= */
@@ -901,8 +908,118 @@ var WALL_T=0.16, UVS=1.55;
 function addLight(x,y,z,r,g,b,range){
   lights.push({x:x,y:y,z:z,color:[r,g,b],range:range});
 }
-function clearGeom(){ P=[]; Nn=[]; U=[]; C=[]; Mt=[]; waterVerts=[]; lights=[]; collWalls=[]; objs=[]; }
+function clearGeom(){ cutFaces=0; P=[]; Nn=[]; U=[]; C=[]; Mt=[]; waterVerts=[]; lights=[]; collWalls=[]; objs=[]; }
 
+/* ===== 有厚度的墙 + 真正的几何破洞 ===== */
+var HOLE_DEPTH=0.28;      /* 凹腔深度：比墙厚更深，斜着看才看得出是洞 */
+function ptOf(axis,p,s,y){ return axis===0 ? [p,y,s] : [s,y,p]; }
+function tri3(a,b,c,n,ua,ub,uc,col,m){
+  vtx(a[0],a[1],a[2],n[0],n[1],n[2],ua[0],ua[1],col[0],col[1],col[2],m);
+  vtx(b[0],b[1],b[2],n[0],n[1],n[2],ub[0],ub[1],col[0],col[1],col[2],m);
+  vtx(c[0],c[1],c[2],n[0],n[1],n[2],uc[0],uc[1],col[0],col[1],col[2],m);
+}
+function emitCap(pa,c,a,b,y0,y1,n,col){
+  var A=ptOf(pa,c,a,y0), B=ptOf(pa,c,b,y0), Cq=ptOf(pa,c,b,y1), D=ptOf(pa,c,a,y1);
+  tri3(A,B,Cq,n,[a/UVS,y0/UVS],[b/UVS,y0/UVS],[b/UVS,y1/UVS],col,0);
+  tri3(A,Cq,D,n,[a/UVS,y0/UVS],[b/UVS,y1/UVS],[a/UVS,y1/UVS],col,0);
+}
+function emitRect(axis,p,s0,s1,y0,y1,n,col){
+  if(s1-s0<0.0005||y1-y0<0.0005) return;
+  var A=ptOf(axis,p,s0,y0), B=ptOf(axis,p,s1,y0), Cq=ptOf(axis,p,s1,y1), D=ptOf(axis,p,s0,y1);
+  tri3(A,B,Cq,n,[s0/UVS,y0/UVS],[s1/UVS,y0/UVS],[s1/UVS,y1/UVS],col,0);
+  tri3(A,Cq,D,n,[s0/UVS,y0/UVS],[s1/UVS,y1/UVS],[s0/UVS,y1/UVS],col,0);
+}
+function innN(axis,ca,sa){
+  if(axis===0) return [0,-sa,-ca];
+  return [-ca,-sa,0];
+}
+function holeR(h,a){ return h.r*(1.0+0.16*Math.sin(3.0*a+(h.s1||0))+0.08*Math.sin(7.0*a+(h.s2||0))); }
+function emitFace(axis,p,s0,s1,y0,y1,n,col){
+  var vis=[-n[0],-n[1],-n[2]];
+  var best=null,bd=1e9;
+  for(var i=0;i<holes.length;i++){
+    var h=holes[i];
+    var dp=axis===0 ? h.x-p : h.z-p;
+    if(Math.abs(dp)>h.r*0.85) continue;
+    var cs=axis===0 ? h.z : h.x;
+    if(h.y+h.r<y0||h.y-h.r>y1) continue;
+    if(cs+h.r<s0-0.08||cs-h.r>s1+0.08) continue;
+    var rho=Math.sqrt(Math.max(0.0004,h.r*h.r-dp*dp));
+    var pad=0.10+0.26*rho;
+    if(cs+rho+pad<s0+0.02||cs-rho-pad>s1-0.02) continue;
+    if(Math.abs(dp)<bd){ bd=Math.abs(dp); best={h:h,cs:cs,cy:h.y,rho:rho}; }
+  }
+  if(!best){ emitRect(axis,p,s0,s1,y0,y1,vis,col); return; }
+  var q=best; cutFaces++;
+  var pd0=0.10+0.26*q.rho;
+  var bs0=Math.max(s0,q.cs-q.rho-pd0), bs1=Math.min(s1,q.cs+q.rho+pd0);
+  var by0=Math.max(y0,q.cy-q.rho-pd0), by1=Math.min(y1,q.cy+q.rho+pd0);
+  if(bs1-bs0<0.02||by1-by0<0.02){ emitRect(axis,p,s0,s1,y0,y1,vis,col); return; }
+  emitRect(axis,p,s0,bs0,y0,y1,vis,col);
+  emitRect(axis,p,bs1,s1,y0,y1,vis,col);
+  emitRect(axis,p,bs0,bs1,y0,by0,vis,col);
+  emitRect(axis,p,bs0,bs1,by1,y1,vis,col);
+  /* 环带：外圈贴着 bbox 边界，内圈是不规则洞缘 */
+  var N=40, seg=[];
+  for(var i2=0;i2<=N;i2++){
+    var a=i2/N*Math.PI*2, ca=Math.cos(a), sa=Math.sin(a);
+    var t1=Math.abs(ca)<1e-6?1e9:(ca>0?(bs1-q.cs)/ca:(bs0-q.cs)/ca);
+    var t2=Math.abs(sa)<1e-6?1e9:(sa>0?(by1-q.cy)/sa:(by0-q.cy)/sa);
+    var t=Math.min(t1,t2);
+    var os=q.cs+ca*t, oy=q.cy+sa*t;
+    var rr=holeR(q.h,a);
+    var is=q.cs+ca*rr, iy=q.cy+sa*rr;
+    is=Math.max(s0,Math.min(s1,is)); iy=Math.max(y0,Math.min(y1,iy));
+    seg.push([os,oy,is,iy,ca,sa]);
+  }
+  for(var i3=0;i3<N;i3++){
+    var s=seg[i3], e=seg[i3+1];
+    var A=ptOf(axis,p,s[0],s[1]), B=ptOf(axis,p,e[0],e[1]), Cq2=ptOf(axis,p,e[2],e[3]), D=ptOf(axis,p,s[2],s[3]);
+    tri3(A,B,Cq2,vis,[s[0]/UVS,s[1]/UVS],[e[0]/UVS,e[1]/UVS],[e[2]/UVS,e[3]/UVS],col,0);
+    tri3(A,Cq2,D,vis,[s[0]/UVS,s[1]/UVS],[e[2]/UVS,e[3]/UVS],[s[2]/UVS,s[3]/UVS],col,0);
+  }
+  /* 洞壁：从墙面往里凹 15cm，切面是哑光石灰色；洞底压暗 */
+  var cutC=[0.74,0.75,0.74], botC=[0.33,0.34,0.35];
+  var pd=p+(axis===0?n[0]:n[2])*HOLE_DEPTH;
+  for(var i4=0;i4<N;i4++){
+    var s2=seg[i4], e2=seg[i4+1];
+    var a1=ptOf(axis,p, s2[2],s2[3]), b1=ptOf(axis,p, e2[2],e2[3]);
+    var a2=ptOf(axis,pd,s2[2],s2[3]), b2=ptOf(axis,pd,e2[2],e2[3]);
+    var n1=innN(axis,s2[4],s2[5]), n2=innN(axis,e2[4],e2[5]);
+    vtx(a1[0],a1[1],a1[2],n1[0],n1[1],n1[2],0,0,cutC[0],cutC[1],cutC[2],5);
+    vtx(b1[0],b1[1],b1[2],n2[0],n2[1],n2[2],0,0,cutC[0],cutC[1],cutC[2],5);
+    vtx(b2[0],b2[1],b2[2],n2[0],n2[1],n2[2],0,1,cutC[0],cutC[1],cutC[2],5);
+    vtx(a1[0],a1[1],a1[2],n1[0],n1[1],n1[2],0,0,cutC[0],cutC[1],cutC[2],5);
+    vtx(b2[0],b2[1],b2[2],n2[0],n2[1],n2[2],0,1,cutC[0],cutC[1],cutC[2],5);
+    vtx(a2[0],a2[1],a2[2],n1[0],n1[1],n1[2],0,1,cutC[0],cutC[1],cutC[2],5);
+  }
+  var cen=ptOf(axis,pd,q.cs,q.cy);
+  for(var i5=0;i5<N;i5++){
+    var s3=seg[i5], e3=seg[i5+1];
+    tri3(cen, ptOf(axis,pd,s3[2],s3[3]), ptOf(axis,pd,e3[2],e3[3]), vis,[0,0],[0,0],[0,0],botC,5);
+  }
+}
+function buildWallFace(x,z,x0,x1,z0,z1,d,y0,y1){
+  var axis=d[0]!==0?0:1;
+  var sgn=d[0]!==0?d[0]:d[1];
+  var edge=axis===0?(sgn===1?x1:x0):(sgn===1?z1:z0);
+  var p=edge-sgn*WALL_T*0.5;            /* 可见面往开放一侧收半个墙厚 */
+  var s0=axis===0?z0:x0, s1=axis===0?z1:x1;
+  var n=[0,0,0]; if(axis===0) n[0]=sgn; else n[2]=sgn;
+  var col=(axis===0&&sgn===1)?[0.95,0.98,0.97]:(axis===0&&sgn===-1)?[0.90,0.94,0.94]:[0.93,0.96,0.95];
+  emitFace(axis,p,s0,s1,y0,y1,n,col);
+  /* 门框断面：端头旁边是开放格就露出 0.16m 墙厚，墙才不是一张纸 */
+  var ta=p, tb=p+sgn*WALL_T;
+  var ca2=Math.min(ta,tb), cb2=Math.max(ta,tb);
+  var ccol=[0.92,0.95,0.95];
+  if(axis===0){
+    if(cellOpen(x,z-1)) emitCap(1,z0,ca2,cb2,y0,y1,[0,0,-1],ccol);
+    if(cellOpen(x,z+1)) emitCap(1,z1,ca2,cb2,y0,y1,[0,0,1],ccol);
+  } else {
+    if(cellOpen(x-1,z)) emitCap(0,x0,ca2,cb2,y0,y1,[-1,0,0],ccol);
+    if(cellOpen(x+1,z)) emitCap(0,x1,ca2,cb2,y0,y1,[1,0,0],ccol);
+  }
+}
 function buildWorldMesh(ccx,ccz){
   if(ccx===undefined){ ccx=regCX; ccz=regCZ; }
   clearGeom();
@@ -922,15 +1039,7 @@ function buildWorldMesh(ccx,ccz){
         var nx=x+d[0], nz=z+d[1];
         if(!cellOpen(nx,nz) || nx<ox0||nx>ox1||nz<oz0||nz>oz1){
           var ny0=fy, ny1=WALL_H;
-          if(d[0]===1){
-            quad([x1,ny0,z1],[x1,ny0,z0],[x1,ny1,z0],[x1,ny1,z1],[-1,0,0],[z1/UVS,0,z0/UVS,WALL_H/UVS],[0.95,0.98,0.97],0);
-          } else if(d[0]===-1){
-            quad([x0,ny0,z0],[x0,ny0,z1],[x0,ny1,z1],[x0,ny1,z0],[1,0,0],[z0/UVS,0,z1/UVS,WALL_H/UVS],[0.90,0.94,0.94],0);
-          } else if(d[1]===1){
-            quad([x0,ny0,z1],[x1,ny0,z1],[x1,ny1,z1],[x0,ny1,z1],[0,0,-1],[x0/UVS,0,x1/UVS,WALL_H/UVS],[0.93,0.96,0.95],0);
-          } else {
-            quad([x1,ny0,z0],[x0,ny0,z0],[x0,ny1,z0],[x1,ny1,z0],[0,0,1],[x1/UVS,0,x0/UVS,WALL_H/UVS],[0.93,0.96,0.95],0);
-          }
+          buildWallFace(x,z,x0,x1,z0,z1,d,ny0,ny1);
           collWalls.push({
             x0: d[0]===1?x1-WALL_T/2: d[0]===-1?x0-WALL_T/2:x0,
             x1: d[0]===1?x1+WALL_T/2: d[0]===-1?x0+WALL_T/2:x1,
@@ -1043,16 +1152,7 @@ function resolveCollision(pos,r){
   for(i=0;i<collWalls.length;i++){
     var w=collWalls[i];
     if(pos[0]<w.x0-r||pos[0]>w.x1+r||pos[2]<w.z0-r||pos[2]>w.z1+r) continue;
-    /* 被锤子砸出的洞：站得进去就放行 */
-    var open=false;
-    for(h=0;h<holes.length;h++){
-      var ho=holes[h];
-      if(ho.y<0.55) continue;
-      if(rectDist(ho.x,ho.z,w)>0.55) continue;
-      var hd2=(pos[0]-ho.x)*(pos[0]-ho.x)+(pos[2]-ho.z)*(pos[2]-ho.z);
-      if(hd2<ho.r*ho.r){ open=true; break; }
-    }
-    if(open) continue;
+    /* 洞只有 15cm 深，墙依旧solid，别让玩家钻进墙里掉进虚空 */
     var nx=Math.max(w.x0,Math.min(pos[0],w.x1));
     var nz=Math.max(w.z0,Math.min(pos[2],w.z1));
     var dx=pos[0]-nx, dz=pos[2]-nz;
@@ -1134,10 +1234,11 @@ function updateFrags(dt){
   }
 }
 function makeHole(x,y,z,dx,dz){
-  var r=0.34+Math.random()*0.12;
-  holes.push({x:x,y:y,z:z,r:r});
-  while(holes.length>HMAX) holes.shift();
+  var r=0.36+Math.random()*0.14;
+  holes.push({x:x,y:y,z:z,r:r,s1:Math.random()*6.283,s2:Math.random()*6.283});
   spawnFrags(x,y,z,dx,dz);
+  /* 洞是几何层面的永久破坏：重建立即生效，不会被 16 个的上限顶掉 */
+  try{ rebuildRegion(regCX,regCZ); }catch(e){ window.__ERR=String(e&&e.message||e); }
   try{ if(window.RTSXSFX) RTSXSFX.play("hit"); }catch(e){}
   swingT=(performance.now()-T0)/1000;
 }
@@ -1608,7 +1709,7 @@ function setMainUniforms(vp,eye,clipOn,clipY,isRefl){
   gl.uniform3fv(p.u.uLC,lightCol);
   gl.uniform1i(p.u.uLN,n);
   /* 最近砸出的洞（最多 16 个） */
-  var hn=Math.min(16,holes.length);
+  var hn=0;   /* 洞已由几何切出来，着色器不再参与 */
   for(var hi=0;hi<16;hi++){
     var ho=holes[holes.length-1-hi];
     var o4=hi*4;
@@ -1799,11 +1900,44 @@ window.__P=function(){
   return {x:player.x,y:player.y,z:player.z,yaw:player.yaw,pitch:player.pitch,
     levers:pulledCount,hammer:hammerOwned,holes:holes.length,frags:frags.length,
     props:regionProps.length,ducks:duckW.length,started:started,
-    tris:meshCount,lights:lights.length,walls:collWalls.length,cell:[regCX,regCZ]};
+    tris:meshCount,cut:cutFaces,err:window.__ERR||"",lights:lights.length,walls:collWalls.length,cell:[regCX,regCZ]};
 };
 window.__PULL=function(){ var n=nearestLever(); if(!n.l) return false; n.l.pulled=true; n.l.pullT=(performance.now()-T0)/1000; pulledCount++; if(pulledCount>=LEVER_N) hammerOwned=true; updateKeyHud(); return true; };
 window.__HAMMER=function(v){ hammerOwned=v!==false; updateKeyHud(); };
 window.__SMASH=function(){ smash(); };
+window.__HOLES=function(){ return holes.slice(-6); };
+window.__CORNER=function(){
+  var cx=Math.floor(player.x/CELL), cz=Math.floor(player.z/CELL), dd=[[1,0],[-1,0],[0,1],[0,-1]];
+  for(var r=1;r<=4;r++) for(var dz=-r;dz<=r;dz++) for(var dx=-r;dx<=r;dx++){
+    var x=cx+dx, z=cz+dz;
+    if(!cellOpen(x,z)) continue;
+    for(var i=0;i<4;i++) for(var j=2;j<4;j++){
+      var a=dd[i], b=dd[j];
+      if(!cellOpen(x+a[0],z+a[1]) && cellOpen(x+b[0],z+b[1])){
+        return {x:x,z:z,a:a,b:b};
+      }
+    }
+  }
+  return null;
+};
+/* 调试：自己找一面墙、站到开放格中心、瞄过去砸一下，返回落点 */
+window.__HUNT=function(){
+  var cx=Math.floor(player.x/CELL), cz=Math.floor(player.z/CELL);
+  for(var r=1;r<=3;r++) for(var dz=-r;dz<=r;dz++) for(var dx=-r;dx<=r;dx++){
+    var x=cx+dx, z=cz+dz;
+    if(!cellOpen(x,z)) continue;
+    var dd=[[1,0],[-1,0],[0,1],[0,-1]];
+    for(var i=0;i<4;i++){
+      if(!cellOpen(x+dd[i][0],z+dd[i][1])){
+        player.x=(x+0.5)*CELL; player.z=(z+0.5)*CELL;
+        player.yaw=Math.atan2(dd[i][0],dd[i][1]); player.pitch=0;
+        lastSmash=-99; smash();
+        return {ok:1,holes:holes.length,cut:cutFaces,x:player.x,z:player.z,dir:dd[i]};
+      }
+    }
+  }
+  return {ok:0};
+};
 window.__MAP=function(){
   var cx=Math.floor(player.x/CELL), cz=Math.floor(player.z/CELL), rows=[];
   for(var dz=-3;dz<=3;dz++){
@@ -1838,6 +1972,17 @@ try{
     FORCE_HAMMER=true; hammerOwned=true; updateKeyHud();
     if(started) toast("锤子已到手 · 左键砸墙，墙会按砸中的那一点碎开");
   }
+  /* 调试：自动找面墙砸一下并退到侧后方看洞 */
+  if(/hunt=1/.test(qs)){ setTimeout(function(){
+    try{
+      var rr=__HUNT();
+      if(rr&&rr.ok&&holes.length){
+        var hh=holes[holes.length-1], dx2=rr.dir[0], dz2=rr.dir[1];
+        player.x=hh.x-dx2*2.2+dz2*1.1; player.z=hh.z-dz2*2.2-dx2*1.1;
+        player.yaw=Math.atan2(hh.x-player.x,hh.z-player.z); player.pitch=-0.06;
+      }
+    }catch(e){}
+  },1200); }
   /* 测试用：模拟"点开场页按钮"的路径 */
   if(/clickstart=1/.test(qs)){ setTimeout(function(){ document.getElementById("qHigh").click(); },30); }
   if(/dbg=1/.test(qs)){
