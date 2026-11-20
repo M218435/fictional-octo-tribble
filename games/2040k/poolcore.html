@@ -253,8 +253,9 @@ void main(){
   else { Tg=vec3(1,0,0); Bt=vec3(0,1,0); }
   N=normalize(N+Tg*nm.x*0.45+Bt*nm.y*0.45);
   vec3 V=normalize(uCam-vPos);
-  vec3 base=texture(uTex,vUV).rgb*vCol;
   int mat=int(vMat+0.5);
+  /* 4/5 号材质不走瓷砖贴图：道具用自己的固有色，才不会糊成一团 */
+  vec3 base=(mat==4||mat==5)?vCol:texture(uTex,vUV).rgb*vCol;
   float under=step(vPos.y, uWaterY-0.02);
   if(under>0.5){
     vec2 cuv=vUV*0.22+vec2(uTime*0.017,uTime*0.013);
@@ -268,6 +269,8 @@ void main(){
   vec3 lit=base*amb;
   float shin=90.0; float specK=0.34;
   if(mat==3){ shin=260.0; specK=1.55; lit*=0.74; }
+  if(mat==4){ shin=58.0; specK=0.62; }          /* 橡皮鸭 / 塑料件 */
+  if(mat==5){ shin=26.0; specK=0.08; lit*=0.92; }  /* 亚光漆面：地滑牌 */
   if(mat==2){ lit=base*2.1; }
   for(int i=0;i<8;i++){
     if(i>=uLN) break;
@@ -755,13 +758,16 @@ function buildWorldMesh(){
     var dz=z*CELL+CELL*0.5+(Math.random()-0.5)*1.4;
     var dy=WATER_Y-0.1;
     var yel=[0.98,0.80,0.16], org=[0.95,0.55,0.12];
-    sphere(dx,dy+0.16,dz,0.34,0.24,0.42,yel,3,10,6);
-    sphere(dx,dy+0.42,dz-0.22,0.20,0.19,0.20,yel,3,10,6);
+    sphere(dx,dy+0.16,dz,0.33,0.23,0.41,yel,4,18,12);
+    sphere(dx,dy+0.42,dz-0.20,0.20,0.19,0.20,yel,4,16,10);
+    /* 尾巴：一个小锥 */
+    quad([dx-0.10,dy+0.22,dz+0.40],[dx+0.10,dy+0.22,dz+0.40],[dx,dy+0.40,dz+0.62],[dx,dy+0.40,dz+0.62],[0,0,1],[0,0,1,1],yel,4);
+    quad([dx+0.10,dy+0.22,dz+0.40],[dx-0.10,dy+0.22,dz+0.40],[dx,dy+0.40,dz+0.62],[dx,dy+0.40,dz+0.62],[0,0,-1],[0,0,1,1],yel,4);
     /* 喙 */
-    quad([dx-0.06,dy+0.38,dz-0.40],[dx+0.06,dy+0.38,dz-0.40],[dx+0.06,dy+0.40,dz-0.52],[dx-0.06,dy+0.40,dz-0.52],[0,0,-1],[0,0,1,1],org,3);
+    quad([dx-0.065,dy+0.375,dz-0.38],[dx+0.065,dy+0.375,dz-0.38],[dx+0.065,dy+0.415,dz-0.53],[dx-0.065,dy+0.415,dz-0.53],[0,0,-1],[0,0,1,1],org,5);
     /* 眼睛 */
-    sphere(dx-0.12,dy+0.47,dz-0.26,0.03,0.03,0.03,[0.08,0.1,0.12],3,6,4);
-    sphere(dx+0.12,dy+0.47,dz-0.26,0.03,0.03,0.03,[0.08,0.1,0.12],3,6,4);
+    sphere(dx-0.115,dy+0.475,dz-0.255,0.032,0.036,0.026,[0.06,0.08,0.10],4,12,8);
+    sphere(dx+0.115,dy+0.475,dz-0.255,0.032,0.036,0.026,[0.06,0.08,0.10],4,12,8);
   }
 
   /* 小心地滑牌 */
@@ -771,10 +777,10 @@ function buildWorldMesh(){
     if(Math.random()>0.14) continue;
     var sx=x*CELL+CELL*0.5+(Math.random()-0.5)*2.2;
     var sz=z*CELL+CELL*0.5+(Math.random()-0.5)*2.2;
-    var yl=[0.94,0.80,0.12];
-    quad([sx-0.30,0,sz+0.10],[sx+0.30,0,sz+0.10],[sx+0.26,0.92,sz-0.14],[sx-0.26,0.92,sz-0.14],[0,0,1],[0,0,1,1],yl,0);
-    quad([sx+0.26,0.92,sz-0.14],[sx-0.26,0.92,sz-0.14],[sx-0.30,0,sz-0.34],[sx+0.30,0,sz-0.34],[0,0,-1],[0,0,1,1],[0.82,0.68,0.10],0);
-    quad([sx-0.26,0.30,sz-0.10],[sx+0.26,0.30,sz-0.10],[sx+0.26,0.42,sz-0.10],[sx-0.26,0.42,sz-0.10],[0,0,-1],[0,0,1,1],[0.12,0.12,0.12],0);
+    var yl=[0.99,0.87,0.16];
+    quad([sx-0.30,0,sz+0.10],[sx+0.30,0,sz+0.10],[sx+0.26,0.92,sz-0.14],[sx-0.26,0.92,sz-0.14],[0,0,1],[0,0,1,1],yl,5);
+    quad([sx+0.26,0.92,sz-0.14],[sx-0.26,0.92,sz-0.14],[sx-0.30,0,sz-0.34],[sx+0.30,0,sz-0.34],[0,0,-1],[0,0,1,1],[0.80,0.66,0.10],5);
+    quad([sx-0.26,0.30,sz-0.101],[sx+0.26,0.30,sz-0.101],[sx+0.26,0.42,sz-0.101],[sx-0.26,0.42,sz-0.101],[0,0,-1],[0,0,1,1],[0.10,0.11,0.12],5);
   }
 
   /* 钥匙卡 */
@@ -782,7 +788,7 @@ function buildWorldMesh(){
     var kx=(ci2%GX)*CELL+CELL*0.5, kz=Math.floor(ci2/GX)*CELL+CELL*0.5;
     var ky=pool[ci2]===1?WATER_Y:0;
     /* 台座 */
-    quad([kx-0.28,ky,kz+0.28],[kx+0.28,ky,kz+0.28],[kx+0.28,ky+0.95,kz-0.28],[kx-0.28,ky+0.95,kz-0.28],[0,0,1],[0,0,1,1],[0.78,0.83,0.84],0);
+    quad([kx-0.28,ky,kz+0.28],[kx+0.28,ky,kz+0.28],[kx+0.28,ky+0.95,kz-0.28],[kx-0.28,ky+0.95,kz-0.28],[0,0,1],[0,0,1,1],[0.80,0.85,0.86],4);
     /* 卡片 */
     quad([kx-0.22,ky+1.02,kz-0.02],[kx+0.22,ky+1.02,kz-0.02],[kx+0.22,ky+1.34,kz-0.02],[kx-0.22,ky+1.34,kz-0.02],[0,0,1],[0,0,1,1],[0.55,1.0,1.0],2);
     addLight(kx,ky+1.2,kz,0.5,0.85,0.9,4.5);
@@ -1439,6 +1445,7 @@ try{
   if(ma){ player.x=parseFloat(ma[1]); player.z=parseFloat(ma[2]); }
   var my=/[?&]yaw=(-?[0-9.]+)/.exec(qs);
   if(my){ player.yaw=parseFloat(my[1])*Math.PI/180; }
+  if(/props=1/.test(qs)) addDemoProps();
   var mp=/[?&]pitch=(-?[0-9.]+)/.exec(qs);
   if(mp){ player.pitch=parseFloat(mp[1])*Math.PI/180; }
   if(/t=[0-9.]+/.test(qs)){
@@ -1446,6 +1453,23 @@ try{
     if(mt) window.__SETTIME&&window.__SETTIME(parseFloat(mt[1]));
   }
 }catch(e){}
+function addDemoProps(){
+  var ax=Math.sin(player.yaw), az=Math.cos(player.yaw);
+  var rx=Math.cos(player.yaw), rz=-Math.sin(player.yaw);
+  function P2(dx,dz){ return [player.x+ax*2.6+rx*dx, player.z+az*2.6+rz*dz]; }
+  var p1=P2(-0.9,0), p2=P2(0.9,0.2);
+  var yel=[0.99,0.82,0.14], org=[0.96,0.56,0.13];
+  var bz=p1[1]+0;
+  sphere(p1[0],0.42,p1[1],0.33,0.23,0.41,yel,4,18,12);
+  sphere(p1[0],0.68,p1[1]-0.20,0.20,0.19,0.20,yel,4,16,10);
+  quad([p1[0]-0.065,0.635,p1[1]-0.38],[p1[0]+0.065,0.635,p1[1]-0.38],[p1[0]+0.065,0.675,p1[1]-0.53],[p1[0]-0.065,0.675,p1[1]-0.53],[0,0,-1],[0,0,1,1],org,5);
+  sphere(p1[0]-0.115,0.735,p1[1]-0.255,0.032,0.036,0.026,[0.06,0.08,0.10],4,12,8);
+  sphere(p1[0]+0.115,0.735,p1[1]-0.255,0.032,0.036,0.026,[0.06,0.08,0.10],4,12,8);
+  var sx=p2[0], sz=p2[1], yl2=[0.94,0.80,0.12];
+  quad([sx-0.30,0,sz+0.10],[sx+0.30,0,sz+0.10],[sx+0.26,0.92,sz-0.14],[sx-0.26,0.92,sz-0.14],[0,0,1],[0,0,1,1],yl2,5);
+  quad([sx+0.26,0.92,sz-0.14],[sx-0.26,0.92,sz-0.14],[sx-0.30,0,sz-0.34],[sx+0.30,0,sz-0.34],[0,0,-1],[0,0,1,1],[0.80,0.66,0.10],5);
+  uploadMesh();
+}
 window.__WARP=function(i){ keyTaken[i]=true; collected++; updateKeyHud(); };
 })();
 </script>
