@@ -1205,52 +1205,60 @@ function makeHole(x,y,z,dx,dz,fromNet){
   swingT=(performance.now()-T0)/1000;
 }
 /* 砸到道具：鸭子碎成橡胶块，路牌先断一条腿倒下、再砸才散架 */
-function propHit(px,py,pz){
-  var i,o,mc,dy;
-  var c0=camView(), dv=c0.dir;
-  for(i=0;i<regionProps.length;i++){
-    o=regionProps[i];
-    if(!o.pk||o.k==="alarm") continue;
-    var dh=Math.sqrt((o.x-player.x)*(o.x-player.x)+(o.z-player.z)*(o.z-player.z));
-    var fx=o.x-player.x, fz=o.z-player.z, fl=Math.sqrt(fx*fx+fz*fz)||1;
-    /* 站在面前 2.2m 内、大致朝它，就算砸中（不用精确对准模型） */
-    if((dv[0]*fx+dv[2]*fz)/fl < 0.05) continue;
-    if(o.k==="duck"){
-      mc=modelCache.duck; if(!mc) continue;
-      if(dh>1.9||py<0.02||py>1.95) continue;
-      var pm=propMod[o.pk]||(propMod[o.pk]={});
-      pm.duckGone=1;
-      spawnFrags(px,py,pz,0,1,[0.92,0.70,0.12]);
-      spawnFrags(o.x,0.7,o.z,0,1,[0.86,0.62,0.10]);
-      sfx("debris"); sfx("smash");
-      rebuildRegion(regCX,regCZ);
-      return true;
-    }
-    if(o.k==="sign"){
-      mc=modelCache.sign; if(!mc) continue;
-      if(dh>1.9||py<0.02||py>1.25) continue;
-      var pm2=propMod[o.pk]||(propMod[o.pk]={});
-      if(!pm2.signDown){
-        pm2.signDown=1; pm2.signAt=(performance.now()-T0)/1000;
-        pm2.signDir=(dh>0.001?1:1);
-        o.fallT=pm2.signAt;
-        sfx("debris");
-        toast("牌子的一条腿断了 · 哐当倒了");
-        return true;
-      }
-      pm2.signGone=1;
-      spawnFrags(o.x,0.2,o.z,0,1,[0.86,0.86,0.80]);
-      sfx("smash");
-      rebuildRegion(regCX,regCZ);
-      return true;
-    }
+function propKill(o, py){
+  var pm=propMod[o.pk]||(propMod[o.pk]={});
+  if(o.k==="duck"){
+    pm.duckGone=1;
+    spawnFrags(o.x, py, o.z, 0, 1, [0.92,0.70,0.12]);
+    spawnFrags(o.x, 0.7, o.z, 0, 1, [0.86,0.62,0.10]);
+    sfx("debris"); sfx("smash");
+    rebuildRegion(regCX,regCZ);
+    return true;
   }
-  /* 水里的鸭子也一样能砸 */
-  for(i=0;i<duckW.length;i++){
+  if(o.k==="sign"){
+    if(!pm.signDown){
+      pm.signDown=1; pm.signAt=(performance.now()-T0)/1000; pm.signDir=1;
+      o.fallT=pm.signAt;
+      sfx("debris");
+      toast("牌子的一条腿断了 · 哐当倒了");
+      return true;
+    }
+    pm.signGone=1;
+    spawnFrags(o.x, 0.2, o.z, 0, 1, [0.86,0.86,0.80]);
+    sfx("smash");
+    rebuildRegion(regCX,regCZ);
+    return true;
+  }
+  return false;
+}
+/* 视线前 2.2m 内、正对着（横向偏差 < 0.85m）、且比墙更近的道具才算砸中 */
+function propPick(maxD, py){
+  var dv=camView().dir, best=null, bd=9.9;
+  for(var i=0;i<regionProps.length;i++){
+    var o=regionProps[i];
+    if(!o.pk||o.k==="alarm") continue;
+    if(o.k!=="duck"&&o.k!=="sign") continue;
+    var fx=o.x-player.x, fz=o.z-player.z, fl=Math.sqrt(fx*fx+fz*fz)||0.001;
+    var along=dv[0]*fx+dv[2]*fz;
+    if(along<0.10||along>2.2) continue;
+    var lat=Math.sqrt(Math.max(0,fl*fl-along*along));
+    if(lat>0.85) continue;
+    if(fl>maxD-0.10) continue;
+    if(fl<bd){ bd=fl; best=o; }
+  }
+  return best;
+}
+function propKillWater(maxD, py){
+  var dv=camView().dir;
+  for(var i=0;i<duckW.length;i++){
     var d2=duckW[i];
-    if(Math.hypot(d2.x-player.x,d2.z-player.z)>2.2) continue;
+    var fx=d2.x-player.x, fz=d2.z-player.z, fl=Math.sqrt(fx*fx+fz*fz)||0.001;
+    var along=dv[0]*fx+dv[2]*fz;
+    if(along<0.10||fl>maxD-0.10||fl>2.4) continue;
+    var lat=Math.sqrt(Math.max(0,fl*fl-along*along));
+    if(lat>0.85) continue;
     if(py<WATER_Y-0.2||py>WATER_Y+0.5) continue;
-    spawnFrags(px,WATER_Y+0.1,pz,0,1,[0.92,0.70,0.12]);
+    spawnFrags(d2.x, WATER_Y+0.15, d2.z, 0, 1, [0.92,0.70,0.12]);
     sfx("splash"); sfx("debris");
     duckW.splice(i,1);
     return true;
@@ -1264,18 +1272,19 @@ function smash(){
   lastSmash=now; swingT=now;
   sfx("swing");
   var c=camView(), eye=c.eye, d=c.dir;
+  var hitT=0, hx=0, hy=0, hz=0;
   for(var t=0.35;t<3.4;t+=0.03){
     var px=eye[0]+d[0]*t, py=eye[1]+d[1]*t, pz=eye[2]+d[2]*t;
-    if(py>WALL_H+0.1) break;
-    if(py<0.03) break;
-    if(propHit(px,py,pz)) return;
+    if(py>WALL_H+0.1||py<0.03) break;
     var cx=Math.floor(px/CELL), cz=Math.floor(pz/CELL);
-    if(!cellOpen(cx,cz)){
-      /* 贴着墙面往里挪一点，洞才会在墙面上 */
-      makeHole(px-d[0]*0.06, py, pz-d[2]*0.06, d[0], d[2]);
-      return;
-    }
+    if(!cellOpen(cx,cz)){ hitT=t; hx=px; hy=py; hz=pz; break; }
   }
+  /* 墙更近就先砸墙，只有道具挡在墙前面才砸道具 */
+  var maxD=hitT||2.6, yy=hy||eye[1];
+  var o=propPick(maxD, yy);
+  if(o){ propKill(o, yy); return; }
+  if(propKillWater(maxD, yy)) return;
+  if(hitT) makeHole(hx-d[0]*0.06, hy, hz-d[2]*0.06, d[0], d[2]);
 }
 function smashTest(){
   var cx=Math.floor(player.x/CELL), cz=Math.floor(player.z/CELL), dd=[[1,0],[-1,0],[0,1],[0,-1]];
@@ -2484,6 +2493,15 @@ window.__MAP=function(){
 };
 window.__CAM=function(){ var c=camView(); return [c.dir[0].toFixed(2),c.dir[1].toFixed(2),c.dir[2].toFixed(2)]; };
 window.__SMASHTEST=function(){ return smashTest(); };
+window.__DBG=function(){
+  var c=camView(), cx=Math.floor(player.x/CELL), cz=Math.floor(player.z/CELL);
+  var openN=[]; var dd=[[1,0],[-1,0],[0,1],[0,-1]];
+  for(var i=0;i<4;i++) openN.push([dd[i][0],dd[i][1],!!cellOpen(cx+dd[i][0],cz+dd[i][1]),!!isOpen(cx+dd[i][0],cz+dd[i][1])]);
+  return {dir:[+c.dir[0].toFixed(3),+c.dir[1].toFixed(3),+c.dir[2].toFixed(3)],
+          eye:[+c.eye[0].toFixed(2),+c.eye[1].toFixed(2),+c.eye[2].toFixed(2)],
+          p:[+player.x.toFixed(2),+player.z.toFixed(2)], yaw:+player.yaw.toFixed(3),
+          cell:[cx,cz], neighbors:openN, hammer:hammerOwned, props:regionProps.length};
+};
 window.__LEVERS=function(){ return levers.map(function(l){return {x:l.x,z:l.z,pulled:l.pulled}; }); };
 window.__SETPLAYER=function(x,z){ player.x=x; player.z=z; };
 window.__LOOK=function(yaw,pitch){ player.yaw=yaw; player.pitch=pitch; };
