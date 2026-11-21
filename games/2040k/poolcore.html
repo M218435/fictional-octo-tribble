@@ -23,7 +23,7 @@
   .stat{display:flex;gap:6px;align-items:center;font-size:11px;color:rgba(234,242,242,.62);
     background:rgba(8,14,16,.5);border:1px solid rgba(160,200,210,.16);border-radius:8px;padding:4px 8px;}
   .stat b{color:#8FE3E6;font-weight:600;}
-  #netchip{cursor:pointer;}
+  #netchip{cursor:pointer;} #snd{cursor:pointer;}
   #goal{position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top));transform:translateX(-50%);
     font-size:12px;letter-spacing:.04em;color:rgba(234,242,242,.66);pointer-events:none;z-index:6;
     text-shadow:0 1px 3px rgba(0,0,0,.6);}
@@ -77,6 +77,7 @@
     <canvas id="mini" width="208" height="208"></canvas>
     <div class="stat"><span id="keys">拉杆 <b>0/10</b></span></div>
     <div class="stat"><span id="netchip">单机</span></div>
+    <div class="stat"><span id="snd">音效 开</span></div>
   </div>
 </div>
 <div id="goal">沿着走廊找拉杆</div>
@@ -1540,7 +1541,7 @@ function auInit(){
     if(!C) return null;
     AU.ctx=new C();
     AU.mast=AU.ctx.createGain();
-    AU.mast.gain.value=0.9;
+    AU.mast.gain.value=1.0;
     AU.mast.connect(AU.ctx.destination);
     AU.ready=true;
   }catch(e){ AU.ready=false; }
@@ -1573,7 +1574,7 @@ function startAmbience(){
     var c=AU.ctx;
     var o1=c.createOscillator(); o1.type="sine"; o1.frequency.value=54;
     var o2=c.createOscillator(); o2.type="triangle"; o2.frequency.value=108;
-    var g=c.createGain(); g.gain.value=0.035;
+    var g=c.createGain(); g.gain.value=0.055;
     var lp=c.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=220;
     o1.connect(lp); o2.connect(lp); lp.connect(g); g.connect(AU.mast);
     o1.start(); o2.start();
@@ -1583,14 +1584,16 @@ function startAmbience(){
 function sfx(name){
   if(!AU.ready){ if(name==="step"||name==="splash") return; auInit(); }
   if(AU.muted) return;
+  /* Chrome/iOS 的自动播放策略会把上下文挂在 suspended：每次发声都试着拉起来 */
+  try{ if(AU.ctx&&AU.ctx.state!=="running") AU.ctx.resume(); }catch(e){}
   switch(name){
-    case "step": auNoise(0.09,0.055,"lowpass",520,1.0); auTone(150,0.05,0.03,"sine",0,110); break;
-    case "splash": auNoise(0.20,0.10,"bandpass",1500,0.8); auNoise(0.28,0.05,"lowpass",420,1.0,0.02); break;
+    case "step": auNoise(0.10,0.10,"lowpass",520,1.0); auTone(150,0.06,0.05,"sine",0,110); break;
+    case "splash": auNoise(0.22,0.14,"bandpass",1500,0.8); auNoise(0.30,0.08,"lowpass",420,1.0,0.02); break;
     case "jump": auNoise(0.07,0.05,"lowpass",700,1.0); break;
     case "land": auNoise(0.12,0.07,"lowpass",380,1.2); auTone(120,0.08,0.04,"sine",0,80); break;
     case "lever": auTone(880,0.05,0.12,"square",0,520); auNoise(0.05,0.09,"bandpass",2200,1.6,0.01); auTone(330,0.09,0.07,"sine",0.05,220); break;
     case "leverDone": auTone(660,0.16,0.14,"sine"); auTone(990,0.20,0.12,"sine",0.10); auTone(1320,0.30,0.10,"sine",0.22); break;
-    case "swing": auNoise(0.16,0.05,"bandpass",900,0.7); break;
+    case "swing": auNoise(0.17,0.08,"bandpass",900,0.7); break;
     case "smash": auNoise(0.13,0.16,"lowpass",900,0.9); auNoise(0.30,0.10,"lowpass",300,1.0,0.08); auTone(90,0.20,0.06,"sine",0.02,55); break;
     case "debris": for(var i=0;i<4;i++) auNoise(0.07,0.05,"bandpass",1600+i*260,1.4,0.03*i); break;
     case "win": auTone(523,0.5,0.16,"sine"); auTone(784,0.6,0.14,"sine",0.18); auTone(1046,0.9,0.12,"sine",0.38); break;
@@ -1598,6 +1601,21 @@ function sfx(name){
   }
 }
 window.__SFX=function(n){ sfx(n); return true; };
+window.__AU=function(){
+  return {ready:AU.ready,muted:AU.muted,state:AU.ctx?AU.ctx.state:null,amb:!!AU.amb,
+          t:AU.ctx?+AU.ctx.currentTime.toFixed(2):null,gain:AU.mast?AU.mast.gain.value:null};
+};
+/* 任何一次点按/按键都当成“解锁音频”的机会：手机上尤其需要这一步 */
+function auUnlock(){
+  auInit();
+  try{ if(AU.ctx&&AU.ctx.state!=="running") AU.ctx.resume(); }catch(e){}
+  if(!AU.muted) startAmbience();
+}
+window.addEventListener("pointerdown",auUnlock,true);
+window.addEventListener("touchstart",auUnlock,true);
+window.addEventListener("keydown",auUnlock,true);
+document.addEventListener("visibilitychange",function(){ if(!document.hidden) auUnlock(); });
+window.addEventListener("pageshow",function(){ auUnlock(); });
 
 function toast(msg){
   toastEl.textContent=msg;
@@ -1999,6 +2017,26 @@ document.getElementById("qNet").addEventListener("click",function(){
   setTimeout(function(){ if(!NETPC.on) netEnter(NET_ROOM); },80);
 });
 document.getElementById("netchip").addEventListener("click",function(){ pcCopy(); });
+var sndEl=document.getElementById("snd");
+function updateSnd(){
+  if(!sndEl) return;
+  sndEl.textContent=AU.muted?"音效 关":"音效 开";
+  sndEl.style.opacity=AU.muted?"0.55":"1";
+}
+if(sndEl) sndEl.addEventListener("click",function(e){
+  e.stopPropagation();
+  AU.muted=!AU.muted;
+  if(AU.muted){
+    try{ if(AU.amb){ AU.amb.o1.stop(); AU.amb.o2.stop(); } AU.amb=null; }catch(_e){}
+  } else {
+    auInit();
+    try{ if(AU.ctx&&AU.ctx.state!=="running") AU.ctx.resume(); }catch(_e){}
+    startAmbience(); sfx("lever");
+  }
+  updateSnd();
+  toast(AU.muted?"音效关了":"音效开了");
+});
+updateSnd();
 document.getElementById("again").addEventListener("click",function(){
   won=false; elapsed=0;
   document.getElementById("win").classList.add("hidden");
