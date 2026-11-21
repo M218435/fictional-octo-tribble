@@ -677,19 +677,20 @@ void main(){
     return true;
   }
   function findStart(){
-    /* 在城里找一块四周 3 米内都空的位置（街道/空地），并朝最开阔的方向站 */
-    var best=null, bestR=0;
-    for(var r=0;r<110&&!best;r++){
-      var cnt=Math.max(1,r*7);
-      for(var a=0;a<cnt;a++){
-        var ang=a/cnt*Math.PI*2;
-        var x=Math.cos(ang)*r*CELL*1.4, z=Math.sin(ang)*r*CELL*1.4;
-        if(sampleH(x,z)<0.3) continue;
-        if(openSpace(x,z,3.0)&&openSpace(x,z,1.4)){ best=[x,z]; bestR=r; break; }
+    /* 先找开阔处（6 米净空），找不到再退到 3 米，尽量开局就把街道看全 */
+    var need=[6.0,3.0,1.4];
+    for(var k=0;k<need.length;k++){
+      for(var r=0;r<120;r++){
+        var cnt=Math.max(1,r*7);
+        for(var a=0;a<cnt;a++){
+          var ang=a/cnt*Math.PI*2;
+          var x=Math.cos(ang)*r*CELL*1.4, z=Math.sin(ang)*r*CELL*1.4;
+          if(sampleH(x,z)<0.3) continue;
+          if(openSpace(x,z,need[k])) return [x,z];
+        }
       }
     }
-    if(!best) best=[0,0];
-    return best;
+    return [0,0];
   }
   /* 站着时朝最空的方向看 */
   function faceOpen(x,z){
