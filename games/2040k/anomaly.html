@@ -72,9 +72,10 @@
   #err{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);max-width:86vw;padding:18px 20px;
     border-radius:12px;background:rgba(30,10,12,.9);border:1px solid #7A2B30;color:#FFD9D9;font-size:12.5px;
     line-height:1.7;z-index:20;display:none;white-space:pre-wrap;}
-  @media (max-width:640px){
+  @media (max-width:640px), (pointer:coarse){
     .box h1{font-size:24px;}
-    #mini{width:118px;height:118px;}
+    #mini{width:104px;height:104px;}
+    #goal{top:auto;bottom:150px;left:50%;max-width:88vw;white-space:normal;text-align:center;font-size:12px;line-height:1.6;}
   }
 </style>
 </head>
@@ -609,23 +610,49 @@ void main(){
   var touchMove={x:0,z:0}, touchSprint=false;
   var started=false;
 
+  function openSpace(x,z,r){
+    if(isBlocked(x,z)!==0) return false;
+    if(r<=0) return true;
+    for(var a=0;a<8;a++){
+      var ang=a*Math.PI/4;
+      if(isBlocked(x+Math.cos(ang)*r,z+Math.sin(ang)*r)!==0) return false;
+    }
+    return true;
+  }
   function findStart(){
-    /* 从中心向外螺旋找一块没被建筑占的平地 */
-    for(var r=0;r<90;r++){
-      for(var a=0;a<Math.max(1,r*6);a++){
-        var ang=a/Math.max(1,r*6)*Math.PI*2;
-        var x=Math.cos(ang)*r*CELL, z=Math.sin(ang)*r*CELL;
-        if(isBlocked(x,z)===0&&sampleH(x,z)>0.3) return [x,z];
+    /* 在城里找一块四周 3 米内都空的位置（街道/空地），并朝最开阔的方向站 */
+    var best=null, bestR=0;
+    for(var r=0;r<110&&!best;r++){
+      var cnt=Math.max(1,r*7);
+      for(var a=0;a<cnt;a++){
+        var ang=a/cnt*Math.PI*2;
+        var x=Math.cos(ang)*r*CELL*1.4, z=Math.sin(ang)*r*CELL*1.4;
+        if(sampleH(x,z)<0.3) continue;
+        if(openSpace(x,z,3.0)&&openSpace(x,z,1.4)){ best=[x,z]; bestR=r; break; }
       }
     }
-    return [0,0];
+    if(!best) best=[0,0];
+    return best;
+  }
+  /* 站着时朝最空的方向看 */
+  function faceOpen(x,z){
+    var bestA=0, bestD=-1;
+    for(var a=0;a<24;a++){
+      var ang=a/24*Math.PI*2, d=0;
+      for(var step=1.0;step<=36;step+=1.0){
+        if(isBlocked(x+Math.sin(ang)*step,z+Math.cos(ang)*step)!==0) break;
+        d=step;
+      }
+      if(d>bestD){ bestD=d; bestA=ang; }
+    }
+    return bestA;
   }
 
   function resetPlayer(){
     var s=findStart();
     player.x=s[0]; player.z=s[1];
     player.y=sampleH(player.x,player.z)+EYE;
-    player.vx=0; player.vz=0; player.yaw=0.6; player.pitch=-0.02;
+    player.vx=0; player.vz=0; player.yaw=faceOpen(player.x,player.z); player.pitch=-0.02;
   }
 
   function blockedAt(x,z){
@@ -918,9 +945,11 @@ void main(){
   }
 
   /* ================= 启动 ================= */
-  var isTouch=("ontouchstart" in window)||navigator.maxTouchPoints>0;
+  var isTouch=("ontouchstart" in window)||navigator.maxTouchPoints>0||
+    (window.matchMedia&&window.matchMedia("(pointer:coarse)").matches);
   function begin(){
     started=true;
+    isTouch=isTouch||(window.matchMedia&&window.matchMedia("(pointer:coarse)").matches)||(navigator.maxTouchPoints>0);
     $("intro").classList.add("hide");
     $("goal").textContent=isTouch?"左摇杆走 · 右侧拖动转头 · 点冲刺加速":"WASD 走，Shift 冲刺，点画面锁鼠标";
     if(isTouch){ $("stick").style.display="block"; $("sprint").style.display="flex"; }
@@ -944,7 +973,7 @@ void main(){
       buildMinimap();
       resetPlayer();
       bar.style.width="100%";
-      txt.textContent="城市就绪 · "+Math.round(st.tris/1000)+"k 面 · 解析 "+(performance.now()-t0).toFixed(0)+" ms";
+      txt.textContent="城市就绪 · "+Math.round(STAT.tris/1000)+"k 面 · 解析 "+(performance.now()-t0).toFixed(0)+" ms";
       $("go").disabled=false;
       glbBuf=null;
       requestAnimationFrame(loop);
