@@ -72,6 +72,9 @@
   #err{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);max-width:86vw;padding:18px 20px;
     border-radius:12px;background:rgba(30,10,12,.9);border:1px solid #7A2B30;color:#FFD9D9;font-size:12.5px;
     line-height:1.7;z-index:20;display:none;white-space:pre-wrap;}
+  #err button{margin-top:10px;padding:7px 18px;border-radius:999px;border:1px solid #7A2B30;
+    background:rgba(255,255,255,.06);color:#FFD9D9;font-size:12.5px;cursor:pointer;}
+  #err button:hover{background:rgba(255,255,255,.12);}
   @media (max-width:640px), (pointer:coarse){
     .box h1{font-size:24px;}
     #mini{width:104px;height:104px;}
@@ -109,7 +112,7 @@
       <button class="ghost" id="city" type="button">自动绕城一圈</button>
     </div>
     <div id="bar"><i></i></div>
-    <div id="loadTxt">正在读取地图模型…</div>
+    <div id="loadTxt">正在读取地图模型（12 MB，首次要等一会儿）…</div>
   </div>
 </div>
 <div id="err"></div>
@@ -120,10 +123,23 @@
 
   var $=function(id){ return document.getElementById(id); };
   var errEl=$("err");
-  function fail(msg){
+  var booting=false;
+  function fail(msg,retry){
     errEl.style.display="block";
     errEl.textContent=String(msg);
     try{ console.error(msg); }catch(e){}
+    if(retry!==false){
+      var b=document.createElement("button");
+      b.type="button"; b.textContent="重试";
+      b.onclick=function(){
+        errEl.style.display="none"; errEl.textContent=""; booting=false;
+        $("go").disabled=true; $("loadTxt").textContent="正在读取地图模型…";
+        $("bar").querySelector("i").style.width="0%";
+        boot();
+      };
+      errEl.appendChild(document.createElement("br"));
+      errEl.appendChild(b);
+    }
   }
   window.addEventListener("error",function(e){
     if(!window.__ok) fail("初始化失败："+(e.message||e.error));
@@ -330,7 +346,7 @@ void main(){
   function wz(x,y,z){ return -y; }
 
   /* ================= GLB 读取 ================= */
-  function fetchGlb(url,onProg){
+  function fetchStream(url,onProg){
     return fetch(url,{cache:"force-cache"}).then(function(res){
       if(!res.ok) throw new Error("地图文件读取失败 HTTP "+res.status+" "+url);
       var total=+(res.headers.get("content-length")||0);
@@ -355,6 +371,47 @@ void main(){
         })();
       });
     });
+  }
+  /* fetch 挂掉（弱网/中途断开）时，退回到 XHR 再要一遍，带进度和超时 */
+  function fetchXhr(url,onProg){
+    return new Promise(function(ok,bad){
+      try{
+        var x=new XMLHttpRequest();
+        x.open("GET",url,true);
+        x.responseType="arraybuffer";
+        x.timeout=180000;
+        x.onprogress=function(e){
+          if(onProg&&e.lengthComputable) onProg(Math.min(1,e.loaded/e.total),e.loaded,e.total);
+        };
+        x.onload=function(){
+          if(x.status>=200&&x.status<300&&x.response&&x.response.byteLength){
+            onProg&&onProg(1,x.response.byteLength,x.response.byteLength);
+            ok(x.response);
+          } else bad(new Error("地图文件读取失败 HTTP "+x.status));
+        };
+        x.onerror=function(){ bad(new Error("网络断开，地图没读到")); };
+        x.ontimeout=function(){ bad(new Error("读地图超时")); };
+        x.send();
+      }catch(e){ bad(e); }
+    });
+  }
+  function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
+  function fetchGlb(url,onProg){
+    var tries=0;
+    function attempt(){
+      tries++;
+      return fetchStream(url,onProg).catch(function(e1){
+        if(tries<3){
+          if(onProg) onProg(0,0,0);
+          return sleep(700*tries).then(attempt);
+        }
+        return fetchXhr(url,onProg).catch(function(){
+          throw new Error("地图没读到（网络断了或被拦截）。点下面的「重试」再来一次。"+
+            (e1&&e1.message?" · "+e1.message:""));
+        });
+      });
+    }
+    return attempt();
   }
 
   function parseGlb(buf){
@@ -959,10 +1016,13 @@ void main(){
 
   var glbBuf=null;
   function boot(){
+    if(booting) return;
+    booting=true;
     var bar=$("bar").querySelector("i"), txt=$("loadTxt");
     fetchGlb("../../modern/model.glb",function(p,got,total){
       bar.style.width=(p*100).toFixed(0)+"%";
-      txt.textContent="读取地图 "+Math.round(p*100)+"% · "+(got/1048576).toFixed(1)+" / "+(total/1048576).toFixed(1)+" MB";
+      txt.textContent="读取地图 "+Math.round(p*100)+"% · "+(got/1048576).toFixed(1)+
+        (total?" / "+(total/1048576).toFixed(1)+" MB":" MB");
     }).then(function(buf){
       glbBuf=buf;
       txt.textContent="解析模型与碰撞网格…";
@@ -976,10 +1036,12 @@ void main(){
       txt.textContent="城市就绪 · "+Math.round(STAT.tris/1000)+"k 面 · 解析 "+(performance.now()-t0).toFixed(0)+" ms";
       $("go").disabled=false;
       glbBuf=null;
+      booting=false;
       requestAnimationFrame(loop);
       window.__ok=true;
       if(/auto=1/.test(location.search)) begin();
     }).catch(function(e){
+      booting=false;
       fail("地图加载失败："+(e&&e.message||e));
       txt.textContent="加载失败";
     });
