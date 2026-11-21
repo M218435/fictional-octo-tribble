@@ -1548,7 +1548,11 @@ function rebuildRegion(cx,cz){
 var toastEl=document.getElementById("toast"), toastT=0;
 
 /* ================= 音效（纯 WebAudio 合成，不依赖任何音频文件） ================= */
-var AU={ctx:null,mast:null,ready:false,muted:false,amb:null};
+var AU={ctx:null,mast:null,comp:null,ready:false,muted:false,amb:null};
+/* 音量档：小 / 中 / 大 / 关，点 HUD 上那个小标签循环切换，记在本地 */
+var VOLV=[0.95,1.35,1.95,0.0], VOLN=["小","中","大","关"], volIdx=2;
+try{ var _pv=localStorage.getItem("pc_vol"); if(_pv!==null&&+_pv>=0&&+_pv<=3) volIdx=+_pv; }catch(_e){}
+var PCMASTER=VOLV[volIdx]||1.95;
 function auInit(){
   if(AU.ready) return AU.ctx;
   try{
@@ -1556,14 +1560,24 @@ function auInit(){
     if(!C) return null;
     AU.ctx=new C();
     AU.mast=AU.ctx.createGain();
-    AU.mast.gain.value=1.0;
-    AU.mast.connect(AU.ctx.destination);
+    AU.mast.gain.value=PCMASTER;
+    /* 限幅器：整体音量拉高后，砸墙这种尖峰也不会把耳朵顶爆 */
+    AU.comp=AU.ctx.createDynamicsCompressor();
+    AU.comp.threshold.value=-14; AU.comp.knee.value=10; AU.comp.ratio.value=4.0;
+    AU.comp.attack.value=0.006; AU.comp.release.value=0.22;
+    AU.mast.connect(AU.comp); AU.comp.connect(AU.ctx.destination);
     AU.ready=true;
   }catch(e){ AU.ready=false; }
   try{ if(AU.ctx&&AU.ctx.state==="suspended") AU.ctx.resume(); }catch(e){}
   return AU.ctx;
 }
 function auGain(v){ var g=AU.ctx.createGain(); g.gain.value=v; g.connect(AU.mast); return g; }
+function applyVol(){
+  var v=VOLV[volIdx];
+  AU.muted=(v<=0);
+  try{ if(AU.mast) AU.mast.gain.value=v>0?v:0; }catch(_e){}
+  return v;
+}
 function auNoise(dur,vol,type,freq,q,delay){
   if(!AU.ready||AU.muted||!AU.ctx) return;
   var d=delay||0, c=AU.ctx, t0=c.currentTime+d;
@@ -1589,7 +1603,7 @@ function startAmbience(){
     var c=AU.ctx;
     var o1=c.createOscillator(); o1.type="sine"; o1.frequency.value=54;
     var o2=c.createOscillator(); o2.type="triangle"; o2.frequency.value=108;
-    var g=c.createGain(); g.gain.value=0.055;
+    var g=c.createGain(); g.gain.value=0.105;
     var lp=c.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=220;
     o1.connect(lp); o2.connect(lp); lp.connect(g); g.connect(AU.mast);
     o1.start(); o2.start();
@@ -1602,23 +1616,24 @@ function sfx(name){
   /* Chrome/iOS 的自动播放策略会把上下文挂在 suspended：每次发声都试着拉起来 */
   try{ if(AU.ctx&&AU.ctx.state!=="running") AU.ctx.resume(); }catch(e){}
   switch(name){
-    case "step": auNoise(0.10,0.10,"lowpass",520,1.0); auTone(150,0.06,0.05,"sine",0,110); break;
-    case "splash": auNoise(0.22,0.14,"bandpass",1500,0.8); auNoise(0.30,0.08,"lowpass",420,1.0,0.02); break;
-    case "jump": auNoise(0.07,0.05,"lowpass",700,1.0); break;
-    case "land": auNoise(0.12,0.07,"lowpass",380,1.2); auTone(120,0.08,0.04,"sine",0,80); break;
-    case "lever": auTone(880,0.05,0.12,"square",0,520); auNoise(0.05,0.09,"bandpass",2200,1.6,0.01); auTone(330,0.09,0.07,"sine",0.05,220); break;
-    case "leverDone": auTone(660,0.16,0.14,"sine"); auTone(990,0.20,0.12,"sine",0.10); auTone(1320,0.30,0.10,"sine",0.22); break;
-    case "swing": auNoise(0.17,0.08,"bandpass",900,0.7); break;
-    case "smash": auNoise(0.13,0.16,"lowpass",900,0.9); auNoise(0.30,0.10,"lowpass",300,1.0,0.08); auTone(90,0.20,0.06,"sine",0.02,55); break;
-    case "debris": for(var i=0;i<4;i++) auNoise(0.07,0.05,"bandpass",1600+i*260,1.4,0.03*i); break;
-    case "win": auTone(523,0.5,0.16,"sine"); auTone(784,0.6,0.14,"sine",0.18); auTone(1046,0.9,0.12,"sine",0.38); break;
-    case "hurt": auTone(300,0.18,0.10,"sawtooth",0,140); break;
+    case "step": auNoise(0.10,0.235,"lowpass",520,1.0); auTone(150,0.06,0.115,"sine",0,110); break;
+    case "splash": auNoise(0.22,0.315,"bandpass",1500,0.8); auNoise(0.30,0.185,"lowpass",420,1.0,0.02); break;
+    case "jump": auNoise(0.07,0.115,"lowpass",700,1.0); break;
+    case "land": auNoise(0.12,0.16,"lowpass",380,1.2); auTone(120,0.08,0.095,"sine",0,80); break;
+    case "lever": auTone(880,0.05,0.275,"square",0,520); auNoise(0.05,0.205,"bandpass",2200,1.6,0.01); auTone(330,0.09,0.16,"sine",0.05,220); break;
+    case "leverDone": auTone(660,0.16,0.315,"sine"); auTone(990,0.20,0.27,"sine",0.10); auTone(1320,0.30,0.225,"sine",0.22); break;
+    case "swing": auNoise(0.17,0.19,"bandpass",900,0.7); break;
+    case "smash": auNoise(0.13,0.36,"lowpass",900,0.9); auNoise(0.30,0.235,"lowpass",300,1.0,0.08); auTone(90,0.20,0.14,"sine",0.02,55); break;
+    case "debris": for(var i=0;i<4;i++) auNoise(0.07,0.125,"bandpass",1600+i*260,1.4,0.03*i); break;
+    case "win": auTone(523,0.5,0.35,"sine"); auTone(784,0.6,0.31,"sine",0.18); auTone(1046,0.9,0.265,"sine",0.38); break;
+    case "hurt": auTone(300,0.18,0.225,"sawtooth",0,140); break;
   }
 }
 window.__SFX=function(n){ sfx(n); return true; };
 window.__AU=function(){
   return {ready:AU.ready,muted:AU.muted,state:AU.ctx?AU.ctx.state:null,amb:!!AU.amb,
-          t:AU.ctx?+AU.ctx.currentTime.toFixed(2):null,gain:AU.mast?AU.mast.gain.value:null};
+          t:AU.ctx?+AU.ctx.currentTime.toFixed(2):null,gain:AU.mast?AU.mast.gain.value:null,
+          comp:!!AU.comp,vol:VOLN[volIdx]};
 };
 /* 任何一次点按/按键都当成“解锁音频”的机会：手机上尤其需要这一步 */
 function auUnlock(){
@@ -2037,12 +2052,14 @@ document.getElementById("netchip").addEventListener("click",function(){ pcCopy()
 var sndEl=document.getElementById("snd");
 function updateSnd(){
   if(!sndEl) return;
-  sndEl.textContent=AU.muted?"音效 关":"音效 开";
+  sndEl.textContent="音量 "+VOLN[volIdx];
   sndEl.style.opacity=AU.muted?"0.55":"1";
 }
 if(sndEl) sndEl.addEventListener("click",function(e){
   e.stopPropagation();
-  AU.muted=!AU.muted;
+  volIdx=(volIdx+1)%4;
+  try{ localStorage.setItem("pc_vol",String(volIdx)); }catch(_e){}
+  applyVol();
   if(AU.muted){
     try{ if(AU.amb){ AU.amb.o1.stop(); AU.amb.o2.stop(); } AU.amb=null; }catch(_e){}
   } else {
@@ -2051,8 +2068,9 @@ if(sndEl) sndEl.addEventListener("click",function(e){
     startAmbience(); sfx("lever");
   }
   updateSnd();
-  toast(AU.muted?"音效关了":"音效开了");
+  toast(AU.muted?"音效关了":"音量·"+VOLN[volIdx]);
 });
+applyVol();
 updateSnd();
 document.getElementById("again").addEventListener("click",function(){
   won=false; elapsed=0;
