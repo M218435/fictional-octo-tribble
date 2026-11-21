@@ -2085,8 +2085,197 @@ function onNetData(data, conn){
   }
 }
 
+
+/* ====== 中继联机：公共 MQTT（WSS 443），不依赖 P2P 打洞 ====== */
+var MQF = { force: /[?&]relay=1/.test(location.search) };
+var MQ = { ok:false, role:"", code:"", sid:"", ws:null, ka:null, helloTimer:null, topic:"" };
+
+function mqRand(){ return Math.random().toString(16).slice(2, 10); }
+function mqTopic(code){ return "rtsx67/v1/" + String(code).toLowerCase(); }
+function mqCat(){
+  var out = [];
+  for (var i = 0; i < arguments.length; i++){
+    var a = arguments[i];
+    if (a && typeof a !== "string" && a.length !== undefined){
+      for (var j = 0; j < a.length; j++) out.push(a[j]);
+    } else out.push(a);
+  }
+  return out;
+}
+function mqUtf8(str){
+  var b = [];
+  for (var i = 0; i < str.length; i++){
+    var c = str.charCodeAt(i);
+    if (c < 128) b.push(c);
+    else if (c < 2048) b.push(192 | (c >> 6), 128 | (c & 63));
+    else b.push(224 | (c >> 12), 128 | ((c >> 6) & 63), 128 | (c & 63));
+  }
+  return b;
+}
+function mqVarint(n){
+  var o = [];
+  do { var d = n % 128; n = Math.floor(n / 128); if (n > 0) d |= 128; o.push(d); } while (n > 0);
+  return o;
+}
+function mqSendPkt(arr){ try { MQ.ws.send(new Uint8Array(arr)); } catch(e){} }
+function mqPublish(obj){
+  if (!MQ.ok || !MQ.ws) return false;
+  var t = mqUtf8(MQ.topic);
+  var p = mqUtf8(JSON.stringify(obj));
+  var body = mqCat([t.length >> 8, t.length & 255], t, p);
+  mqSendPkt(mqCat([0x30], mqVarint(body.length), body));
+  return true;
+}
+function mqWrap(gid){
+  var hs = { data:[], close:[], error:[] };
+  var to = (gid === "mq-host") ? "host" : String(gid).slice(3);
+  var conn = {
+    peer: gid,
+    _mq: true,
+    send: function(str){
+      var obj; try { obj = JSON.parse(str); } catch(e){ return; }
+      mqPublish({ t:"d", from: MQ.sid, to: to, d: obj });
+    },
+    close: function(){ mqPublish({ t:"bye", from: MQ.sid, to: to }); },
+    on: function(t, fn){ if (hs[t]) hs[t].push(fn); return conn; },
+    emit: function(t, a){ var l = hs[t] || []; for (var i = 0; i < l.length; i++){ try { l[i](a); } catch(e){} } }
+  };
+  return conn;
+}
+function mqRecv(e){
+  var arr = new Uint8Array(e.data);
+  var type = arr[0] >> 4;
+  if (type === 2){ MQ.connack = true; return; }
+  if (type === 9){ MQ.suback = true; return; }
+  var p = 1, len = 0, mul = 1, d;
+  do { d = arr[p++]; len += (d & 127) * mul; mul *= 128; } while (d & 128);
+  if (type !== 3) return;
+  var tl = (arr[p] << 8) | arr[p + 1]; p += 2 + tl;
+  var txt = "";
+  try { txt = new TextDecoder("utf-8").decode(arr.subarray(p)); } catch(err){ return; }
+  var m; try { m = JSON.parse(txt); } catch(err){ return; }
+  mqOnMsg(m);
+}
+function mqOnMsg(m){
+  if (!m || !m.t) return;
+  if (MQ.role === "host"){
+    if (m.t === "hello" && m.sid && m.sid !== MQ.sid){
+      var gid = "mq-" + m.sid;
+      if (NET.conns[gid]) return;
+      var c = mqWrap(gid);
+      wireHostConn(c);
+      onNetData({ k:"hi", n: m.n || "访客" }, c);
+      return;
+    }
+    if (m.t === "d" && m.from && NET.conns["mq-" + m.from]){
+      onNetData(JSON.stringify(m.d), NET.conns["mq-" + m.from]);
+    }
+    return;
+  }
+  if (m.t === "d" && m.to === MQ.sid){
+    if (!NET._relayConn) NET._relayConn = mqWrap("mq-host");
+    if (!NET.on) guestReady(MQ.code, NET._relayConn, "（中继）", true);
+    onNetData(JSON.stringify(m.d), NET._relayConn);
+  }
+}
+function mqConnect(asHost, code){
+  MQ.role = asHost ? "host" : "guest";
+  MQ.code = code; MQ.sid = mqRand(); MQ.topic = mqTopic(code); MQ.ok = false;
+  var cid = "rtsx67" + mqRand();
+  var body = mqCat([0x00, 0x04], [0x4d, 0x51, 0x54, 0x54], [0x04, 0x02, 0x00, 0x3c], [0, cid.length], mqUtf8(cid));
+  var pkt = mqCat([0x10], mqVarint(body.length), body);
+  netStat(asHost ? "正在开中继通道…" : "正在从中继找房主…");
+  try { MQ.ws = new WebSocket("wss://broker.hivemq.com:8884/mqtt", "mqtt"); }
+  catch(e){ netStat("中继通道开不起来：" + e.message, "bad"); return; }
+  MQ.ws.binaryType = "arraybuffer";
+  MQ.ws.onopen = function(){
+    mqSendPkt(pkt);
+    var t = mqUtf8(MQ.topic);
+    var sub = mqCat([0x00, 0x01, t.length >> 8, t.length & 255], t, [0x00]);
+    mqSendPkt(mqCat([0x82], mqVarint(sub.length), sub));
+    MQ.ok = true;
+    if (MQ.ka) clearInterval(MQ.ka);
+    MQ.ka = setInterval(function(){ mqSendPkt([0xC0, 0x00]); }, 25000);
+    if (asHost){
+      if (NET.on && NET.host && NET.room === code){
+        paintRoom();
+        netStat("房间 " + code + " 已开（中继也在听）· 世界里 " + world.size + " 块，等朋友进来", "ok");
+      } else {
+        hostReady(code, "（中继）");
+      }
+    } else {
+      netStat("中继已连上，正在敲房主的门…", "warn");
+      var n = 0;
+      mqPublish({ t:"hello", sid: MQ.sid, n: myName });
+      if (MQ.helloTimer) clearInterval(MQ.helloTimer);
+      MQ.helloTimer = setInterval(function(){
+        if (NET.on || ++n > 8){ clearInterval(MQ.helloTimer); MQ.helloTimer = null; return; }
+        mqPublish({ t:"hello", sid: MQ.sid, n: myName });
+      }, 1500);
+    }
+  };
+  MQ.ws.onclose = function(ev){
+    MQ.ok = false; MQ.closeInfo = (ev && ev.code) + "/" + (ev && ev.reason);
+    if (window.__dbgMQ) window.__dbgMQ = MQ;
+    if (MQ.ka){ clearInterval(MQ.ka); MQ.ka = null; }
+    if (!NET.on) netStat("中继通道断了，再点一次" + (asHost ? "建房" : "加入"), "bad");
+  };
+  MQ.ws.onerror = function(ev){
+    MQ.errInfo = (ev && ev.message) || "error";
+    if (!MQ.ok) netStat("中继服务器连不上（网络拦了公共 MQTT），换流量/换 WiFi 再试", "bad");
+  };
+  MQ.ws.onmessage = mqRecv;
+  if (/[?&]dbg=1/.test(location.search)){ window.__mq = MQ; }
+}
+
+function hostReady(code, label){
+  if (NET.on && NET.host && NET.room === code) return;
+  NET.on = true; NET.host = true; NET.room = code; NET.ready = true;
+  if (!running){
+    if (!loadSave()){ newIsland(false); inv["泥"] = 2; inv["石"] = 1; }
+    if (!animals.length) spawnAnimals(5);
+  }
+  paintRoom();
+  keepScreenAwake(true);
+  try { if (el("roomIn")) el("roomIn").value = code; } catch(e){}
+  netStat("房间 " + code + " 已开" + (label || "") + " · 世界里 " + world.size + " 块，等朋友进来", "ok");
+  SFX.play("success", { volume:.7 });
+  enterGame();
+  toast("房号 " + code + " · 发给朋友，用同一房号加入");
+}
+function guestReady(code, conn, label, skipHi){
+  if (NET.on && !NET.host) return;
+  NET.on = true; NET.host = false; NET.room = code; NET.ready = true;
+  NET.conn = conn;
+  if (!skipHi) send(conn, { k:"hi", n: myName });
+  paintRoom();
+  netStat("已连上 " + code + (label || ""), "ok");
+  SFX.play("success", { volume:.7 });
+  enterGame();
+}
+function wireHostConn(c){
+  NET.conns[c.peer] = c;
+  c.on("error", function(err){ netStat("和对方的通道出错：" + ((err && err.type) || "") + "，让他重连一次", "bad"); });
+  c.on("data", function(d){ onNetData(d, c); });
+  c.on("close", function(){
+    if (NET.remotes[c.peer]){
+      bcast({ k:"bye", id:c.peer });
+      delete NET.remotes[c.peer];
+      if (tagEls[c.peer]){ tagEls[c.peer].remove(); delete tagEls[c.peer]; }
+      paintCounts();
+    }
+    delete NET.conns[c.peer];
+    paintRoom();
+  });
+  return c;
+}
+
 function hostRoom(code){
-  if (!window.Peer){ netStat("联机库没加载上，只能单机", "bad"); return; }
+  if (NET.on && NET.host && NET.room === code){ toast("房间 " + code + " 已经开着了"); return; }
+  if (MQF.force || !window.Peer){
+    mqConnect(true, code);
+    return;
+  }
   if (NET.peer && !NET.on){
     /* 上一次还在连，别叠着开第二个 peer（同房号会撞 unavailable-id） */
     netStat("正在连服务器…稍等一下", "bad");
@@ -2097,53 +2286,30 @@ function hostRoom(code){
   try {
     NET.peer = new Peer(id, { debug: 0, config: { iceServers: [
       { urls: "stun:stun.l.google.com:19302" },
-      { urls: "stun:global.stun.twilio.com:3478" },
-      { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
-      { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
-      { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
+      { urls: "stun:stun.qq.com:3478" },
+      { urls: "stun:stun.miwifi.com:3478" }
     ] } });
   } catch(e){ netStat("建房失败：" + e.message, "bad"); return; }
 
-  /* 连不上就别一直卡在“正在建房…”：8 秒没 open 就收干净，提示先单机 */
+  /* 房主同时在 2.5 秒起挂上中继：对面走中继也能进来；PeerJS 失败则彻底转中继 */
+  setTimeout(function(){ if (!MQ.ok) mqConnect(true, code); }, 2500);
+  /* PeerJS 打不开就自动切中继通道，别让用户卡在“正在建房…” */
   clearTimeout(NET._th);
   NET._th = setTimeout(function(){
     if (NET.on) return;
-    netStat("联机服务器 12 秒没回应（学校/公司网络常拦 PeerJS），先单机玩；换个网络再点建房试试", "bad");
-    toast("联机服务器没连上，先单机玩");
+    netStat("直连服务器没回应，正在自动切中继通道…");
     try { if (NET.peer) NET.peer.destroy(); } catch(e) {}
     NET.peer = null;
-  }, 12000);
+    if (!MQ.ok) mqConnect(true, code);
+  }, 6000);
+  setTimeout(function(){ if (!NET.on && !MQ.ok) mqConnect(true, code); }, 9000);
 
   NET.peer.on("open", function(){
     clearTimeout(NET._th);
-    NET.on = true; NET.host = true; NET.room = code; NET.ready = true;
-    /* 建房用当前存档开：有存档就把它当成房间世界，朋友进来看到的是你的岛 */
-    if (!running){
-      if (!loadSave()){ newIsland(false); inv["泥"] = 2; inv["石"] = 1; }
-      if (!animals.length) spawnAnimals(5);
-    }
-    paintRoom();
-    keepScreenAwake(true);
-    try { if (el("roomIn")) el("roomIn").value = code; } catch(e){}
-    netStat("房间 " + code + " 已开 · 世界里 " + world.size + " 块，等朋友进来", "ok");
-    SFX.play("success", { volume:.7 });
-    enterGame();
-    toast("房号 " + code + " · 发给朋友，用同一房号加入");
+    hostReady(code, "");
   });
   NET.peer.on("connection", function(c){
-    NET.conns[c.peer] = c;
-    c.on("error", function(err){ netStat("和对方的通道出错：" + ((err && err.type) || "") + "，让他重连一次", "bad"); });
-    c.on("data", function(d){ onNetData(d, c); });
-    c.on("close", function(){
-      if (NET.remotes[c.peer]){
-        bcast({ k:"bye", id:c.peer });
-        delete NET.remotes[c.peer];
-        if (tagEls[c.peer]){ tagEls[c.peer].remove(); delete tagEls[c.peer]; }
-        paintCounts();
-      }
-      delete NET.conns[c.peer];
-      paintRoom();
-    });
+    wireHostConn(c);
   });
   NET.peer.on("disconnected", function(){
     if (!NET.on) return;
@@ -2192,25 +2358,29 @@ document.addEventListener("visibilitychange", function(){
   if (NET.on && NET.peer && NET.peer.disconnected) tryReconnect();
 });
 function joinRoom(code){
-  if (!window.Peer){ netStat("联机库没加载上，只能单机", "bad"); return; }
+  if (NET.on){ netStat("已经在房间里了", "warn"); return; }
+  if (MQF.force || !window.Peer){
+    mqConnect(false, code);
+    return;
+  }
   netStat("正在连…");
   try {
     NET.peer = new Peer({ debug: 0, config: { iceServers: [
       { urls: "stun:stun.l.google.com:19302" },
-      { urls: "stun:global.stun.twilio.com:3478" },
-      { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
-      { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
-      { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
+      { urls: "stun:stun.qq.com:3478" },
+      { urls: "stun:stun.miwifi.com:3478" }
     ] } });
   } catch(e){ netStat("连接失败：" + e.message, "bad"); return; }
 
   clearTimeout(NET._tj);
   NET._tj = setTimeout(function(){
     if (NET.on) return;
-    netStat("连不上房主（15 秒）：房号对吗？房主那边要显示「房间已开」。", "bad");
+    netStat("直连没成，正在自动切中继通道找房主…");
     try { if (NET.peer) NET.peer.destroy(); } catch(e) {}
     NET.peer = null;
-  }, 15000);
+    if (!MQ.ok) mqConnect(false, code);
+  }, 6000);
+  setTimeout(function(){ if (!NET.on && !MQ.ok) mqConnect(false, code); }, 9000);
 
   NET.peer.on("open", function(){
     clearTimeout(NET._tj);
@@ -2218,12 +2388,7 @@ function joinRoom(code){
     NET.conn = c;
     c.on("open", function(){
       clearTimeout(NET._tj);
-      NET.on = true; NET.host = false; NET.room = code; NET.ready = true;
-      send(c, { k:"hi", n: myName });
-      paintRoom();
-      netStat("已连上 " + code, "ok");
-      SFX.play("success", { volume:.7 });
-      enterGame();
+      guestReady(code, c, "", false);
     });
     c.on("data", function(d){ onNetData(d, c); });
     c.on("error", function(err){ netStat("连接出错：" + ((err && err.type) || "ice") + "，检查网络后再点加入", "bad"); });
