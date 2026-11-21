@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>异常方块 · 2040K 画质</title>
+<style>
+  :root{
+    --ink:#E9F2F4; --dim:#9FB3BA; --dim2:#71888F; --line:#22363D;
+    --cyan:#7FE3F2; --blue:#7FB6D8;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;background:#0A1216;color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    overflow:hidden;user-select:none;}
+  canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;}
+
+  .top{position:fixed;left:0;right:0;top:0;padding:12px 14px;display:flex;align-items:flex-start;
+    justify-content:space-between;pointer-events:none;z-index:6;}
+  .back{pointer-events:auto;display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;
+    border:1px solid rgba(127,227,242,.22);background:rgba(10,20,24,.62);color:var(--ink);
+    font-size:12px;letter-spacing:.02em;text-decoration:none;backdrop-filter:blur(8px);}
+  .back:hover{border-color:rgba(127,227,242,.45);}
+  .right{display:flex;flex-direction:column;align-items:flex-end;gap:7px;}
+  #mini{width:150px;height:150px;border-radius:12px;border:1px solid rgba(127,227,242,.16);
+    background:rgba(8,16,20,.62);backdrop-filter:blur(6px);display:block;}
+  .stat{padding:5px 10px;border-radius:999px;background:rgba(8,16,20,.62);border:1px solid rgba(127,227,242,.14);
+    font-size:11.5px;color:var(--dim);letter-spacing:.02em;backdrop-filter:blur(6px);white-space:nowrap;}
+  .stat b{color:var(--ink);font-weight:600;}
+  #pos{font-variant-numeric:tabular-nums;}
+
+  #cross{position:fixed;left:50%;top:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;
+    background:rgba(233,242,244,.85);box-shadow:0 0 8px rgba(0,0,0,.55);z-index:5;pointer-events:none;}
+
+  #goal{position:fixed;left:50%;top:14px;transform:translateX(-50%);font-size:12.5px;color:var(--dim);
+    letter-spacing:.03em;z-index:5;pointer-events:none;text-shadow:0 1px 8px rgba(0,0,0,.6);white-space:nowrap;}
+
+  #toast{position:fixed;left:50%;bottom:88px;transform:translate(-50%,10px);max-width:min(78vw,420px);
+    padding:9px 16px;border-radius:999px;background:rgba(8,18,22,.82);border:1px solid rgba(127,227,242,.2);
+    color:var(--ink);font-size:12.5px;line-height:1.5;text-align:center;opacity:0;transition:.25s;z-index:7;pointer-events:none;}
+  #toast.on{opacity:1;transform:translate(-50%,0);}
+
+  .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:9;
+    background:radial-gradient(120% 90% at 50% 0%,#10222A 0%,#060D11 70%);transition:opacity .35s;}
+  .overlay.hide{opacity:0;pointer-events:none;}
+  .box{max-width:520px;padding:32px 28px;text-align:center;}
+  .box h1{margin:0 0 12px;font-family:Georgia,"Songti SC","STSong",serif;font-size:30px;font-weight:600;letter-spacing:-.01em;}
+  .box p{margin:0 0 18px;font-size:13px;line-height:1.85;color:var(--dim);}
+  .box .kv{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:0 0 22px;}
+  .box .kv span{padding:5px 10px;border-radius:999px;border:1px solid var(--line);font-size:11.5px;color:var(--dim2);}
+  .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
+  button.primary,button.ghost{border-radius:999px;padding:11px 22px;font-size:13px;cursor:pointer;
+    border:1px solid transparent;font-family:inherit;transition:.18s;}
+  button.primary{background:linear-gradient(180deg,#8FEAF6,#4FC9DE);color:#06232B;font-weight:600;border-color:#9DF0FA;}
+  button.primary:hover{filter:brightness(1.06);}
+  button.ghost{background:transparent;color:var(--dim);border-color:var(--line);}
+  button.ghost:hover{color:var(--ink);border-color:#35525C;}
+  #bar{height:5px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;margin:14px auto 0;max-width:280px;}
+  #bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#7FE3F2,#C9F6FF);transition:width .2s;}
+  #loadTxt{font-size:11.5px;color:var(--dim2);margin-top:8px;font-variant-numeric:tabular-nums;}
+
+  #stick{position:fixed;left:22px;bottom:26px;width:104px;height:104px;border-radius:50%;
+    border:1px solid rgba(127,227,242,.22);background:rgba(8,16,20,.35);z-index:6;display:none;
+    backdrop-filter:blur(4px);touch-action:none;}
+  #stick i{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;
+    background:rgba(127,227,242,.30);border:1px solid rgba(127,227,242,.5);}
+  #sprint{position:fixed;right:24px;bottom:34px;width:82px;height:82px;border-radius:50%;z-index:6;
+    display:none;align-items:center;justify-content:center;font-size:12px;color:var(--dim);
+    border:1px solid rgba(127,227,242,.22);background:rgba(8,16,20,.35);backdrop-filter:blur(4px);touch-action:none;}
+  #sprint.on{color:var(--ink);border-color:rgba(127,227,242,.6);background:rgba(127,227,242,.18);}
+
+  #err{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);max-width:86vw;padding:18px 20px;
+    border-radius:12px;background:rgba(30,10,12,.9);border:1px solid #7A2B30;color:#FFD9D9;font-size:12.5px;
+    line-height:1.7;z-index:20;display:none;white-space:pre-wrap;}
+  @media (max-width:640px){
+    .box h1{font-size:24px;}
+    #mini{width:118px;height:118px;}
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="top">
+  <a class="back" href="index.html">← 2040K</a>
+  <div class="right">
+    <canvas id="mini" width="300" height="300"></canvas>
+    <div class="stat" id="pos">0, 0</div>
+    <div class="stat" id="hud">异常方块 · 漫游</div>
+  </div>
+</div>
+<div id="goal">WASD 走，Shift 冲刺，鼠标转头</div>
+<div id="cross"></div>
+<div id="toast"></div>
+<div id="stick"><i></i></div>
+<div id="sprint">冲刺</div>
+
+<div class="overlay" id="intro">
+  <div class="box">
+    <h1>异常方块</h1>
+    <p>一座 200×200 的城，整块模型直接读进来：地形、街道、楼群、树木都是真的几何。
+      这一版先把「能走、能看、会碰撞」跑通——第一人称在街上走，抬头看楼顶，楼是实心的，地面有高低。</p>
+    <div class="kv">
+      <span>真实 glb 地图</span><span>44 万三角面</span><span>第一人称</span><span>手机可玩</span>
+    </div>
+    <div class="row">
+      <button class="primary" id="go" type="button">进入城市</button>
+      <button class="ghost" id="city" type="button">自动绕城一圈</button>
+    </div>
+    <div id="bar"><i></i></div>
+    <div id="loadTxt">正在读取地图模型…</div>
+  </div>
+</div>
+<div id="err"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  var $=function(id){ return document.getElementById(id); };
+  var errEl=$("err");
+  function fail(msg){
+    errEl.style.display="block";
+    errEl.textContent=String(msg);
+    try{ console.error(msg); }catch(e){}
+  }
+  window.addEventListener("error",function(e){
+    if(!window.__ok) fail("初始化失败："+(e.message||e.error));
+  });
+
+  var canvas=$("c");
+  var gl=canvas.getContext("webgl2",{antialias:true,alpha:false,powerPreference:"high-performance"});
+  if(!gl){ fail("这个浏览器/设备不支持 WebGL2，打不开这座城。"); return; }
+
+  /* ================= 数学 ================= */
+  function m4id(){ return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]); }
+  function m4mul(a,b){
+    var o=new Float32Array(16);
+    for(var i=0;i<4;i++){
+      var a0=a[i],a1=a[i+4],a2=a[i+8],a3=a[i+12];
+      o[i]   =a0*b[0]+a1*b[1]+a2*b[2]+a3*b[3];
+      o[i+4] =a0*b[4]+a1*b[5]+a2*b[6]+a3*b[7];
+      o[i+8] =a0*b[8]+a1*b[9]+a2*b[10]+a3*b[11];
+      o[i+12]=a0*b[12]+a1*b[13]+a2*b[14]+a3*b[15];
+    }
+    return o;
+  }
+  function m4persp(fovy,aspect,near,far){
+    var f=1/Math.tan(fovy/2), o=new Float32Array(16);
+    o[0]=f/aspect; o[5]=f; o[10]=(far+near)/(near-far); o[11]=-1; o[14]=2*far*near/(near-far);
+    return o;
+  }
+  function m4look(eye,dir,up){
+    var zx=dir[0],zy=dir[1],zz=dir[2];
+    var zl=Math.sqrt(zx*zx+zy*zy+zz*zz)||1; zx/=zl; zy/=zl; zz/=zl;
+    var xx=up[1]*zz-up[2]*zy, xy=up[2]*zx-up[0]*zz, xz=up[0]*zy-up[1]*zx;
+    var xl=Math.sqrt(xx*xx+xy*xy+xz*xz)||1; xx/=xl; xy/=xl; xz/=xl;
+    var yx=zy*xz-zz*xy, yy=zz*xx-zx*xz, yz=zx*xy-zy*xx;
+    var o=new Float32Array(16);
+    o[0]=xx; o[1]=yx; o[2]=zx; o[3]=0;
+    o[4]=xy; o[5]=yy; o[6]=zy; o[7]=0;
+    o[8]=xz; o[9]=yz; o[10]=zz; o[11]=0;
+    o[12]=-(xx*eye[0]+xy*eye[1]+xz*eye[2]);
+    o[13]=-(yx*eye[0]+yy*eye[1]+yz*eye[2]);
+    o[14]=-(zx*eye[0]+zy*eye[1]+zz*eye[2]);
+    o[15]=1;
+    return o;
+  }
+  function m4inv(m){
+    var o=new Float32Array(16), a=m;
+    var a00=a[0],a01=a[1],a02=a[2],a03=a[3];
+    var a10=a[4],a11=a[5],a12=a[6],a13=a[7];
+    var a20=a[8],a21=a[9],a22=a[10],a23=a[11];
+    var a30=a[12],a31=a[13],a32=a[14],a33=a[15];
+    var b00=a00*a11-a01*a10, b01=a00*a12-a02*a10, b02=a00*a13-a03*a10;
+    var b03=a01*a12-a02*a11, b04=a01*a13-a03*a11, b05=a02*a13-a03*a12;
+    var b06=a20*a31-a21*a30, b07=a20*a32-a22*a30, b08=a20*a33-a23*a30;
+    var b09=a21*a32-a22*a31, b10=a21*a33-a23*a31, b11=a22*a33-a23*a32;
+    var det=b00*b11-b01*b10+b02*b09+b03*b08-b04*b07+b05*b06;
+    if(!det) return m4id();
+    det=1/det;
+    o[0]=(a11*b11-a12*b10+a13*b09)*det; o[1]=(a02*b10-a01*b11-a03*b09)*det;
+    o[2]=(a31*b05-a32*b04+a33*b03)*det; o[3]=(a22*b04-a21*b05-a23*b03)*det;
+    o[4]=(a12*b08-a10*b11-a13*b07)*det; o[5]=(a00*b11-a02*b08+a03*b07)*det;
+    o[6]=(a32*b02-a30*b05-a33*b01)*det; o[7]=(a20*b05-a22*b02+a23*b01)*det;
+    o[8]=(a10*b10-a11*b08+a13*b06)*det; o[9]=(a01*b08-a00*b10-a03*b06)*det;
+    o[10]=(a30*b04-a31*b02+a33*b00)*det; o[11]=(a21*b02-a20*b04-a23*b00)*det;
+    o[12]=(a11*b07-a10*b09-a12*b06)*det; o[13]=(a00*b09-a01*b07+a02*b06)*det;
+    o[14]=(a31*b01-a30*b03-a32*b00)*det; o[15]=(a20*b03-a21*b01+a22*b00)*det;
+    return o;
+  }
+
+  /* ================= 着色器 ================= */
+  function sh(type,src){
+    var s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s);
+    if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)+"\n"+src);
+    return s;
+  }
+  function prog(vs,fs){
+    var p=gl.createProgram();
+    gl.attachShader(p,sh(gl.VERTEX_SHADER,vs));
+    gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs));
+    gl.linkProgram(p);
+    if(!gl.getProgramParameter(p,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    var o={p:p,u:{},a:{}};
+    var nu=gl.getProgramParameter(p,gl.ACTIVE_UNIFORMS);
+    for(var i=0;i<nu;i++){
+      var info=gl.getActiveUniform(p,i), loc=gl.getUniformLocation(p,info.name), nm=info.name.replace(/\[0\]$/,"");
+      o.u[nm]=loc; if(nm!==info.name) o.u[info.name]=loc;
+    }
+    var na=gl.getProgramParameter(p,gl.ACTIVE_ATTRIBUTES);
+    for(var j=0;j<na;j++){ var ai=gl.getActiveAttrib(p,j); o.a[ai.name]=gl.getAttribLocation(p,ai.name); }
+    return o;
+  }
+
+  var VS_MAIN=`#version 300 es
+layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNor; layout(location=2) in vec3 aCol;
+uniform mat4 uVP; uniform mat4 uM;
+out vec3 vPos; out vec3 vNor; out vec3 vCol;
+void main(){
+  vec4 wp=uM*vec4(aPos,1.0);
+  vPos=wp.xyz; vNor=mat3(uM)*aNor; vCol=aCol;
+  gl_Position=uVP*wp;
+}`;
+
+  var FS_MAIN=`#version 300 es
+precision highp float;
+in vec3 vPos; in vec3 vNor; in vec3 vCol;
+uniform vec3 uCam; uniform vec3 uSun; uniform vec3 uSky; uniform vec3 uGround;
+uniform vec3 uFogCol; uniform float uFogDen; uniform float uTime;
+out vec4 o;
+void main(){
+  vec3 n=normalize(cross(dFdx(vPos),dFdy(vPos)));
+  if(dot(n,normalize(uCam-vPos))<0.0) n=-n;
+  float up=clamp(n.y*0.5+0.5,0.0,1.0);
+  vec3 amb=mix(uGround,uSky,up);
+  float d=max(dot(n,normalize(uSun)),0.0);
+  vec3 base=vCol;
+  /* 竖直面：世界高度上做一层窗带，让方块楼不像塑料 */
+  if(abs(n.y)<0.35){
+    float hy=vPos.y-5.2;
+    if(hy>0.7){
+      /* 每栋楼一点明度差，避免整城一个色 */
+      float hb=fract(sin(dot(vec2(floor(vPos.x/9.0),floor(vPos.z/9.0)),vec2(27.13,57.31)))*43758.5453);
+      base*=0.84+0.22*hb;
+      float band=step(0.55,fract(hy/2.4));
+      float win=step(0.5,fract((vPos.x+vPos.z)*0.18+0.3))*0.5+0.5;
+      base*=mix(1.0,0.74+0.12*band*win,0.9);
+      base+=vec3(0.02,0.02,0.02)*step(0.75,fract(hy/2.4));
+    }
+  }
+  vec3 lit=base*(amb+vec3(1.02,0.98,0.90)*d*0.72);
+  /* 极轻的菲涅尔天光，给玻璃幕墙一点边光 */
+  vec3 v=normalize(uCam-vPos);
+  float fr=pow(1.0-max(dot(n,v),0.0),4.0);
+  lit+=uSky*fr*0.10;
+  float dist=length(vPos-uCam);
+  float fog=1.0-exp(-pow(dist*uFogDen,2.0));
+  vec3 col=mix(lit,uFogCol,clamp(fog,0.0,1.0));
+  o=vec4(col,1.0);
+}`;
+
+  var VS_SKY=`#version 300 es
+layout(location=0) in vec2 aP;
+out vec2 vP;
+void main(){ vP=aP; gl_Position=vec4(aP,0.9999,1.0); }`;
+
+  var FS_SKY=`#version 300 es
+precision highp float;
+in vec2 vP;
+uniform mat4 uInvVP; uniform vec3 uCam; uniform vec3 uSun; uniform vec3 uSky; uniform vec3 uFogCol; uniform vec3 uGround;
+out vec4 o;
+void main(){
+  vec4 p=uInvVP*vec4(vP,1.0,1.0);
+  vec3 d=normalize(p.xyz/p.w-uCam);
+  float h=clamp(d.y,0.0,1.0);
+  vec3 sky=mix(uFogCol*1.06,uSky,pow(h,0.55));
+  float sd=max(dot(d,normalize(uSun)),0.0);
+  sky+=vec3(1.0,0.90,0.72)*pow(sd,180.0)*0.9;
+  sky+=vec3(1.0,0.86,0.66)*pow(sd,18.0)*0.10;
+  if(d.y<0.0) sky=mix(uFogCol,uGround*0.9,clamp(-d.y*5.0,0.0,0.6));
+  o=vec4(sky,1.0);
+}`;
+
+  var progMain=prog(VS_MAIN,FS_MAIN);
+  var progSky=prog(VS_SKY,FS_SKY);
+
+  /* ================= 天空全屏三角 ================= */
+  var skyVAO=gl.createVertexArray(), skyBuf=gl.createBuffer();
+  gl.bindVertexArray(skyVAO);
+  gl.bindBuffer(gl.ARRAY_BUFFER,skyBuf);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1, 3,-1, -1,3]),gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+  gl.bindVertexArray(null);
+
+  /* ================= 外围地坪 ================= */
+  var gndVAO=gl.createVertexArray(), gndBuf=gl.createBuffer(), gndN=0;
+  (function(){
+    var H=1200, y=5.30;
+    var v=[ -H,y,-H, 0,1,0, 0.86,0.81,0.70,
+              H,y,-H, 0,1,0, 0.86,0.81,0.70,
+             -H,y, H, 0,1,0, 0.86,0.81,0.70,
+              H,y,-H, 0,1,0, 0.86,0.81,0.70,
+              H,y, H, 0,1,0, 0.86,0.81,0.70,
+             -H,y, H, 0,1,0, 0.86,0.81,0.70 ];
+    gl.bindVertexArray(gndVAO);
+    gl.bindBuffer(gl.ARRAY_BUFFER,gndBuf);
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(v),gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,3,gl.FLOAT,false,36,0);
+    gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1,3,gl.FLOAT,false,36,12);
+    gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2,3,gl.FLOAT,false,36,24);
+    gl.bindVertexArray(null);
+    gndN=6;
+  })();
+
+  /* ================= 地图常量 ================= */
+  var MAP_HALF=100;                 /* 模型 x/z 各 ±100 */
+  var CELL=0.5;                      /* 网格精度（米） */
+  var GN=Math.round(MAP_HALF*2/CELL);/* 400×400 */
+  var heights=new Float32Array(GN*GN);   /* 地形高度 */
+  var blocked=new Uint8Array(GN*GN);     /* 建筑占位 */
+  var groundMin=1e9, groundMax=-1e9;
+  var meshVAO=null, meshBuf=null, meshCount=0;
+
+  /* 世界坐标：glTF 是 Z 轴朝上，绕 X 转 -90° 变成 Y 朝上 */
+  function wx(x,y,z){ return x; }
+  function wy(x,y,z){ return z; }
+  function wz(x,y,z){ return -y; }
+
+  /* ================= GLB 读取 ================= */
+  function fetchGlb(url,onProg){
+    return fetch(url,{cache:"force-cache"}).then(function(res){
+      if(!res.ok) throw new Error("地图文件读取失败 HTTP "+res.status+" "+url);
+      var total=+(res.headers.get("content-length")||0);
+      if(!res.body||!res.body.getReader){
+        return res.arrayBuffer().then(function(ab){ onProg&&onProg(1); return ab; });
+      }
+      var reader=res.body.getReader(), chunks=[], got=0;
+      return new Promise(function(ok,bad){
+        (function pump(){
+          reader.read().then(function(r){
+            if(r.done){
+              if(total&&got<total) total=got;
+              var out=new Uint8Array(got), off=0;
+              for(var i=0;i<chunks.length;i++){ out.set(chunks[i],off); off+=chunks[i].length; }
+              ok(out.buffer);
+              return;
+            }
+            chunks.push(r.value); got+=r.value.length;
+            if(onProg) onProg(total? Math.min(1,got/total) : 0, got, total);
+            pump();
+          },bad);
+        })();
+      });
+    });
+  }
+
+  function parseGlb(buf){
+    var dv=new DataView(buf);
+    if(dv.getUint32(0,true)!==0x46546C67) throw new Error("不是 GLB 文件");
+    var len=dv.getUint32(8,true), off=12, js=null, bin=null;
+    while(off<len){
+      var clen=dv.getUint32(off,true), ctype=dv.getUint32(off+4,true);
+      if(ctype===0x4E4F534A) js=JSON.parse(new TextDecoder("utf-8").decode(new Uint8Array(buf,off+8,clen)));
+      else if(ctype===0x004E4942) bin=new Uint8Array(buf,off+8,clen);
+      off+=8+clen;
+    }
+    if(!js||!bin) throw new Error("GLB 结构不完整");
+    return {json:js,bin:bin};
+  }
+
+  var COMP={5120:1,5121:1,5122:2,5123:2,5125:4,5126:4};
+  var TYPE={SCALAR:1,VEC2:2,VEC3:3,VEC4:4,MAT4:16};
+  function readAcc(js,bin,idx){
+    var a=js.accessors[idx], bv=js.bufferViews[a.bufferView];
+    var n=TYPE[a.type], bytes=COMP[a.componentType]*n;
+    var stride=bv.byteStride||bytes;
+    var base=(bv.byteOffset||0)+(a.byteOffset||0);
+    var out=new Float32Array(a.count*n);
+    var dv=new DataView(bin.buffer,bin.byteOffset);
+    for(var i=0;i<a.count;i++){
+      var o=base+i*stride;
+      for(var k=0;k<n;k++){
+        var v;
+        switch(a.componentType){
+          case 5126: v=dv.getFloat32(o+k*4,true); break;
+          case 5123: v=dv.getUint16(o+k*2,true); break;
+          case 5125: v=dv.getUint32(o+k*4,true); break;
+          case 5121: v=dv.getUint8(o+k); break;
+          case 5122: v=dv.getInt16(o+k*2,true); break;
+          case 5120: v=dv.getInt8(o+k); break;
+          default: v=0;
+        }
+        if(a.normalized){
+          if(a.componentType===5121) v/=255;
+          else if(a.componentType===5123) v/=65535;
+          else if(a.componentType===5122) v=Math.max(v/32767,-1);
+          else if(a.componentType===5120) v=Math.max(v/127,-1);
+        }
+        out[i*n+k]=v;
+      }
+    }
+    return out;
+  }
+  function readIdx(js,bin,idx){
+    var a=js.accessors[idx], bv=js.bufferViews[a.bufferView];
+    var base=(bv.byteOffset||0)+(a.byteOffset||0);
+    var out=new Uint32Array(a.count);
+    var dv=new DataView(bin.buffer,bin.byteOffset);
+    for(var i=0;i<a.count;i++){
+      out[i]= a.componentType===5125 ? dv.getUint32(base+i*4,true)
+           : a.componentType===5123 ? dv.getUint16(base+i*2,true)
+           : dv.getUint8(base+i);
+    }
+    return out;
+  }
+
+  /* 地形高度 + 建筑占位：把三角形栅格化到 0.5m 网格 */
+  function cellOf(v){ return Math.floor((v+MAP_HALF)/CELL); }
+  function rasterTri(ax,az,bx,bz,cxz,cz,fn){
+    var minx=Math.min(ax,bx,cxz), maxx=Math.max(ax,bx,cxz);
+    var minz=Math.min(az,bz,cz), maxz=Math.max(az,bz,cz);
+    var i0=Math.max(0,cellOf(minx)), i1=Math.min(GN-1,cellOf(maxx));
+    var j0=Math.max(0,cellOf(minz)), j1=Math.min(GN-1,cellOf(maxz));
+    var d=(bz-cz)*(ax-cxz)+(cxz-bx)*(az-cz);
+    if(Math.abs(d)<1e-9) return;
+    for(var j=j0;j<=j1;j++){
+      for(var i=i0;i<=i1;i++){
+        var px=(i+0.5)*CELL-MAP_HALF, pz=(j+0.5)*CELL-MAP_HALF;
+        var l1=((bz-cz)*(px-cxz)+(cxz-bx)*(pz-cz))/d;
+        var l2=((cz-az)*(px-cxz)+(ax-cxz)*(pz-cz))/d;
+        var l3=1-l1-l2;
+        if(l1>=-0.001&&l2>=-0.001&&l3>=-0.001) fn(i,j,l1,l2,l3);
+      }
+    }
+  }
+
+  var STAT={tris:0,verts:0,prims:0,disabled:0};
+  function buildScene(glb){
+    var js=glb.json, bin=glb.bin;
+    var nodes=js.nodes, meshes=js.meshes, mats=js.materials;
+    var triTotal=0, vertTotal=0;
+    for(var mi=0;mi<meshes.length;mi++){
+      var m=meshes[mi];
+      for(var pi=0;pi<m.primitives.length;pi++){
+        var pr=m.primitives[pi];
+        triTotal+=js.accessors[pr.indices].count/3;
+        vertTotal+=js.accessors[pr.attributes.POSITION].count;
+      }
+    }
+    var P=new Float32Array(vertTotal*3), N=new Float32Array(vertTotal*3), C=new Float32Array(vertTotal*3);
+    var IDX=new Uint32Array(triTotal*3);
+    var vo=0, io=0;
+
+    function put(px,py,pz,nx,ny,nz,r,g,b){
+      P[vo*3]=px; P[vo*3+1]=py; P[vo*3+2]=pz;
+      N[vo*3]=nx; N[vo*3+1]=ny; N[vo*3+2]=nz;
+      C[vo*3]=r;   C[vo*3+1]=g; C[vo*3+2]=b;
+      vo++;
+    }
+
+    /* 先算整体包围盒，用于把模型摆正到地面 */
+    var stats={buildings:0,terrain:0,land:0,trans:0};
+
+    for(var ni=0;ni<nodes.length;ni++){
+      var nd=nodes[ni];
+      if(nd.mesh===undefined) continue;
+      var name=(nd.name||"").split("_")[0];
+      var mesh=meshes[nd.mesh];
+      var mtx=nd.matrix? new Float32Array(nd.matrix) : m4id();
+      if(nd.translation||nd.rotation||nd.scale){
+        var t=nd.translation||[0,0,0], s=nd.scale||[1,1,1], q=nd.rotation||[0,0,0,1];
+        var qx=q[0],qy=q[1],qz=q[2],qw=q[3];
+        var xx=1-2*(qy*qy+qz*qz), xy=2*(qx*qy-qw*qz), xz=2*(qx*qz+qw*qy);
+        var yx=2*(qx*qy+qw*qz), yy=1-2*(qx*qx+qz*qz), yz=2*(qy*qz-qw*qx);
+        var zx=2*(qx*qz-qw*qy), zy=2*(qy*qz+qw*qx), zz=1-2*(qx*qx+qy*qy);
+        mtx=new Float32Array([
+          xx*s[0],xy*s[0],xz*s[0],0,
+          yx*s[1],yy*s[1],yz*s[1],0,
+          zx*s[2],zy*s[2],zz*s[2],0,
+          t[0],t[1],t[2],1
+        ]);
+      }
+      for(var pi=0;pi<mesh.primitives.length;pi++){
+        var pr=mesh.primitives[pi];
+        var pa=readAcc(js,bin,pr.attributes.POSITION);
+        var na=pr.attributes.NORMAL!==undefined? readAcc(js,bin,pr.attributes.NORMAL):null;
+        var ca=pr.attributes.COLOR_0!==undefined? readAcc(js,bin,pr.attributes.COLOR_0):null;
+        var ia=readIdx(js,bin,pr.indices);
+        var mat=(pr.material!==undefined)? mats[pr.material]:null;
+        var bc=(mat&&mat.pbrMetallicRoughness&&mat.pbrMetallicRoughness.baseColorFactor)||[0.72,0.74,0.72,1];
+        var base=vo, nv=js.accessors[pr.attributes.POSITION].count;
+
+        for(var v=0;v<nv;v++){
+          var x=pa[v*3], y=pa[v*3+1], z=pa[v*3+2];
+          /* 节点矩阵（这里基本都是单位阵） */
+          var tx=mtx[0]*x+mtx[4]*y+mtx[8]*z+mtx[12];
+          var ty=mtx[1]*x+mtx[5]*y+mtx[9]*z+mtx[13];
+          var tz=mtx[2]*x+mtx[6]*y+mtx[10]*z+mtx[14];
+          var WX=wx(tx,ty,tz), WY=wy(tx,ty,tz), WZ=wz(tx,ty,tz);
+          var nx=0,ny=1,nz=0;
+          if(na){
+            var ox=na[v*3], oy=na[v*3+1], oz=na[v*3+2];
+            nx=mtx[0]*ox+mtx[4]*oy+mtx[8]*oz;
+            ny=mtx[1]*ox+mtx[5]*oy+mtx[9]*oz;
+            nz=mtx[2]*ox+mtx[6]*oy+mtx[10]*oz;
+            var tnx=wx(nx,ny,nz), tny=wy(nx,ny,nz), tnz=wz(nx,ny,nz);
+            nx=tnx; ny=tny; nz=tnz;
+            var nl=Math.sqrt(nx*nx+ny*ny+nz*nz)||1; nx/=nl; ny/=nl; nz/=nl;
+          }
+          var r=bc[0],g=bc[1],b=bc[2];
+          if(ca){ r=ca[v*(ca.length/nv)]; g=ca[v*(ca.length/nv)+1]; b=ca[v*(ca.length/nv)+2]; }
+          put(WX,WY,WZ,nx,ny,nz,r,g,b);
+        }
+        for(var k=0;k<ia.length;k++) IDX[io++]=base+ia[k];
+
+        /* 栅格化：建筑挡路、地形给高度 */
+        if(name==="building"||name==="terrain"||name==="landcover"){
+          for(var t2=0;t2<ia.length;t2+=3){
+            var i1=base+ia[t2], i2=base+ia[t2+1], i3=base+ia[t2+2];
+            var A=[P[i1*3],P[i1*3+1],P[i1*3+2]];
+            var B=[P[i2*3],P[i2*3+1],P[i2*3+2]];
+            var D=[P[i3*3],P[i3*3+1],P[i3*3+2]];
+            if(name==="building"){
+              if(Math.max(A[1],B[1],D[1])<3.0) continue;
+              rasterTri(A[0],A[2],B[0],B[2],D[0],D[2],function(i,j){
+                blocked[j*GN+i]=1;
+              });
+              stats.buildings++;
+            } else if(name==="terrain"){
+              rasterTri(A[0],A[2],B[0],B[2],D[0],D[2],function(i,j,l1,l2,l3){
+                var h=A[1]*l1+B[1]*l2+D[1]*l3;
+                var o=j*GN+i;
+                if(h>heights[o]) heights[o]=h;
+                if(h>groundMax) groundMax=h;
+                if(h<groundMin) groundMin=h;
+              });
+              stats.terrain++;
+            } else {
+              if(Math.max(A[1],B[1],D[1])<2.2) continue;
+              rasterTri(A[0],A[2],B[0],B[2],D[0],D[2],function(i,j){
+                if(!blocked[j*GN+i]) blocked[j*GN+i]=2;   /* 2 = 树/杂物，也挡人但画法不同 */
+              });
+              stats.land++;
+            }
+          }
+        }
+      }
+    }
+
+    STAT.tris=triTotal; STAT.verts=vertTotal; STAT.prims=js.meshes.length;
+    var bx0=1e9,bx1=-1e9,by0=1e9,by1=-1e9,bz0=1e9,bz1=-1e9;
+    for(var q2=0;q2<vo;q2++){
+      var X=P[q2*3],Y=P[q2*3+1],Z=P[q2*3+2];
+      if(X<bx0)bx0=X; if(X>bx1)bx1=X; if(Y<by0)by0=Y; if(Y>by1)by1=Y; if(Z<bz0)bz0=Z; if(Z>bz1)bz1=Z;
+    }
+    STAT.bb=[bx0,by0,bz0,bx1,by1,bz1];
+    meshCount=io;
+
+    /* 打包：pos(3)+nor(3)+col(3) */
+    var inter=new Float32Array(vo*9);
+    for(var q=0;q<vo;q++){
+      inter[q*9]=P[q*3];     inter[q*9+1]=P[q*3+1]; inter[q*9+2]=P[q*3+2];
+      inter[q*9+3]=N[q*3];   inter[q*9+4]=N[q*3+1]; inter[q*9+5]=N[q*3+2];
+      inter[q*9+6]=C[q*3];   inter[q*9+7]=C[q*3+1]; inter[q*9+8]=C[q*3+2];
+    }
+    meshVAO=gl.createVertexArray();
+    meshBuf=gl.createBuffer();
+    gl.bindVertexArray(meshVAO);
+    gl.bindBuffer(gl.ARRAY_BUFFER,meshBuf);
+    gl.bufferData(gl.ARRAY_BUFFER,inter,gl.STATIC_DRAW);
+    var st=36;
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,3,gl.FLOAT,false,st,0);
+    gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1,3,gl.FLOAT,false,st,12);
+    gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2,3,gl.FLOAT,false,st,24);
+    gl.bindVertexArray(null);
+    var ib=gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ib);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,IDX,gl.STATIC_DRAW);
+    gl.bindVertexArray(meshVAO);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ib);
+    gl.bindVertexArray(null);
+
+    return stats;
+  }
+
+  /* ================= 地形查询 ================= */
+  function sampleH(x,z){
+    var fi=(x+MAP_HALF)/CELL, fj=(z+MAP_HALF)/CELL;
+    var i=Math.floor(fi), j=Math.floor(fj);
+    if(i<0||j<0||i>=GN-1||j>=GN-1) return 0;
+    var u=fi-i, v=fj-j, o=j*GN+i;
+    var h00=heights[o], h10=heights[o+1], h01=heights[o+GN], h11=heights[o+GN+1];
+    if(h00===0&&h10===0&&h01===0&&h11===0) return 0;
+    return (h00*(1-u)+h10*u)*(1-v)+(h01*(1-u)+h11*u)*v;
+  }
+  function isBlocked(x,z){
+    var i=Math.floor((x+MAP_HALF)/CELL), j=Math.floor((z+MAP_HALF)/CELL);
+    if(i<0||j<0||i>=GN||j>=GN) return 3;
+    return blocked[j*GN+i];
+  }
+
+  /* ================= 玩家 ================= */
+  var player={x:0,y:0,z:0,yaw:0.6,pitch:-0.02,vx:0,vz:0,step:0,fph:0,bob:0};
+  var NOGRAV=false;
+  var EYE=1.68, RAD=0.36;
+  var keys={};
+  var touchMove={x:0,z:0}, touchSprint=false;
+  var started=false;
+
+  function findStart(){
+    /* 从中心向外螺旋找一块没被建筑占的平地 */
+    for(var r=0;r<90;r++){
+      for(var a=0;a<Math.max(1,r*6);a++){
+        var ang=a/Math.max(1,r*6)*Math.PI*2;
+        var x=Math.cos(ang)*r*CELL, z=Math.sin(ang)*r*CELL;
+        if(isBlocked(x,z)===0&&sampleH(x,z)>0.3) return [x,z];
+      }
+    }
+    return [0,0];
+  }
+
+  function resetPlayer(){
+    var s=findStart();
+    player.x=s[0]; player.z=s[1];
+    player.y=sampleH(player.x,player.z)+EYE;
+    player.vx=0; player.vz=0; player.yaw=0.6; player.pitch=-0.02;
+  }
+
+  function blockedAt(x,z){
+    var b=isBlocked(x,z);
+    return b!==0;
+  }
+
+  function stepPlayer(dt){
+    var fwd=0, side=0;
+    if(keys.KeyW||keys.w) fwd+=1;
+    if(keys.KeyS||keys.s) fwd-=1;
+    if(keys.KeyD||keys.d) side+=1;
+    if(keys.KeyA||keys.a) side-=1;
+    fwd+=touchMove.z; side+=touchMove.x;
+    var sprint=(keys.ShiftLeft||keys.ShiftRight||touchSprint)?2.0:1.0;
+    var speed=(isWaterish(player.x,player.z)?3.4:5.4)*sprint;
+    var mag=Math.sqrt(fwd*fwd+side*side);
+    if(mag>1){ fwd/=mag; side/=mag; mag=1; }
+    mag=Math.min(1,mag);
+
+    var sy=Math.sin(player.yaw), cy=Math.cos(player.yaw);
+    var wx=sy*fwd+cy*side, wz=cy*fwd-sy*side;
+    var accel=14;
+    player.vx+=(wx*speed-player.vx)*Math.min(1,accel*dt);
+    player.vz+=(wz*speed-player.vz)*Math.min(1,accel*dt);
+
+    /* 分轴推进，撞墙就沿墙滑 */
+    var nx=player.x+player.vx*dt;
+    if(!blockedAt(nx+Math.sign(player.vx)*RAD,player.z)) player.x=nx;
+    else player.vx=0;
+    var nz=player.z+player.vz*dt;
+    if(!blockedAt(player.x,nz+Math.sign(player.vz)*RAD)) player.z=nz;
+    else player.vz=0;
+
+    /* 地图边界 */
+    player.x=Math.max(-MAP_HALF+1.2,Math.min(MAP_HALF-1.2,player.x));
+    player.z=Math.max(-MAP_HALF+1.2,Math.min(MAP_HALF-1.2,player.z));
+
+    if(!NOGRAV){
+      var gh=sampleH(player.x,player.z)+EYE;
+      player.y+=(gh-player.y)*Math.min(1,12*dt);
+    }
+
+    var mv=Math.sqrt(player.vx*player.vx+player.vz*player.vz);
+    player.step+=dt*mv*1.5;
+    player.bob=Math.sin(player.step)*0.022*Math.min(1,mv);
+    var fph=Math.floor(player.step/2.2);
+    if(fph!==player.fph){ player.fph=fph; if(mv>1.2) sfx("step"); }
+  }
+  function isWaterish(x,z){ return false; }
+
+  /* ================= 音效 ================= */
+  var AU={ctx:null,mast:null,ready:false,muted:false};
+  function auInit(){
+    if(AU.ready) return AU.ctx;
+    try{
+      var C=window.AudioContext||window.webkitAudioContext;
+      if(!C) return null;
+      AU.ctx=new C();
+      AU.mast=AU.ctx.createGain(); AU.mast.gain.value=0.9;
+      AU.mast.connect(AU.ctx.destination);
+      AU.ready=true;
+    }catch(e){}
+    try{ if(AU.ctx&&AU.ctx.state!=="running") AU.ctx.resume(); }catch(e){}
+    return AU.ctx;
+  }
+  function noise(dur,vol,type,freq,q,delay){
+    if(!AU.ready||AU.muted||!AU.ctx) return;
+    var c=AU.ctx, t0=c.currentTime+(delay||0), n=Math.floor(c.sampleRate*dur);
+    var buf=c.createBuffer(1,n,c.sampleRate), ch=buf.getChannelData(0);
+    for(var i=0;i<n;i++){ var k=1-i/n; ch[i]=(Math.random()*2-1)*k*k; }
+    var src=c.createBufferSource(); src.buffer=buf;
+    var f=c.createBiquadFilter(); f.type=type||"lowpass"; f.frequency.value=freq||500; f.Q.value=q||1;
+    var g=c.createGain(); g.gain.value=vol; src.connect(f); f.connect(g); g.connect(AU.mast);
+    src.start(t0);
+  }
+  function sfx(n){
+    if(!AU.ready) auInit();
+    if(AU.muted) return;
+    try{ if(AU.ctx&&AU.ctx.state!=="running") AU.ctx.resume(); }catch(e){}
+    if(n==="step") noise(0.09,0.07,"lowpass",620,1.0);
+  }
+
+  /* ================= 输入 ================= */
+  canvas.addEventListener("pointerdown",function(e){
+    if(!started) return;
+    if(e.pointerType==="mouse"){
+      if(document.pointerLockElement!==canvas) canvas.requestPointerLock&&canvas.requestPointerLock();
+    }
+  });
+  document.addEventListener("mousemove",function(e){
+    if(document.pointerLockElement===canvas){
+      player.yaw-=(e.movementX||0)*0.0024;
+      player.pitch-=(e.movementY||0)*0.0022;
+      player.pitch=Math.max(-1.35,Math.min(1.35,player.pitch));
+    }
+  });
+  document.addEventListener("pointerlockchange",function(){
+    var on=document.pointerLockElement===canvas;
+    $("goal").textContent=on?"WASD 走，Shift 冲刺 · Esc 松鼠标":(started?"点一下画面锁鼠标 · WASD 仍可走":"WASD 走，Shift 冲刺，鼠标转头");
+  });
+  window.addEventListener("keydown",function(e){
+    keys[e.code]=1; keys[e.key]=1;
+    if(e.code==="KeyR"&&started){ resetPlayer(); toast("回到起点"); }
+  });
+  window.addEventListener("keyup",function(e){ keys[e.code]=0; keys[e.key]=0; });
+
+  var looking=false, lastX=0, lastY=0;
+
+  /* 手机：左半屏拖动 = 走；右半屏拖动 = 转头 */
+  var stick=$("stick"), stickDot=stick.querySelector("i");
+  var stickId=null, stickCX=0, stickCY=0;
+  stick.addEventListener("pointerdown",function(e){
+    stickId=e.pointerId; stick.setPointerCapture(e.pointerId);
+    var r=stick.getBoundingClientRect(); stickCX=r.left+r.width/2; stickCY=r.top+r.height/2;
+    moveStick(e.clientX,e.clientY);
+  });
+  stick.addEventListener("pointermove",function(e){ if(e.pointerId===stickId) moveStick(e.clientX,e.clientY); });
+  function endStick(e){
+    if(e.pointerId!==stickId) return;
+    stickId=null; touchMove.x=0; touchMove.z=0;
+    stickDot.style.transform="";
+  }
+  stick.addEventListener("pointerup",endStick);
+  stick.addEventListener("pointercancel",endStick);
+  function moveStick(cx,cy){
+    var dx=(cx-stickCX)/52, dy=(cy-stickCY)/52;
+    var l=Math.sqrt(dx*dx+dy*dy); if(l>1){ dx/=l; dy/=l; }
+    touchMove.x=dx; touchMove.z=-dy;
+    stickDot.style.transform="translate("+(dx*34)+"px,"+(dy*34)+"px)";
+  }
+  var sprintBtn=$("sprint");
+  sprintBtn.addEventListener("pointerdown",function(e){ e.preventDefault(); touchSprint=true; sprintBtn.classList.add("on"); });
+  ["pointerup","pointercancel","pointerleave"].forEach(function(ev){
+    sprintBtn.addEventListener(ev,function(){ touchSprint=false; sprintBtn.classList.remove("on"); });
+  });
+  canvas.addEventListener("pointermove",function(e){
+    if(e.pointerType==="mouse"||e.isPrimary===false) return;
+    if(looking){
+      player.yaw-=e.movementX*0.0035; player.pitch-=e.movementY*0.0032;
+      player.pitch=Math.max(-1.35,Math.min(1.35,player.pitch));
+    }
+  });
+  canvas.addEventListener("pointerdown",function(e){
+    if(e.pointerType!=="mouse"&&!looking){ looking=true; lastX=e.clientX; lastY=e.clientY; }
+  });
+  canvas.addEventListener("pointermove",function(e){
+    if(e.pointerType==="mouse"||!looking) return;
+    player.yaw-=(e.clientX-lastX)*0.0038; player.pitch-=(e.clientY-lastY)*0.0034;
+    player.pitch=Math.max(-1.35,Math.min(1.35,player.pitch));
+    lastX=e.clientX; lastY=e.clientY;
+  });
+  canvas.addEventListener("pointerup",function(){ looking=false; });
+  canvas.addEventListener("pointercancel",function(){ looking=false; });
+
+  /* ================= 视图 ================= */
+  var VW=1,VH=1,DPR=1;
+  function resize(){
+    var w=window.innerWidth,h=window.innerHeight;
+    DPR=Math.min(2.0,window.devicePixelRatio||1);
+    var maxPix=2.4e6;
+    if(w*h*DPR*DPR>maxPix) DPR=Math.sqrt(maxPix/(w*h));
+    VW=Math.floor(w*DPR); VH=Math.floor(h*DPR);
+    canvas.width=VW; canvas.height=VH;
+    canvas.style.width=w+"px"; canvas.style.height=h+"px";
+    gl.viewport(0,0,VW,VH);
+  }
+  window.addEventListener("resize",resize);
+
+  /* ================= 小地图 ================= */
+  var mini=$("mini"), mctx=mini.getContext("2d"), mapImg=null, MAPS=300;
+  function buildMinimap(){
+    var cv=document.createElement("canvas"); cv.width=MAPS; cv.height=MAPS;
+    var x2=cv.getContext("2d");
+    var img=x2.createImageData(MAPS,MAPS);
+    var step=GN/MAPS;
+    for(var j=0;j<MAPS;j++){
+      for(var i=0;i<MAPS;i++){
+        var gi=Math.floor(i*step), gj=Math.floor(j*step);
+        var o=(gj*GN+gi), b=blocked[o], h=heights[o];
+        var r=8,g=14,bb=18,a=110;
+        if(b===1){ r=190;g=204;bb=214;a=235; }
+        else if(b===2){ r=90;g=128;bb=104;a=210; }
+        else if(h>0.4){ var k=Math.min(1,h/12); r=24+k*10; g=34+k*16; bb=36+k*16; a=140; }
+        else { r=12;g=18;bb=22;a=100; }
+        var po=(j*MAPS+i)*4;
+        img.data[po]=r; img.data[po+1]=g; img.data[po+2]=bb; img.data[po+3]=a;
+      }
+    }
+    x2.putImageData(img,0,0);
+    mapImg=cv;
+  }
+  var miniR=14;      /* 小地图显示半径（米） */
+  function drawMini(){
+    var w=mini.width,h=mini.height;
+    mctx.clearRect(0,0,w,h);
+    if(mapImg){
+      var px=(player.x+MAP_HALF)/(MAP_HALF*2)*MAPS;
+      var pz=(player.z+MAP_HALF)/(MAP_HALF*2)*MAPS;
+      var srcR=miniR/(MAP_HALF*2)*MAPS;
+      mctx.drawImage(mapImg, px-srcR, pz-srcR, srcR*2, srcR*2, 0,0,w,h);
+    }
+    /* 视野锥 + 玩家 */
+    var cx=w/2, cy=h/2;
+    mctx.save();
+    mctx.translate(cx,cy);
+    mctx.rotate(-player.yaw);
+    mctx.fillStyle="rgba(127,227,242,.13)";
+    mctx.beginPath(); mctx.moveTo(0,0);
+    mctx.lineTo(-h*0.55, -h*0.75); mctx.lineTo(h*0.55,-h*0.75);
+    mctx.closePath(); mctx.fill();
+    mctx.restore();
+    mctx.fillStyle="#7FE3F2";
+    mctx.beginPath();
+    mctx.moveTo(cx,cy-6); mctx.lineTo(cx-5,cy+5); mctx.lineTo(cx,cy+2); mctx.lineTo(cx+5,cy+5);
+    mctx.closePath(); mctx.fill();
+  }
+
+  /* ================= 渲染 ================= */
+  var SUN=[0.42,0.72,0.55], SKYC=[0.44,0.62,0.80], GROUNDC=[0.20,0.24,0.22], FOGC=[0.66,0.74,0.78];
+  var frameN=0, PERF={frames:0,acc:0,fps:0,worst:0};
+  function drawScene(){
+    var aspect=VW/VH;
+    var vp=m4persp(1.02,aspect,0.1,320);
+    var cp=Math.cos(player.pitch), sp=Math.sin(player.pitch);
+    var dir=[Math.sin(player.yaw)*cp, sp, Math.cos(player.yaw)*cp];
+    var eye=[player.x, player.y+player.bob, player.z];
+    var v=m4mul(vp,m4look(eye,[-dir[0],-dir[1],-dir[2]],[0,1,0]));
+    gl.viewport(0,0,VW,VH);
+
+    /* 天空 */
+    gl.disable(gl.DEPTH_TEST); gl.depthMask(false);
+    gl.useProgram(progSky.p);
+    gl.uniformMatrix4fv(progSky.u.uVP,false,v);
+    gl.uniformMatrix4fv(progSky.u.uInvVP,false,m4inv(v));
+    gl.uniform3fv(progSky.u.uCam,new Float32Array(eye));
+    gl.uniform3fv(progSky.u.uSun,new Float32Array(SUN));
+    gl.uniform3fv(progSky.u.uSky,new Float32Array(SKYC));
+    gl.uniform3fv(progSky.u.uGround,new Float32Array(GROUNDC));
+    gl.uniform3fv(progSky.u.uFogCol,new Float32Array(FOGC));
+    gl.bindVertexArray(skyVAO);
+    gl.drawArrays(gl.TRIANGLES,0,3);
+    gl.bindVertexArray(null);
+
+    gl.enable(gl.DEPTH_TEST); gl.depthMask(true);
+    gl.clear(gl.DEPTH_BUFFER_BIT);
+    gl.useProgram(progMain.p);
+    gl.uniformMatrix4fv(progMain.u.uVP,false,v);
+    gl.uniformMatrix4fv(progMain.u.uM,false,m4id());
+    gl.uniform3fv(progMain.u.uCam,new Float32Array(eye));
+    gl.uniform3fv(progMain.u.uSun,new Float32Array(SUN));
+    gl.uniform3fv(progMain.u.uSky,new Float32Array(SKYC));
+    gl.uniform3fv(progMain.u.uGround,new Float32Array(GROUNDC));
+    gl.uniform3fv(progMain.u.uFogCol,new Float32Array(FOGC));
+    gl.uniform1f(progMain.u.uFogDen,0.0044);
+    if(gndVAO && gndN){
+      gl.enable(gl.DEPTH_TEST);
+      gl.bindVertexArray(gndVAO);
+      gl.drawArrays(gl.TRIANGLES,0,gndN);
+    }
+    if(meshVAO){
+      gl.bindVertexArray(meshVAO);
+      gl.drawElements(gl.TRIANGLES,meshCount,gl.UNSIGNED_INT,0);
+      gl.bindVertexArray(null);
+    }
+  }
+
+  /* ================= 主循环 ================= */
+  var T0=performance.now(), lastT=T0;
+  function loop(ts){
+    var dt=Math.min(0.05,(ts-lastT)/1000);
+    lastT=ts;
+    frameN++;
+    if(started) stepPlayer(dt);
+    if(tour) stepTour(dt);
+    drawScene();
+    drawMini();
+    $("pos").textContent=Math.round(player.x)+", "+Math.round(player.z);
+    PERF.frames++; PERF.acc+=dt;
+    if(PERF.acc>=1){ PERF.fps=Math.round(PERF.frames/PERF.acc); PERF.frames=0; PERF.acc=0; }
+    $("hud").innerHTML=PERF.fps+" fps · 三角面 "+Math.round(STAT.tris/1000)+"k";
+    requestAnimationFrame(loop);
+  }
+
+  /* ================= 提示 ================= */
+  var toastEl=$("toast"), toastT=0;
+  function toast(msg){
+    toastEl.textContent=msg; toastEl.classList.add("on");
+    clearTimeout(toastT); toastT=setTimeout(function(){ toastEl.classList.remove("on"); },2200);
+  }
+
+  /* ================= 启动 ================= */
+  var isTouch=("ontouchstart" in window)||navigator.maxTouchPoints>0;
+  function begin(){
+    started=true;
+    $("intro").classList.add("hide");
+    $("goal").textContent=isTouch?"左摇杆走 · 右侧拖动转头 · 点冲刺加速":"WASD 走，Shift 冲刺，点画面锁鼠标";
+    if(isTouch){ $("stick").style.display="block"; $("sprint").style.display="flex"; }
+    auInit();
+    if(!isTouch){ try{ canvas.requestPointerLock&&canvas.requestPointerLock(); }catch(e){} }
+  }
+
+  var glbBuf=null;
+  function boot(){
+    var bar=$("bar").querySelector("i"), txt=$("loadTxt");
+    fetchGlb("../../modern/model.glb",function(p,got,total){
+      bar.style.width=(p*100).toFixed(0)+"%";
+      txt.textContent="读取地图 "+Math.round(p*100)+"% · "+(got/1048576).toFixed(1)+" / "+(total/1048576).toFixed(1)+" MB";
+    }).then(function(buf){
+      glbBuf=buf;
+      txt.textContent="解析模型与碰撞网格…";
+      var glb=parseGlb(buf);
+      var t0=performance.now();
+      var st=buildScene(glb);
+      resize();
+      buildMinimap();
+      resetPlayer();
+      bar.style.width="100%";
+      txt.textContent="城市就绪 · "+Math.round(st.tris/1000)+"k 面 · 解析 "+(performance.now()-t0).toFixed(0)+" ms";
+      $("go").disabled=false;
+      glbBuf=null;
+      requestAnimationFrame(loop);
+      window.__ok=true;
+      if(/auto=1/.test(location.search)) begin();
+    }).catch(function(e){
+      fail("地图加载失败："+(e&&e.message||e));
+      txt.textContent="加载失败";
+    });
+  }
+
+  go.addEventListener("click",function(){ begin(); });
+  $("city").addEventListener("click",function(){ begin(); runTour(); });
+
+  /* 自动绕城：绕着城里走一圈，用来快速看模型 */
+  var tour=null;
+  function runTour(){
+    tour={t:0,cx:0,cz:0,r:36,w:0.16};
+    toast("自动绕城 · 按 R 可回起点");
+  }
+  function stepTour(dt){
+    if(!tour) return;
+    tour.t+=dt;
+    var a=tour.t*0.18;
+    player.x=tour.cx+Math.cos(a)*tour.r;
+    player.z=tour.cz+Math.sin(a)*tour.r;
+    player.yaw=a+Math.PI/2;
+    player.pitch=-0.08;
+    player.y=sampleH(player.x,player.z)+EYE;
+    if(tour.t>40){ tour=null; toast("绕城结束"); }
+  }
+
+  window.addEventListener("pointerdown",function(){ auInit(); },true);
+  window.addEventListener("keydown",function(){ auInit(); },true);
+
+  /* 调试钩子 */
+  window.__P=function(){ return {x:+player.x.toFixed(2),y:+player.y.toFixed(2),z:+player.z.toFixed(2),yaw:+player.yaw.toFixed(2),pitch:+player.pitch.toFixed(2)}; };
+  window.__PERF=function(){ return {fps:PERF.fps,tris:STAT.tris,verts:STAT.verts,prims:STAT.prims,ground:[+groundMin.toFixed(1),+groundMax.toFixed(1)],blocked:blocked.reduce(function(a,b){return a+(b?1:0);},0)}; };
+  window.__FLY=function(x,y,z,yaw,pitch){ NOGRAV=true; player.x=x; player.y=y; player.z=z; player.vx=0; player.vz=0; if(yaw!==undefined)player.yaw=yaw; if(pitch!==undefined)player.pitch=pitch; return window.__P(); };
+  window.__TEL=function(x,z,yaw,pitch){ NOGRAV=false; player.x=x; player.z=z; if(yaw!==undefined) player.yaw=yaw; if(pitch!==undefined) player.pitch=pitch; player.y=sampleH(x,z)+EYE; toast("传送到 "+Math.round(x)+", "+Math.round(z)); return window.__P(); };
+  window.__LOOK=function(yaw,pitch){ player.yaw=yaw; player.pitch=pitch; };
+  window.__H=function(x,z){ return +sampleH(x,z).toFixed(2); };
+  window.__B=function(x,z){ return isBlocked(x,z); };
+  window.__START=function(){ begin(); };
+  window.__MARK=function(){ return {hp:[0,0]}; };
+  window.__BB=function(){ return STAT.bb||null; };
+  window.__GL=function(){ return gl.getError(); };
+  window.__U=function(){ return {M:!!progMain.u.uM,VP:!!progMain.u.uVP,CAM:!!progMain.u.uCam,FOG:!!progMain.u.uFogDen,SUN:!!progMain.u.uSun,SKY:!!progMain.u.uSky,GND:!!progMain.u.uGround,FC:!!progMain.u.uFogCol,names:Object.keys(progMain.u)}; };
+  window.__CNT=function(){ return {n:meshCount,vao:!!meshVAO}; };
+
+  boot();
+})();
+</script>
+</body>
+</html>
