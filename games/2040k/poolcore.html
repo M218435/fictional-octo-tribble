@@ -23,6 +23,7 @@
   .stat{display:flex;gap:6px;align-items:center;font-size:11px;color:rgba(234,242,242,.62);
     background:rgba(8,14,16,.5);border:1px solid rgba(160,200,210,.16);border-radius:8px;padding:4px 8px;}
   .stat b{color:#8FE3E6;font-weight:600;}
+  #netchip{cursor:pointer;}
   #goal{position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top));transform:translateX(-50%);
     font-size:12px;letter-spacing:.04em;color:rgba(234,242,242,.66);pointer-events:none;z-index:6;
     text-shadow:0 1px 3px rgba(0,0,0,.6);}
@@ -75,6 +76,7 @@
   <div class="right">
     <canvas id="mini" width="208" height="208"></canvas>
     <div class="stat"><span id="keys">拉杆 <b>0/10</b></span></div>
+    <div class="stat"><span id="netchip">单机</span></div>
   </div>
 </div>
 <div id="goal">沿着走廊找拉杆</div>
@@ -91,6 +93,7 @@
     <div class="row">
       <button id="qHigh" class="primary" type="button">高画质</button>
       <button id="qLow" type="button">流畅</button>
+      <button id="qNet" type="button">联机（公共池）</button>
     </div>
     <div class="hint">电脑：WASD 走 · 鼠标环顾 · Shift 冲刺 · 左键砸墙 / 拉杆<br>手机：左摇杆走 · 右侧拖动转视角 · 点一下屏幕 = 拉杆或砸</div>
   </div>
@@ -288,6 +291,7 @@ void main(){
   if(mat==4){ shin=58.0; specK=0.62; }          /* 橡皮鸭 / 塑料件 */
   if(mat==5){ shin=26.0; specK=0.08; lit*=0.92; }  /* 亚光漆面 */
   if(mat==6){ shin=46.0; specK=0.45; }             /* modern/ 真实模型 */
+  if(mat==7){ shin=90.0; specK=0.0; lit=base*(amb+0.62); }  /* 玩家皮肤：哑光 + 保底亮度 */
   if(mat==2){ lit=base*2.1; }
   for(int i=0;i<8;i++){
     if(i>=uLN) break;
@@ -659,6 +663,7 @@ function drawObjects(vp,eye,clipOn,clipY,isRefl){
       gl.drawElements(gl.TRIANGLES,mc.parts?mc.parts[0].count:mc.count,gl.UNSIGNED_SHORT,0);
     }
   }
+  drawNetAvatars(p,eye);
   /* 水里的鸭子：浮在水面，能推动，也会转过来看你 */
   mc=modelCache.duck;
   if(mc){
@@ -826,7 +831,8 @@ function buildLevers(){
     var dirs=[[1,0],[-1,0],[0,1],[0,-1]], pick=null;
     for(var k=0;k<4;k++){ var d=dirs[k]; if(!cellOpen(c[0]+d[0],c[1]+d[1])){ pick=d; break; } }
     if(!pick) pick=[0,1];
-    var lx=w[0]+pick[0]*(CELL*0.5-0.30), lz=w[1]+pick[1]*(CELL*0.5-0.30);
+    /* 贴墙：模型背面几乎压在墙面上（以前离墙 30cm，看着像浮在半空） */
+    var lx=w[0]+pick[0]*(CELL*0.5-0.02), lz=w[1]+pick[1]*(CELL*0.5-0.02);
     var yaw=Math.atan2(-pick[0],-pick[1]);
     levers.push({id:i,x:lx,z:lz,yaw:yaw,cell:c,pulled:false,anim:0});
   }
@@ -1000,7 +1006,7 @@ function buildWorldMesh(ccx,ccz){
   }
   levers.forEach(function(l){
     if(l.cell[0]<ox0||l.cell[0]>ox1||l.cell[1]<oz0||l.cell[1]>oz1) return;
-    regionProps.push({k:"alarm",x:l.x,y:0.72,z:l.z,yaw:l.yaw,scale:1.0,lever:l,baseFix:0.0774});
+    regionProps.push({k:"alarm",x:l.x,y:1.18,z:l.z,yaw:l.yaw,scale:2.6,lever:l,baseFix:0.0774});
     addLight(l.x,1.55,l.z, 1.0,0.42,0.26, 3.6);
   });
 }
@@ -1133,11 +1139,13 @@ function updateFrags(dt){
     if(!cellOpen(cx,cz)) f.x-=f.vx*dt*1.4;
   }
 }
-function makeHole(x,y,z,dx,dz){
+function makeHole(x,y,z,dx,dz,fromNet){
   var r=0.34+Math.random()*0.12;
   holes.push({x:x,y:y,z:z,r:r});
+  if(!fromNet) netHole(x,y,z,dx,dz,r);
   while(holes.length>HMAX) holes.shift();
   spawnFrags(x,y,z,dx,dz);
+  sfx("smash"); sfx("debris");
   try{ if(window.RTSXSFX) RTSXSFX.play("hit"); }catch(e){}
   swingT=(performance.now()-T0)/1000;
 }
@@ -1146,6 +1154,7 @@ function smash(){
   if(!hammerOwned){ tryPullLever(); return; }
   if(now-lastSmash<0.30) return;
   lastSmash=now; swingT=now;
+  sfx("swing");
   var c=camView(), eye=c.eye, d=c.dir;
   for(var t=0.35;t<3.4;t+=0.03){
     var px=eye[0]+d[0]*t, py=eye[1]+d[1]*t, pz=eye[2]+d[2]*t;
@@ -1180,9 +1189,12 @@ function tryPullLever(){
   n.l.pulled=true; n.l.pullT=(performance.now()-T0)/1000;
   pulledCount++;
   updateKeyHud();
+  sfx("lever");
+  netLever(n.l.id);
   try{ if(window.RTSXSFX) RTSXSFX.play("click"); }catch(e){}
   if(pulledCount>=LEVER_N){
     hammerOwned=true;
+    sfx("leverDone");
     toast("第 10 个 —— 锤子到手 · 左键砸墙");
   } else {
     toast("拉杆 "+pulledCount+"/"+LEVER_N);
@@ -1397,6 +1409,75 @@ function rebuildRegion(cx,cz){
 }
 /* ================= HUD ================= */
 var toastEl=document.getElementById("toast"), toastT=0;
+
+/* ================= 音效（纯 WebAudio 合成，不依赖任何音频文件） ================= */
+var AU={ctx:null,mast:null,ready:false,muted:false,amb:null};
+function auInit(){
+  if(AU.ready) return AU.ctx;
+  try{
+    var C=window.AudioContext||window.webkitAudioContext;
+    if(!C) return null;
+    AU.ctx=new C();
+    AU.mast=AU.ctx.createGain();
+    AU.mast.gain.value=0.9;
+    AU.mast.connect(AU.ctx.destination);
+    AU.ready=true;
+  }catch(e){ AU.ready=false; }
+  try{ if(AU.ctx&&AU.ctx.state==="suspended") AU.ctx.resume(); }catch(e){}
+  return AU.ctx;
+}
+function auGain(v){ var g=AU.ctx.createGain(); g.gain.value=v; g.connect(AU.mast); return g; }
+function auNoise(dur,vol,type,freq,q,delay){
+  if(!AU.ready||AU.muted||!AU.ctx) return;
+  var d=delay||0, c=AU.ctx, t0=c.currentTime+d;
+  var n=Math.floor(c.sampleRate*dur), buf=c.createBuffer(1,n,c.sampleRate), ch=buf.getChannelData(0);
+  for(var i=0;i<n;i++){ var k=1-i/n; ch[i]=(Math.random()*2-1)*k*k; }
+  var src=c.createBufferSource(); src.buffer=buf;
+  var f=c.createBiquadFilter(); f.type=type||"bandpass"; f.frequency.value=freq||800; f.Q.value=q||1.0;
+  var g=auGain(vol);
+  src.connect(f); f.connect(g); src.start(t0);
+}
+function auTone(freq,dur,vol,type,delay,slideTo){
+  if(!AU.ready||AU.muted||!AU.ctx) return;
+  var c=AU.ctx, t0=c.currentTime+(delay||0);
+  var o=c.createOscillator(); o.type=type||"sine"; o.frequency.setValueAtTime(freq,t0);
+  if(slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(20,slideTo),t0+dur);
+  var g=auGain(vol); g.gain.setValueAtTime(vol,t0);
+  g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+  o.connect(g); o.start(t0); o.stop(t0+dur+0.02);
+}
+function startAmbience(){
+  if(!auInit()||AU.amb||AU.muted) return;
+  try{
+    var c=AU.ctx;
+    var o1=c.createOscillator(); o1.type="sine"; o1.frequency.value=54;
+    var o2=c.createOscillator(); o2.type="triangle"; o2.frequency.value=108;
+    var g=c.createGain(); g.gain.value=0.035;
+    var lp=c.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=220;
+    o1.connect(lp); o2.connect(lp); lp.connect(g); g.connect(AU.mast);
+    o1.start(); o2.start();
+    AU.amb={o1:o1,o2:o2,g:g};
+  }catch(e){}
+}
+function sfx(name){
+  if(!AU.ready){ if(name==="step"||name==="splash") return; auInit(); }
+  if(AU.muted) return;
+  switch(name){
+    case "step": auNoise(0.09,0.055,"lowpass",520,1.0); auTone(150,0.05,0.03,"sine",0,110); break;
+    case "splash": auNoise(0.20,0.10,"bandpass",1500,0.8); auNoise(0.28,0.05,"lowpass",420,1.0,0.02); break;
+    case "jump": auNoise(0.07,0.05,"lowpass",700,1.0); break;
+    case "land": auNoise(0.12,0.07,"lowpass",380,1.2); auTone(120,0.08,0.04,"sine",0,80); break;
+    case "lever": auTone(880,0.05,0.12,"square",0,520); auNoise(0.05,0.09,"bandpass",2200,1.6,0.01); auTone(330,0.09,0.07,"sine",0.05,220); break;
+    case "leverDone": auTone(660,0.16,0.14,"sine"); auTone(990,0.20,0.12,"sine",0.10); auTone(1320,0.30,0.10,"sine",0.22); break;
+    case "swing": auNoise(0.16,0.05,"bandpass",900,0.7); break;
+    case "smash": auNoise(0.13,0.16,"lowpass",900,0.9); auNoise(0.30,0.10,"lowpass",300,1.0,0.08); auTone(90,0.20,0.06,"sine",0.02,55); break;
+    case "debris": for(var i=0;i<4;i++) auNoise(0.07,0.05,"bandpass",1600+i*260,1.4,0.03*i); break;
+    case "win": auTone(523,0.5,0.16,"sine"); auTone(784,0.6,0.14,"sine",0.18); auTone(1046,0.9,0.12,"sine",0.38); break;
+    case "hurt": auTone(300,0.18,0.10,"sawtooth",0,140); break;
+  }
+}
+window.__SFX=function(n){ sfx(n); return true; };
+
 function toast(msg){
   toastEl.textContent=msg;
   toastEl.classList.add("on");
@@ -1469,6 +1550,11 @@ function updatePlayer(dt){
   var mv=Math.sqrt(player.vx*player.vx+player.vz*player.vz);
   player.step+=dt*mv*1.6;
   player.bob=Math.sin(player.step)*0.026*(mv>0.6?1:0);
+  /* 脚步声：每半个摆步一次，水里换成水花 */
+  if(mv>0.55){
+    var fph=Math.floor(player.step/2.4);
+    if(fph!==player.fph){ player.fph=fph; sfx(inWater?"splash":"step"); }
+  }
 
   /* 走过的格子记下来，小地图才亮 */
   for(var dz2=-1;dz2<=1;dz2++) for(var dx2=-1;dx2<=1;dx2++){
@@ -1714,6 +1800,10 @@ function begin(quality){
       sprintBtn.classList.add("on");
     }
     if(!isTouch) lockPointer();
+    try{ auInit(); startAmbience(); }catch(e){}
+  /* 之前把网络心跳挂在渲染循环里：标签页切后台 rAF 停摆，位姿就断了 */
+  if(!window.__netTimer){ window.__netTimer=setInterval(function(){ try{ netTick(0.1); }catch(e){} },100); }
+    if(!NETPC.on) setTimeout(function(){ netEnter(NET_ROOM); },60);
     toast(hammerOwned?"锤子已到手 · 左键砸墙，墙会按砸中的那一点碎开":"在大迷宫里找 10 个火警拉杆 · 拉完拿到锤子");
   }catch(e){
     showFail(e&&e.message?e.message:String(e));
@@ -1722,6 +1812,11 @@ function begin(quality){
 
 document.getElementById("qHigh").addEventListener("click",function(){ begin(1); });
 document.getElementById("qLow").addEventListener("click",function(){ begin(0); });
+document.getElementById("qNet").addEventListener("click",function(){
+  begin(1);
+  setTimeout(function(){ if(!NETPC.on) netEnter(NET_ROOM); },80);
+});
+document.getElementById("netchip").addEventListener("click",function(){ pcCopy(); });
 document.getElementById("again").addEventListener("click",function(){
   won=false; elapsed=0;
   document.getElementById("win").classList.add("hidden");
@@ -1768,6 +1863,7 @@ function loop(ts){
     if(tourStage===1){ keysDown.w=1; if(elapsed>2.2){ tourStage=2; keysDown.w=0; try{ smashTest(); }catch(e){} } }
     updatePlayer(dt);
   }
+  /* 网络心跳走独立定时器，见 begin() */
   try{
     var c=camView();
     var vp={vp:m4mul(m4persp(1.28,VW/VH,0.05,120),c.view),eye:c.eye,dir:c.dir};
@@ -1794,14 +1890,341 @@ try{
   showFail(e&&e.message?e.message:String(e));
 }
 
+
+/* ================= 多人：公共 MQTT 中继 + 我的世界风格方块玩家 ================= */
+var PX=0.056;                                  /* 1 皮肤像素 ≈ 5.6cm，32px ≈ 1.8m */
+var NETPC={on:false,host:false,room:"",sid:"",ws:null,ok:false,topic:"",players:{},
+           lastPose:0,connack:false,helloTimer:null,ka:null,joined:false};
+var NETNAME="玩家";
+var NET_ROOM=((/[?&]room=([A-Za-z0-9]{4,8})/.exec(QS)||[])[1]||"").toUpperCase();
+
+function pcBytes(n){
+  var a=new Uint8Array(n), ok=false;
+  try{ if(window.crypto&&crypto.getRandomValues){ crypto.getRandomValues(a); ok=true; } }catch(e){}
+  if(!ok){ for(var i=0;i<n;i++) a[i]=Math.floor(Math.random()*256); }
+  return a;
+}
+function pcRand(){
+  var a=pcBytes(8), h="";
+  for(var i=0;i<8;i++) h+=("0"+a[i].toString(16)).slice(-2);
+  return h;
+}
+function pcCode(){
+  var A="ABCDEFGHJKLMNPQRSTUVWXYZ23456789", o="", r=pcBytes(5);
+  for(var i=0;i<5;i++) o+=A[r[i]%A.length];
+  return o;
+}
+function pcTopic(c){ return "rtsx67pool/v1/"+String(c).toLowerCase(); }
+
+/* ---------- 皮肤贴图（64×64，canvas 现画） ---------- */
+var skinT=null;
+function mkSkin(){
+  if(skinT) return skinT;
+  var C=document.createElement("canvas"); C.width=64; C.height=64;
+  var x=C.getContext("2d"); x.imageSmoothingEnabled=false;
+  var SK="#C08A63",HAIR="#2E1E12",SH="#2E9EA0",PA="#3A4A9A",Shoe="#3E3E42",DARK="#20171A";
+  function r(u,v,w,h,c){ x.fillStyle=c; x.fillRect(u,v,w,h); }
+  r(8,8,8,8,SK); r(0,8,8,8,SK); r(16,8,8,8,SK); r(24,8,8,8,SK); r(8,0,8,8,HAIR); r(16,0,8,8,SK);
+  r(8,8,8,2,HAIR); r(0,8,8,2,HAIR); r(16,8,8,2,HAIR); r(24,8,8,2,HAIR);
+  r(10,11,2,1,"#F1EEE6"); r(13,11,2,1,"#F1EEE6");
+  r(10,12,1,1,"#3F63B4"); r(14,12,1,1,"#3F63B4");
+  r(11,14,3,1,DARK);
+  r(20,20,8,12,SH); r(32,20,8,12,SH); r(16,20,4,12,SH); r(28,20,4,12,SH);
+  r(20,16,8,4,SH); r(28,16,8,4,SH); r(22,20,4,1,SK);
+  r(44,20,4,12,SH); r(52,20,4,12,SH); r(40,20,4,12,SH); r(48,20,4,12,SH);
+  r(44,16,4,4,SK); r(48,16,4,4,SK);
+  r(44,29,4,3,SK); r(40,29,4,3,SK); r(48,29,4,3,SK); r(52,29,4,3,SK);
+  r(4,20,4,12,PA); r(12,20,4,12,PA); r(0,20,4,12,PA); r(8,20,4,12,PA);
+  r(4,16,4,4,PA); r(8,16,4,4,PA);
+  r(4,31,4,1,Shoe); r(0,31,4,1,Shoe); r(8,31,4,1,Shoe); r(12,31,4,1,Shoe);
+  var t=gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D,t);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,C);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  skinT=t; return t;
+}
+
+/* ---------- 方块部件（像素单位建，画的时候整体乘 PX） ---------- */
+function pcU(u,v,w,h){ return [u/64,v/64,(u+w)/64,(v+h)/64]; }
+function pcPart(x0,x1,y0,y1,z0,z1,f){
+  var buf=[];
+  function v(x,y,z,nx,ny,nz,u,vv){ buf.push(x,y,z,nx,ny,nz,u,vv,1,1,1,7.0); }
+  function quad(q,n,uv){
+    v(q[0][0],q[0][1],q[0][2],n[0],n[1],n[2],uv[0],uv[3]);
+    v(q[1][0],q[1][1],q[1][2],n[0],n[1],n[2],uv[2],uv[3]);
+    v(q[2][0],q[2][1],q[2][2],n[0],n[1],n[2],uv[2],uv[1]);
+    v(q[0][0],q[0][1],q[0][2],n[0],n[1],n[2],uv[0],uv[3]);
+    v(q[2][0],q[2][1],q[2][2],n[0],n[1],n[2],uv[2],uv[1]);
+    v(q[3][0],q[3][1],q[3][2],n[0],n[1],n[2],uv[0],uv[1]);
+  }
+  if(f.front) quad([[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]],[0,0,1],f.front);
+  if(f.back)  quad([[x1,y0,z0],[x0,y0,z0],[x0,y1,z0],[x1,y1,z0]],[0,0,-1],f.back);
+  if(f.left)  quad([[x0,y0,z0],[x0,y0,z1],[x0,y1,z1],[x0,y1,z0]],[-1,0,0],f.left);
+  if(f.right) quad([[x1,y0,z1],[x1,y0,z0],[x1,y1,z0],[x1,y1,z1]],[1,0,0],f.right);
+  if(f.top)   quad([[x0,y1,z1],[x1,y1,z1],[x1,y1,z0],[x0,y1,z0]],[0,1,0],f.top);
+  if(f.bottom)quad([[x0,y0,z0],[x1,y0,z0],[x1,y0,z1],[x0,y0,z1]],[0,-1,0],f.bottom);
+  var vao=gl.createVertexArray(), vb=gl.createBuffer();
+  gl.bindVertexArray(vao);
+  gl.bindBuffer(gl.ARRAY_BUFFER,vb);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(buf),gl.STATIC_DRAW);
+  bindAttribs(progMain);
+  gl.bindVertexArray(null);
+  return {vao:vao,count:buf.length/12};
+}
+var avParts=null;
+function buildAvatar(){
+  if(avParts) return avParts;
+  var head=pcU(8,8,8,8), hb=pcU(24,8,8,8), hl=pcU(16,8,8,8), hr=pcU(0,8,8,8), ht=pcU(8,0,8,8), hbot=pcU(16,0,8,8);
+  var bf=pcU(20,20,8,12), bb=pcU(32,20,8,12), bl=pcU(28,20,4,12), br=pcU(16,20,4,12), bt=pcU(20,16,8,4), bbot=pcU(28,16,8,4);
+  var af=pcU(44,20,4,12), ab=pcU(52,20,4,12), al=pcU(48,20,4,12), ar=pcU(40,20,4,12), at=pcU(44,16,4,4), abot=pcU(48,16,4,4);
+  var lf=pcU(4,20,4,12), lb=pcU(12,20,4,12), ll=pcU(8,20,4,12), lr=pcU(0,20,4,12), lt=pcU(4,16,4,4), lbot=pcU(8,16,4,4);
+  avParts={
+    head: {m:pcPart(-4,4,24,32,-4,4,{front:head,back:hb,left:hl,right:hr,top:ht,bottom:hbot}), p:[0,24,0]},
+    body: {m:pcPart(-4,4,12,24,-2,2,{front:bf,back:bb,left:bl,right:br,top:bt,bottom:bbot}), p:[0,12,0]},
+    armR: {m:pcPart(4,8,12,24,-2,2,{front:af,back:ab,left:al,right:ar,top:at,bottom:abot}), p:[6,24,0]},
+    armL: {m:pcPart(-8,-4,12,24,-2,2,{front:af,back:ab,left:al,right:ar,top:at,bottom:abot}), p:[-6,24,0]},
+    legR: {m:pcPart(0,4,0,12,-2,2,{front:lf,back:lb,left:ll,right:lr,top:lt,bottom:lbot}), p:[2,12,0]},
+    legL: {m:pcPart(-4,0,0,12,-2,2,{front:lf,back:lb,left:ll,right:lr,top:lt,bottom:lbot}), p:[-2,12,0]}
+  };
+  return avParts;
+}
+function pcPartMat(root,p,ang){
+  var m=m4mul(m4T(p[0],p[1],p[2]),m4Rx(ang));
+  m=m4mul(m,m4T(-p[0],-p[1],-p[2]));
+  return m4mul(root,m);
+}
+function drawNetAvatars(p,eye){
+  var ids=Object.keys(NETPC.players);
+  if(!ids.length) return;
+  var A=buildAvatar();
+  var tex=mkSkin();
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,tex);
+  gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D,texNorm);
+  var t=(performance.now()-T0)/1000;
+  for(var i=0;i<ids.length;i++){
+    var pl=NETPC.players[ids[i]];
+    if(!pl||pl.sid===NETPC.sid) continue;
+    /* 位置做一点插值，别人走起来不会一顿一顿 */
+    pl.x+=(pl.tx-pl.x)*0.22; pl.z+=(pl.tz-pl.z)*0.22;
+    if(!pl.init){ pl.x=pl.tx; pl.z=pl.tz; pl.init=1; }
+    var yaw=pl.yaw||0, c=Math.cos(yaw), sn=Math.sin(yaw), yy=pl.ty-1.68;
+    var root=new Float32Array([c*PX,0,-sn*PX,0, 0,PX,0,0, sn*PX,0,c*PX,0, pl.x,yy,pl.z,1]);
+    var sw=Math.sin((pl.walk||0)*1.9)*0.62;
+    var pit=Math.max(-0.5,Math.min(0.5,pl.pitch||0));
+    var list=[["body",0],["head",pit],["armR",-sw],["armL",sw],["legR",sw],["legL",-sw]];
+    for(var k=0;k<list.length;k++){
+      var part=A[list[k][0]];
+      gl.uniformMatrix4fv(p.u.uM,false,pcPartMat(root,part.p,list[k][1]));
+      gl.bindVertexArray(part.m.vao);
+      gl.drawArrays(gl.TRIANGLES,0,part.m.count);
+    }
+  }
+  gl.bindVertexArray(null);
+}
+
+/* ---------- MQTT 客户端（手写最小实现） ---------- */
+function pcCat(){
+  var o=[];
+  for(var i=0;i<arguments.length;i++){
+    var a=arguments[i];
+    if(a&&typeof a!=="string"&&a.length!==undefined){ for(var j=0;j<a.length;j++) o.push(a[j]); }
+    else o.push(a);
+  }
+  return o;
+}
+function pcUtf8(str){
+  var b=[];
+  for(var i=0;i<str.length;i++){
+    var c=str.charCodeAt(i);
+    if(c<128) b.push(c);
+    else if(c<2048) b.push(192|(c>>6),128|(c&63));
+    else b.push(224|(c>>12),128|((c>>6)&63),128|(c&63));
+  }
+  return b;
+}
+function pcVarint(n){
+  var o=[];
+  do{ var d=n%128; n=Math.floor(n/128); if(n>0) d|=128; o.push(d); }while(n>0);
+  return o;
+}
+function pcSend(arr){ NETPC.tx=(NETPC.tx||0)+1; try{ NETPC.ws.send(new Uint8Array(arr)); }catch(e){} }
+function pcPub(obj){
+  if(!NETPC.ok||!NETPC.ws) return false;
+  var t=pcUtf8(NETPC.topic), p=pcUtf8(JSON.stringify(obj));
+  var body=pcCat([t.length>>8,t.length&255],t,p);
+  pcSend(pcCat([0x30],pcVarint(body.length),body));
+  return true;
+}
+function pcPaintChip(){
+  var c=document.getElementById("netchip");
+  if(!c) return;
+  if(NETPC.on){
+    var n=Object.keys(NETPC.players).length;
+    c.innerHTML=(NETPC.room==="LOBBY"?"公共池":"房号 <b>"+NETPC.room+"</b>")+(n>0?" · <b>"+n+"</b> 人":"");
+  } else {
+    c.textContent="单机";
+  }
+}
+function pcCopy(){
+  if(!NETPC.on){ toast("还没联机 · 点开场页的「联机开房」"); return; }
+  var txt=(NETPC.room==="LOBBY")
+    ? "池核 · 公共池（谁打开都进同一个池子）：https://hhh.l2.ink/games/2040k/poolcore.html"
+    : ("池核 私房 "+NETPC.room+" · 直接进：https://hhh.l2.ink/games/2040k/poolcore.html?room="+NETPC.room);
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(txt).then(function(){ toast("房号 "+NETPC.room+" 已复制"); },
+        function(){ toast("房号 "+NETPC.room+"（浏览器拦了复制，手抄一下）"); });
+      return;
+    }
+  }catch(e){}
+  toast("房号 "+NETPC.room);
+}
+function netConnect(asHost,code){
+  NETPC.host=asHost; NETPC.room=code; NETPC.ok=false;
+  NETPC.topic=pcTopic(code);
+  var cid="rtsxpool"+pcRand();
+  var body=pcCat([0x00,0x04],[0x4d,0x51,0x54,0x54],[0x04,0x02,0x00,0x3c],[0,cid.length],pcUtf8(cid));
+  var pkt=pcCat([0x10],pcVarint(body.length),body);
+  try{ NETPC.ws=new WebSocket("wss://broker.hivemq.com:8884/mqtt","mqtt"); }
+  catch(e){ toast("中继开不起来："+e.message); return; }
+  NETPC.ws.binaryType="arraybuffer";
+  NETPC.ws.onopen=function(){
+    pcSend(pkt);
+    var t=pcUtf8(NETPC.topic);
+    var sub=pcCat([0x00,0x01,t.length>>8,t.length&255],t,[0x00]);
+    pcSend(pcCat([0x82],pcVarint(sub.length),sub));
+    NETPC.ok=true;
+    NETPC.ka=setInterval(function(){ pcSend([0xC0,0x00]); },25000);
+    NETPC.on=true;
+    pcPaintChip();
+    toast(code==="LOBBY"?"公共池 · 所有人都在同一个池子里，等别人进来就行":("私房 "+code+" · 把链接发朋友"));
+    /* 进池先喊一声，池里已经有人就会把拉杆/破洞状态回给你 */
+    pcPub({t:"hello",sid:NETPC.sid,n:NETNAME});
+    var n=0;
+    clearInterval(NETPC.helloTimer);
+    NETPC.helloTimer=setInterval(function(){
+      if(NETPC.joined||++n>6){ clearInterval(NETPC.helloTimer); NETPC.helloTimer=null; return; }
+      pcPub({t:"hello",sid:NETPC.sid,n:NETNAME});
+    },1600);
+  };
+  NETPC.ws.onclose=function(){
+    NETPC.ok=false; NETPC.on=false;
+    clearInterval(NETPC.ka); NETPC.ka=null;
+    pcPaintChip();
+  };
+  NETPC.ws.onmessage=pcRecv;
+}
+function pcRecv(e){
+  var arr=new Uint8Array(e.data), type=arr[0]>>4, p=1, len=0, mul=1, d;
+  do{ d=arr[p++]; len+=(d&127)*mul; mul*=128; }while(d&128);
+  if(type===2){ NETPC.connack=true; NETPC.rxk=(NETPC.rxk||0)+1; return; }
+  if(type!==3) return;
+  NETPC.rx=(NETPC.rx||0)+1;
+  var tl=(arr[p]<<8)|arr[p+1]; p+=2+tl;
+  var txt=""; try{ txt=new TextDecoder("utf-8").decode(arr.subarray(p)); }catch(err){ return; }
+  var m; try{ m=JSON.parse(txt); }catch(err){ return; }
+  netOnMsg(m);
+}
+function netOnMsg(m){
+  if(!m||!m.t) return;
+  if(m.sid===NETPC.sid) return;
+  if(m.t==="hello"){
+    if(NETPC.host){
+      var pulled=[];
+      for(var i=0;i<levers.length;i++) if(levers[i].pulled) pulled.push(levers[i].id);
+      var hs=holes.slice(-16).map(function(h){ return [h.x,h.y,h.z,h.r]; });
+      pcPub({t:"snap",to:m.sid,levers:pulled,holes:hs,host:NETPC.sid});
+      pcPub({t:"p",sid:NETPC.sid,x:player.x,y:player.y,z:player.z,yaw:player.yaw,pitch:player.pitch,walk:player.step});
+    }
+    return;
+  }
+  if(m.t==="snap"&&m.to===NETPC.sid){
+    NETPC.joined=true;
+    clearInterval(NETPC.helloTimer); NETPC.helloTimer=null;
+    if(m.levers) for(var j=0;j<m.levers.length;j++){
+      for(var q=0;q<levers.length;q++) if(levers[q].id===m.levers[j]&&!levers[q].pulled){ levers[q].pulled=true; levers[q].pullT=0; pulledCount++; }
+    }
+    if(m.holes) for(var hh=0;hh<m.holes.length;hh++){ var e2=m.holes[hh]; holes.push({x:e2[0],y:e2[1],z:e2[2],r:e2[3]}); }
+    while(holes.length>HMAX) holes.shift();
+    updateKeyHud();
+    if(pulledCount>=LEVER_N) hammerOwned=true;
+    toast("已连上房主的池子 · 拉杆 "+pulledCount+"/"+LEVER_N);
+    return;
+  }
+  if(m.t==="p"){
+    NETPC.lastSee=performance.now();
+    var pl=NETPC.players[m.sid];
+    if(!pl){ pl=NETPC.players[m.sid]={x:m.x,z:m.z,tx:m.x,tz:m.z,y:m.y,ty:m.y,yaw:m.yaw,pitch:m.pitch,walk:m.walk||0,t0:0}; }
+    pl.tx=m.x; pl.tz=m.z; pl.ty=m.y; pl.yaw=m.yaw||0; pl.pitch=m.pitch||0;
+    if(m.walk!==undefined||m.walk===0) pl.walk=m.walk||0;
+    pl.last=performance.now();
+    pcPaintChip();
+    return;
+  }
+  if(m.t==="lv"){
+    for(var q2=0;q2<levers.length;q2++){
+      if(levers[q2].id===m.id&&!levers[q2].pulled){
+        levers[q2].pulled=true; levers[q2].pullT=(performance.now()-T0)/1000;
+        pulledCount++; updateKeyHud(); sfx("lever");
+        if(pulledCount>=LEVER_N) hammerOwned=true;
+      }
+    }
+    return;
+  }
+  if(m.t==="h"){
+    holes.push({x:m.x,y:m.y,z:m.z,r:m.r||0.4});
+    while(holes.length>HMAX) holes.shift();
+    spawnFrags(m.x,m.y,m.z,m.dx||0,m.dz||0);
+    sfx("smash");
+    return;
+  }
+  if(m.t==="bye"&&NETPC.players[m.sid]){ delete NETPC.players[m.sid]; pcPaintChip(); }
+}
+function netLever(id){ pcPub({t:"lv",id:id,sid:NETPC.sid}); }
+function netHole(x,y,z,dx,dz,r){ pcPub({t:"h",x:x,y:y,z:z,dx:dx,dz:dz,r:r,sid:NETPC.sid}); }
+function netTick(dt){
+  var now=performance.now();
+  var ids=Object.keys(NETPC.players);
+  for(var i=0;i<ids.length;i++){
+    var pl=NETPC.players[ids[i]];
+    if(pl.last&&now-pl.last>9000){ delete NETPC.players[ids[i]]; pcPaintChip(); }
+  }
+  if(!NETPC.on) return;
+  if(!NETPC.host&&now-(NETPC.lastSee||0)>14000){
+    NETPC.host=true; NETPC.lastSee=now; pcPaintChip();
+    pcPub({t:"hello",sid:NETPC.sid,n:NETNAME});
+  }
+  if(now-NETPC.lastPose>110){
+    NETPC.lastPose=now;
+    pcPub({t:"p",sid:NETPC.sid,x:player.x,y:player.y,z:player.z,yaw:player.yaw,pitch:player.pitch,walk:player.step});
+  }
+}
+function netEnter(code){
+  NETPC.sid=pcRand();
+  var c=String(code||"").replace(/[^A-Za-z0-9]/g,"");
+  var priv=(c.length>=4)?c.toUpperCase():"";
+  NETPC.lastSee=performance.now();
+  netConnect(true,priv||"LOBBY");
+  /* 公共池没有“房主”：先当应答者，看到别人发位姿就退位；长时间没人再接管 */
+  setTimeout(function(){
+    if(performance.now()-NETPC.lastSee>2000) return;
+    NETPC.host=false; pcPaintChip();
+  },2600);
+}
+function startHost(){ if(!NETPC.on) netEnter(""); else toast("已经在公共池里了"); }
+
 /* ================= 调试 ================= */
 window.__P=function(){
   return {x:player.x,y:player.y,z:player.z,yaw:player.yaw,pitch:player.pitch,
+    net:{on:NETPC.on,host:NETPC.host,room:NETPC.room,players:Object.keys(NETPC.players).length},
     levers:pulledCount,hammer:hammerOwned,holes:holes.length,frags:frags.length,
     props:regionProps.length,ducks:duckW.length,started:started,
     tris:meshCount,lights:lights.length,walls:collWalls.length,cell:[regCX,regCZ]};
 };
-window.__PULL=function(){ var n=nearestLever(); if(!n.l) return false; n.l.pulled=true; n.l.pullT=(performance.now()-T0)/1000; pulledCount++; if(pulledCount>=LEVER_N) hammerOwned=true; updateKeyHud(); return true; };
+window.__PULL=function(){ var n=nearestLever(); if(!n.l) return false; n.l.pulled=true; n.l.pullT=(performance.now()-T0)/1000; pulledCount++; if(pulledCount>=LEVER_N) hammerOwned=true; updateKeyHud(); try{ netLever(n.l.id); }catch(e){} return true; };
 window.__HAMMER=function(v){ hammerOwned=v!==false; updateKeyHud(); };
 window.__SMASH=function(){ smash(); };
 window.__MAP=function(){
@@ -1825,6 +2248,20 @@ window.__LOOK=function(yaw,pitch){ player.yaw=yaw; player.pitch=pitch; };
 window.__KEYIN=function(name,v){ keysDown[name]=v?1:0; };
 window.__START=function(q){ begin(q===undefined?1:q); };
 window.__STARTCELL=function(){ return {x:CELL*0.5,z:CELL*0.5}; };
+window.__NP=function(sid,x,z,yaw,name){
+  NETPC.on=true;
+  NETPC.players[sid||"dbg1"]={x:x,z:z,tx:x,tz:z,y:player.y,ty:player.y,yaw:yaw||0,pitch:0,walk:0,last:performance.now()};
+  pcPaintChip();
+  return true;
+};
+window.__NPCLR=function(){ NETPC.players={}; return true; };
+window.__CG=function(){ return [pcCode(),pcCode(),pcRand()]; };
+window.__NET=function(){
+  var ws=NETPC.ws;
+  return {on:NETPC.on,ok:NETPC.ok,connack:!!NETPC.connack,room:NETPC.room,topic:NETPC.topic,
+    sid:NETPC.sid,rnd:Math.random(),rs:ws?ws.readyState:-1,tx:NETPC.tx||0,rx:NETPC.rx||0,rxk:NETPC.rxk||0,joined:!!NETPC.joined,
+    players:Object.keys(NETPC.players).length};
+};
 try{
   var qs=location.search||"";
   if(/auto=1/.test(qs)){ begin(/q=low/.test(qs)?0:1); }
