@@ -2050,7 +2050,7 @@ function pcVarint(n){
   do{ var d=n%128; n=Math.floor(n/128); if(n>0) d|=128; o.push(d); }while(n>0);
   return o;
 }
-function pcSend(arr){ NETPC.tx=(NETPC.tx||0)+1; try{ NETPC.ws.send(new Uint8Array(arr)); }catch(e){} }
+function pcSend(arr){ NETPC.tx=(NETPC.tx||0)+1; NETPC.lastTx=performance.now(); try{ NETPC.ws.send(new Uint8Array(arr)); }catch(e){} }
 function pcPub(obj){
   if(!NETPC.ok||!NETPC.ws) return false;
   var t=pcUtf8(NETPC.topic), p=pcUtf8(JSON.stringify(obj));
@@ -2065,7 +2065,7 @@ function pcPaintChip(){
     var n=Object.keys(NETPC.players).length;
     c.innerHTML=(NETPC.room==="LOBBY"?"公共池":"房号 <b>"+NETPC.room+"</b>")+(n>0?" · <b>"+n+"</b> 人":"");
   } else {
-    c.textContent="单机";
+    c.textContent=NETPC.room?("重连中… "+(NETPC.retries||1)):"单机";
   }
 }
 function pcCopy(){
@@ -2085,37 +2085,73 @@ function pcCopy(){
 function netConnect(asHost,code){
   NETPC.host=asHost; NETPC.room=code; NETPC.ok=false;
   NETPC.topic=pcTopic(code);
+  NETPC.gen=(NETPC.gen||0)+1;
+  var gen=NETPC.gen;
+  /* 换连接前先把旧 socket 彻底掐掉，且让它的 onclose 失效，
+     否则旧连接的关闭事件会把刚建好的新连接又打回“单机” */
+  if(NETPC.retryT){ clearTimeout(NETPC.retryT); NETPC.retryT=null; }
+  if(NETPC.ws){
+    try{ NETPC.ws.onopen=NETPC.ws.onclose=NETPC.ws.onerror=null; NETPC.ws.close(); }catch(e){}
+    NETPC.ws=null;
+  }
   var cid="rtsxpool"+pcRand();
-  var body=pcCat([0x00,0x04],[0x4d,0x51,0x54,0x54],[0x04,0x02,0x00,0x3c],[0,cid.length],pcUtf8(cid));
+  /* keepalive 300s：手机/后台标签页里 setInterval 会被限流，60s 的窗口太容易超 */
+  var body=pcCat([0x00,0x04],[0x4d,0x51,0x54,0x54],[0x04,0x02,0x01,0x2c],[0,cid.length],pcUtf8(cid));
   var pkt=pcCat([0x10],pcVarint(body.length),body);
-  try{ NETPC.ws=new WebSocket("wss://broker.hivemq.com:8884/mqtt","mqtt"); }
-  catch(e){ toast("中继开不起来："+e.message); return; }
-  NETPC.ws.binaryType="arraybuffer";
-  NETPC.ws.onopen=function(){
+  var ws;
+  try{ ws=new WebSocket("wss://broker.hivemq.com:8884/mqtt","mqtt"); }
+  catch(e){ toast("中继开不起来："+e.message); pcRetryNow(); return; }
+  NETPC.ws=ws;
+  ws.binaryType="arraybuffer";
+  NETPC.connack=false;
+  ws.onopen=function(){
+    if(gen!==NETPC.gen) return;
     pcSend(pkt);
     var t=pcUtf8(NETPC.topic);
     var sub=pcCat([0x00,0x01,t.length>>8,t.length&255],t,[0x00]);
     pcSend(pcCat([0x82],pcVarint(sub.length),sub));
     NETPC.ok=true;
-    NETPC.ka=setInterval(function(){ pcSend([0xC0,0x00]); },25000);
     NETPC.on=true;
+    NETPC.retries=0;
+    NETPC.lastTx=performance.now();
+    clearInterval(NETPC.ka);
+    NETPC.ka=setInterval(function(){ if(gen!==NETPC.gen) return; try{ pcSend([0xC0,0x00]); }catch(e){} },20000);
     pcPaintChip();
     toast(code==="LOBBY"?"公共池 · 所有人都在同一个池子里，等别人进来就行":("私房 "+code+" · 把链接发朋友"));
     /* 进池先喊一声，池里已经有人就会把拉杆/破洞状态回给你 */
+    NETPC.joined=false;
     pcPub({t:"hello",sid:NETPC.sid,n:NETNAME});
     var n=0;
     clearInterval(NETPC.helloTimer);
     NETPC.helloTimer=setInterval(function(){
-      if(NETPC.joined||++n>6){ clearInterval(NETPC.helloTimer); NETPC.helloTimer=null; return; }
+      if(gen!==NETPC.gen||NETPC.joined||++n>6){ clearInterval(NETPC.helloTimer); NETPC.helloTimer=null; return; }
       pcPub({t:"hello",sid:NETPC.sid,n:NETNAME});
     },1600);
   };
-  NETPC.ws.onclose=function(){
-    NETPC.ok=false; NETPC.on=false;
+  function down(ev){
+    if(gen!==NETPC.gen) return;
+    NETPC.ok=false; NETPC.on=false; NETPC.connack=false;
     clearInterval(NETPC.ka); NETPC.ka=null;
+    NETPC.players={};
     pcPaintChip();
-  };
-  NETPC.ws.onmessage=pcRecv;
+    pcRetryNow(ev&&ev.type==="error"?400:0);
+  }
+  ws.onclose=down;
+  ws.onerror=down;
+  ws.onmessage=pcRecv;
+}
+
+/* 断线重连：1.5s 起，指数退避到 9s，只要还在游戏里就一直试 */
+function pcRetryNow(delay){
+  if(NETPC.retryT) return;
+  var n=(NETPC.retries=(NETPC.retries||0)+1);
+  var d=(typeof delay==="number")?delay:Math.min(9000,900*Math.pow(1.7,n-1));
+  pcPaintChip();
+  NETPC.retryT=setTimeout(function(){
+    NETPC.retryT=null;
+    if(!NETPC.room) return;
+    netConnect(true,NETPC.room);
+  }, d);
 }
 function pcRecv(e){
   var arr=new Uint8Array(e.data), type=arr[0]>>4, p=1, len=0, mul=1, d;
@@ -2147,7 +2183,13 @@ function netOnMsg(m){
     if(m.levers) for(var j=0;j<m.levers.length;j++){
       for(var q=0;q<levers.length;q++) if(levers[q].id===m.levers[j]&&!levers[q].pulled){ levers[q].pulled=true; levers[q].pullT=0; pulledCount++; }
     }
-    if(m.holes) for(var hh=0;hh<m.holes.length;hh++){ var e2=m.holes[hh]; holes.push({x:e2[0],y:e2[1],z:e2[2],r:e2[3]}); }
+    if(m.holes) for(var hh=0;hh<m.holes.length;hh++){
+      var e2=m.holes[hh], dup=false;
+      for(var hq=0;hq<holes.length;hq++){
+        if(Math.abs(holes[hq].x-e2[0])<0.25&&Math.abs(holes[hq].y-e2[1])<0.25&&Math.abs(holes[hq].z-e2[2])<0.25){ dup=true; break; }
+      }
+      if(!dup) holes.push({x:e2[0],y:e2[1],z:e2[2],r:e2[3]});
+    }
     while(holes.length>HMAX) holes.shift();
     updateKeyHud();
     if(pulledCount>=LEVER_N) hammerOwned=true;
@@ -2193,6 +2235,7 @@ function netTick(dt){
     if(pl.last&&now-pl.last>9000){ delete NETPC.players[ids[i]]; pcPaintChip(); }
   }
   if(!NETPC.on) return;
+  if(now-(NETPC.lastTx||0)>40000){ try{ pcSend([0xC0,0x00]); }catch(e){} }
   if(!NETPC.host&&now-(NETPC.lastSee||0)>14000){
     NETPC.host=true; NETPC.lastSee=now; pcPaintChip();
     pcPub({t:"hello",sid:NETPC.sid,n:NETNAME});
@@ -2255,7 +2298,21 @@ window.__NP=function(sid,x,z,yaw,name){
   return true;
 };
 window.__NPCLR=function(){ NETPC.players={}; return true; };
+/* 回到前台或网络恢复时，别等退避计时器，马上再连一次 */
+(function(){
+  function wake(){
+    if(NETPC.on||!NETPC.room) return;
+    /* 把退避计时器清掉，直接来一次 */
+    if(NETPC.retryT){ clearTimeout(NETPC.retryT); NETPC.retryT=null; }
+    NETPC.retries=0; netConnect(true,NETPC.room);
+  }
+  document.addEventListener("visibilitychange",function(){ if(!document.hidden) wake(); });
+  window.addEventListener("focus",wake);
+  window.addEventListener("online",wake);
+  window.addEventListener("pageshow",wake);
+})();
 window.__CG=function(){ return [pcCode(),pcCode(),pcRand()]; };
+window.__NETDROP=function(){ try{ NETPC.ws.close(); return true; }catch(e){ return String(e.message); } };
 window.__NET=function(){
   var ws=NETPC.ws;
   return {on:NETPC.on,ok:NETPC.ok,connack:!!NETPC.connack,room:NETPC.room,topic:NETPC.topic,
