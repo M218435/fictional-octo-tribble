@@ -134,7 +134,7 @@ if(!gl){
 }
 
 var QS=location.search||"";
-var DBG_REFL=/refl=1/.test(QS), DBG_NOWATER=/nowater=1/.test(QS), DBG_GRID=/grid=1/.test(QS);
+var DBG_REFL=/refl=1/.test(QS), DBG_NOWATER=/nowater=1/.test(QS), DBG_GRID=/grid=1/.test(QS), DBG_FPS=/[?&]fps=1/.test(QS);
 /* 固定种子随机器：同一个 seed 永远是同一个世界 */
 (function(){
   var m=/[?&]seed=(\d+)/.exec(QS);
@@ -144,10 +144,14 @@ var DBG_REFL=/refl=1/.test(QS), DBG_NOWATER=/nowater=1/.test(QS), DBG_GRID=/grid
 })();
 
 var DPR=1, VW=1, VH=1, QUALITY=1;   /* 1 = 高画质, 0 = 流畅 */
+var RES_SCALE=1;   /* 自适应渲染倍率：帧率掉了就自动减，帧率够了再慢慢加回来 */
 function resize(){
   var w=window.innerWidth||360, h=window.innerHeight||640;
-  var maxDpr=(QUALITY?2.0:1.4);
-  DPR=Math.min(maxDpr,window.devicePixelRatio||1);
+  var maxDpr=(QUALITY?1.75:1.25);
+  DPR=Math.min(maxDpr,window.devicePixelRatio||1)*RES_SCALE;
+  /* 像素总量封顶：手机 1080×2400 @dpr2 就是 5.8M 像素，必然卡 */
+  var maxPix=QUALITY?2.3e6:1.05e6;
+  if(w*h*DPR*DPR>maxPix){ DPR=Math.sqrt(maxPix/(w*h)); }
   VW=Math.floor(w*DPR); VH=Math.floor(h*DPR);
   canvas.width=VW; canvas.height=VH;
   canvas.style.width=w+"px"; canvas.style.height=h+"px";
@@ -649,6 +653,10 @@ function drawObjects(vp,eye,clipOn,clipY,isRefl){
     bob=(o.big)?Math.sin(t*0.7+(o.ph||0))*0.012:0;
     var oy=o.y-((mc.min?mc.min[1]:0)*sc)+(o.baseFix?o.baseFix*sc:0)+bob;
     base=new Float32Array([c*sc,0,-sn*sc,0, 0,sc,0,0, sn*sc,0,c*sc,0, o.x,oy,o.z,1]);
+    if(o.fallT){
+      var fk=Math.min(1,(t-o.fallT)/0.55);
+      base=m4mul(base,m4Rx(fk*fk*(o.fallDir||1)*1.5));
+    }
     if(o.k==="alarm"&&mc.parts&&o.lever){
       gl.uniformMatrix4fv(p.u.uM,false,base); bindModel(mc);
       gl.drawElements(gl.TRIANGLES,mc.parts[0].count,gl.UNSIGNED_SHORT,0);
@@ -811,6 +819,8 @@ function markVisited(cx,cz){ visitedSet[cellKey(cx,cz)]=1; }
 
 /* ================= 拉杆 / 锤子 ================= */
 var LEVER_N=10, levers=[], pulledCount=0, hammerOwned=false, FORCE_HAMMER=false;
+/* 10 个拉杆拉完，出现“离开的地方”：在 1000 格以内，靠信标和指南针找 */
+var EXIT=null, EXIT_NEAR=false;
 function findOpenCell(tx,tz){
   for(var r=0;r<30;r++){
     for(var dz=-r;dz<=r;dz++) for(var dx=-r;dx<=r;dx++){
@@ -837,6 +847,20 @@ function buildLevers(){
     levers.push({id:i,x:lx,z:lz,yaw:yaw,cell:c,pulled:false,anim:0});
   }
 }
+function spawnExit(){
+  /* 位置确定性：所有客户端算出来是同一处，不用额外同步 */
+  var ang=2.39996*5.5+hsh(7,11,13)*0.9;
+  var d=EXIT_NEAR?26:(240+hsh(17,19,23)*760);      /* 240~1000 格 */
+  var c=findOpenCell(Math.round(Math.cos(ang)*d),Math.round(Math.sin(ang)*d));
+  var w=cellCenter(c[0],c[1]);
+  EXIT={x:w[0],z:w[1],cell:c};
+  toast("出口开了 · 在 "+Math.round(d)+" 格外的光柱处");
+}
+function exitDist(){
+  if(!EXIT) return 1e9;
+  var dx=EXIT.x-player.x, dz=EXIT.z-player.z;
+  return Math.sqrt(dx*dx+dz*dz);
+}
 function nearestLever(){
   var best=null,bd=1e9;
   for(var i=0;i<levers.length;i++){
@@ -850,6 +874,8 @@ function nearestLever(){
 
 /* ================= 破坏 / 碎片 ================= */
 var holes=[], HMAX=16;
+/* 道具状态按格子存：重建窗口时不会把“牌子倒了 / 鸭子碎了”重置 */
+var propMod={};
 var frags=[], FRAG_MAX=56, FRAG_LIFE=10.0;
 var swingT=-9, lastSmash=-9;
 /* ================= 几何 ================= */
@@ -995,14 +1021,31 @@ function buildWorldMesh(ccx,ccz){
       if(!cellOpen(x,z)||cellPool(x,z)===1||isPlaza(x,z)) continue;
       var gx=(x+0.5)*CELL+(hsh(x,z,51)-0.5)*2.2;
       var gz=(z+0.5)*CELL+(hsh(x,z,52)-0.5)*2.2;
+      var pk=cellKey(x,z), pm=propMod[pk];
       if(hsh(x,z,41)<0.13){
-        regionProps.push({k:"duck",x:gx,y:0,z:gz,yaw:0,scale:5.96,ph:hsh(x,z,53)*6.28,big:1});
-        collCircles.push({x:gx,z:gz,r:0.62});
+        if(!pm||!pm.duckGone){
+          regionProps.push({k:"duck",x:gx,y:0,z:gz,yaw:0,scale:5.96,ph:hsh(x,z,53)*6.28,big:1,pk:pk});
+          collCircles.push({x:gx,z:gz,r:0.70,kind:"duck",pk:pk});   /* 实心：撞上去是硬挡 */
+        }
       } else if(hsh(x,z,42)<0.11){
-        regionProps.push({k:"sign",x:gx,y:0,z:gz,yaw:hsh(x,z,54)*6.28,scale:1.5,ph:0});
-        collCircles.push({x:gx,z:gz,r:0.44});
+        if(!pm||!pm.signGone){
+          var down=!!(pm&&pm.signDown);
+          regionProps.push({k:"sign",x:gx,y:0,z:gz,yaw:hsh(x,z,54)*6.28,scale:1.5,ph:0,pk:pk,
+                            fallT:down?(pm.signAt||0):0, fallDir:(pm&&pm.signDir)||1});
+          collCircles.push({x:gx,z:gz,r:down?0.30:0.46,kind:"sign",pk:pk});
+        }
       }
     }
+  }
+  /* 出口信标：一根从地面顶到天花板的冷光柱，远处也能看见 */
+  if(EXIT&&EXIT.cell[0]>=ox0&&EXIT.cell[0]<=ox1&&EXIT.cell[1]>=oz0&&EXIT.cell[1]<=oz1){
+    var ex=EXIT.x, ez=EXIT.z, ey1=WALL_H;
+    var ecol=[0.16,0.90,0.62];
+    quad([ex-0.55,0.02,ez+0.55],[ex+0.55,0.02,ez+0.55],[ex+0.55,ey1,ez+0.55],[ex-0.55,ey1,ez+0.55],[0,0,-1],[0,0,1,ey1/2],ecol,2);
+    quad([ex+0.55,0.02,ez-0.55],[ex-0.55,0.02,ez-0.55],[ex-0.55,ey1,ez-0.55],[ex+0.55,ey1,ez-0.55],[0,0,1],[1,0,0,ey1/2],ecol,2);
+    quad([ex-0.55,0.02,ez-0.55],[ex-0.55,0.02,ez+0.55],[ex-0.55,ey1,ez+0.55],[ex-0.55,ey1,ez-0.55],[1,0,0],[1,0,0,ey1/2],ecol,2);
+    quad([ex+0.55,0.02,ez+0.55],[ex+0.55,0.02,ez-0.55],[ex+0.55,ey1,ez-0.55],[ex+0.55,ey1,ez+0.55],[-1,0,0],[0,0,1,ey1/2],ecol,2);
+    addLight(ex,2.6,ez, 0.34,1.0,0.78, 26.0);
   }
   levers.forEach(function(l){
     if(l.cell[0]<ox0||l.cell[0]>ox1||l.cell[1]<oz0||l.cell[1]>oz1) return;
@@ -1046,13 +1089,20 @@ function rectDist(px,pz,o){
 }
 function resolveCollision(pos,r){
   var i,h;
+  /* 先把身边的洞挑出来：洞是永久累积的，不能再每面墙遍历全部 */
+  var nearH=[];
+  for(h=0;h<holes.length;h++){
+    var hn0=holes[h];
+    if(hn0.x<pos[0]-3||hn0.x>pos[0]+3||hn0.z<pos[2]-3||hn0.z>pos[2]+3) continue;
+    nearH.push(hn0);
+  }
   for(i=0;i<collWalls.length;i++){
     var w=collWalls[i];
     if(pos[0]<w.x0-r||pos[0]>w.x1+r||pos[2]<w.z0-r||pos[2]>w.z1+r) continue;
     /* 被锤子砸出的洞：站得进去就放行 */
     var open=false;
-    for(h=0;h<holes.length;h++){
-      var ho=holes[h];
+    for(h=0;h<nearH.length;h++){
+      var ho=nearH[h];
       if(ho.y<0.55) continue;
       if(rectDist(ho.x,ho.z,w)>0.55) continue;
       var hd2=(pos[0]-ho.x)*(pos[0]-ho.x)+(pos[2]-ho.z)*(pos[2]-ho.z);
@@ -1092,7 +1142,7 @@ function resolveCollision(pos,r){
 function m4T(x,y,z){ return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1]); }
 function m4Rx(a){ var c=Math.cos(a),s=Math.sin(a);
   return new Float32Array([1,0,0,0, 0,c,s,0, 0,-s,c,0, 0,0,0,1]); }
-function spawnFrags(x,y,z,dx,dz){
+function spawnFrags(x,y,z,dx,dz,col){
   if(dx===undefined){ dx=0; dz=1; }
   var n=7+Math.floor(Math.random()*4);
   var tx=dz, tz=-dx;                     /* 墙面切向 */
@@ -1108,7 +1158,7 @@ function spawnFrags(x,y,z,dx,dz){
       sx:0.05+Math.random()*0.11, sy:0.035+Math.random()*0.06, sz:0.05+Math.random()*0.11,
       rx:Math.random()*6.283, ry:Math.random()*6.283, rz:Math.random()*6.283,
       wx:(Math.random()-0.5)*9, wy:(Math.random()-0.5)*9, wz:(Math.random()-0.5)*9,
-      col:[0.80+Math.random()*0.16, 0.85+Math.random()*0.13, 0.85+Math.random()*0.13],
+      col:col||[0.80+Math.random()*0.16, 0.85+Math.random()*0.13, 0.85+Math.random()*0.13],
       age:0});
   }
   /* 超出上限：从最老的开始丢，别一次清空 */
@@ -1140,14 +1190,72 @@ function updateFrags(dt){
   }
 }
 function makeHole(x,y,z,dx,dz,fromNet){
-  var r=0.34+Math.random()*0.12;
-  holes.push({x:x,y:y,z:z,r:r});
+  var r=0.34+Math.random()*0.12, merged=null;
+  /* 永久破坏：洞不回收。砸在同一个地方就把那个洞继续扩大，而不是堆一堆重复的 */
+  for(var i=0;i<holes.length;i++){
+    var ho=holes[i];
+    if(Math.abs(ho.x-x)<0.22&&Math.abs(ho.y-y)<0.22&&Math.abs(ho.z-z)<0.22){ merged=ho; break; }
+  }
+  if(merged){ merged.r=Math.min(1.15,merged.r+0.13); r=merged.r; }
+  else { holes.push({x:x,y:y,z:z,r:r}); }
   if(!fromNet) netHole(x,y,z,dx,dz,r);
-  while(holes.length>HMAX) holes.shift();
   spawnFrags(x,y,z,dx,dz);
   sfx("smash"); sfx("debris");
   try{ if(window.RTSXSFX) RTSXSFX.play("hit"); }catch(e){}
   swingT=(performance.now()-T0)/1000;
+}
+/* 砸到道具：鸭子碎成橡胶块，路牌先断一条腿倒下、再砸才散架 */
+function propHit(px,py,pz){
+  var i,o,mc,dy;
+  var c0=camView(), dv=c0.dir;
+  for(i=0;i<regionProps.length;i++){
+    o=regionProps[i];
+    if(!o.pk||o.k==="alarm") continue;
+    var dh=Math.sqrt((o.x-player.x)*(o.x-player.x)+(o.z-player.z)*(o.z-player.z));
+    var fx=o.x-player.x, fz=o.z-player.z, fl=Math.sqrt(fx*fx+fz*fz)||1;
+    /* 站在面前 2.2m 内、大致朝它，就算砸中（不用精确对准模型） */
+    if((dv[0]*fx+dv[2]*fz)/fl < 0.05) continue;
+    if(o.k==="duck"){
+      mc=modelCache.duck; if(!mc) continue;
+      if(dh>1.9||py<0.02||py>1.95) continue;
+      var pm=propMod[o.pk]||(propMod[o.pk]={});
+      pm.duckGone=1;
+      spawnFrags(px,py,pz,0,1,[0.92,0.70,0.12]);
+      spawnFrags(o.x,0.7,o.z,0,1,[0.86,0.62,0.10]);
+      sfx("debris"); sfx("smash");
+      rebuildRegion(regCX,regCZ);
+      return true;
+    }
+    if(o.k==="sign"){
+      mc=modelCache.sign; if(!mc) continue;
+      if(dh>1.9||py<0.02||py>1.25) continue;
+      var pm2=propMod[o.pk]||(propMod[o.pk]={});
+      if(!pm2.signDown){
+        pm2.signDown=1; pm2.signAt=(performance.now()-T0)/1000;
+        pm2.signDir=(dh>0.001?1:1);
+        o.fallT=pm2.signAt;
+        sfx("debris");
+        toast("牌子的一条腿断了 · 哐当倒了");
+        return true;
+      }
+      pm2.signGone=1;
+      spawnFrags(o.x,0.2,o.z,0,1,[0.86,0.86,0.80]);
+      sfx("smash");
+      rebuildRegion(regCX,regCZ);
+      return true;
+    }
+  }
+  /* 水里的鸭子也一样能砸 */
+  for(i=0;i<duckW.length;i++){
+    var d2=duckW[i];
+    if(Math.hypot(d2.x-player.x,d2.z-player.z)>2.2) continue;
+    if(py<WATER_Y-0.2||py>WATER_Y+0.5) continue;
+    spawnFrags(px,WATER_Y+0.1,pz,0,1,[0.92,0.70,0.12]);
+    sfx("splash"); sfx("debris");
+    duckW.splice(i,1);
+    return true;
+  }
+  return false;
 }
 function smash(){
   var now=(performance.now()-T0)/1000;
@@ -1160,6 +1268,7 @@ function smash(){
     var px=eye[0]+d[0]*t, py=eye[1]+d[1]*t, pz=eye[2]+d[2]*t;
     if(py>WALL_H+0.1) break;
     if(py<0.03) break;
+    if(propHit(px,py,pz)) return;
     var cx=Math.floor(px/CELL), cz=Math.floor(pz/CELL);
     if(!cellOpen(cx,cz)){
       /* 贴着墙面往里挪一点，洞才会在墙面上 */
@@ -1195,7 +1304,8 @@ function tryPullLever(){
   if(pulledCount>=LEVER_N){
     hammerOwned=true;
     sfx("leverDone");
-    toast("第 10 个 —— 锤子到手 · 左键砸墙");
+    if(!EXIT) spawnExit();
+    toast("第 10 个 —— 锤子到手，出口也开了：跟着光柱走");
   } else {
     toast("拉杆 "+pulledCount+"/"+LEVER_N);
   }
@@ -1401,11 +1511,13 @@ sprintBtn.addEventListener("pointercancel",function(){ sprintTouch=false; });
 
 /* ================= 世界交互 / 窗口 ================= */
 function rebuildRegion(cx,cz){
+  var t0=performance.now();
   regCX=cx; regCZ=cz;
   buildWorldMesh(cx,cz);
   uploadMesh();
   uploadWater();
   seedWaterDucks();
+  PERF.rebuildMs=performance.now()-t0; PERF.rebuilds++;
 }
 /* ================= HUD ================= */
 var toastEl=document.getElementById("toast"), toastT=0;
@@ -1506,6 +1618,24 @@ function drawMini(){
     miniCtx.fillStyle=l.pulled?"rgba(120,240,190,.95)":"#FF6B3D";
     miniCtx.beginPath(); miniCtx.arc(lx,ly,3.0,0,6.3); miniCtx.fill();
   }
+  if(EXIT){
+    var ex2=(EXIT.x/CELL-pcx+half)*s, ey2=(EXIT.z/CELL-pcz+half)*s;
+    var inx=ex2>2&&ex2<w-2&&ey2>2&&ey2<h-2;
+    if(inx){
+      miniCtx.fillStyle="#5BFFC8";
+      miniCtx.beginPath(); miniCtx.arc(ex2,ey2,4.2,0,6.3); miniCtx.fill();
+      miniCtx.strokeStyle="rgba(91,255,200,.55)"; miniCtx.lineWidth=1.4;
+      miniCtx.beginPath(); miniCtx.arc(ex2,ey2,8.5,0,6.3); miniCtx.stroke();
+    } else {
+      var ang2=Math.atan2(ex2-w/2, ey2-h/2);
+      var rr2=Math.min(w,h)/2-6;
+      var ax2=w/2+Math.sin(ang2)*rr2, ay2=h/2+Math.cos(ang2)*rr2;
+      miniCtx.fillStyle="#5BFFC8";
+      miniCtx.save(); miniCtx.translate(ax2,ay2); miniCtx.rotate(-ang2);
+      miniCtx.beginPath(); miniCtx.moveTo(0,-5); miniCtx.lineTo(3.6,4); miniCtx.lineTo(-3.6,4); miniCtx.closePath(); miniCtx.fill();
+      miniCtx.restore();
+    }
+  }
   var px=(player.x/CELL-pcx+half)*s, py=(player.z/CELL-pcz+half)*s;
   miniCtx.fillStyle="#FFF";
   miniCtx.beginPath(); miniCtx.arc(px,py,2.8,0,6.3); miniCtx.fill();
@@ -1580,15 +1710,52 @@ function updatePlayer(dt){
     if(d.z<ccz-lim){ d.z=ccz-lim; d.vz=Math.abs(d.vz)*0.4; }
     if(d.z>ccz+lim){ d.z=ccz+lim; d.vz=-Math.abs(d.vz)*0.4; }
   }
+  /* 撞到路牌：一条腿断掉，牌子按现实那样倒下去 */
+  var spd2=Math.sqrt(player.vx*player.vx+player.vz*player.vz);
+  if(spd2>0.8){
+    for(var pi=0;pi<regionProps.length;pi++){
+      var po=regionProps[pi];
+      if(po.k!=="sign"||!po.pk||po.fallT) continue;
+      var pdx=po.x-player.x, pdz=po.z-player.z;
+      if(Math.sqrt(pdx*pdx+pdz*pdz)>0.95) continue;
+      var pm3=propMod[po.pk]||(propMod[po.pk]={});
+      var ly=Math.sin(po.yaw)*pdx+Math.cos(po.yaw)*pdz;
+      pm3.signDown=1; pm3.signAt=(performance.now()-T0)/1000;
+      pm3.signDir=(ly>0?-1:1);
+      po.fallT=pm3.signAt; po.fallDir=pm3.signDir;
+      sfx("debris");
+      toast("撞到路牌 · 腿折了，哐当倒地");
+      for(var ci=0;ci<collCircles.length;ci++) if(collCircles[ci].pk===po.pk) collCircles[ci].r=0.30;
+      break;
+    }
+  }
   updateFrags(dt);
 
-  /* 换格就重建窗口 */
-  if(cx!==regCX||cz!==regCZ) rebuildRegion(cx,cz);
+  /* 走到窗口边上才重建（以前每跨一格就重建整块，脚步一顿一顿的） */
+  if(cx<regCX-RS+2||cx>regCX+RS-2||cz<regCZ-RS+2||cz>regCZ+RS-2) rebuildRegion(cx,cz);
+
+  /* 到了出口就结束 */
+  if(EXIT&&!won&&exitDist()<3.0){
+    won=true;
+    sfx("win");
+    document.getElementById("winTime").textContent=fmtTime(elapsed);
+    document.getElementById("winSub").textContent="10 根拉杆、一把锤子、"+Math.round(exitDist()<1?0:0)+"一段没有尽头的瓷砖走廊。";
+    document.getElementById("win").classList.remove("hidden");
+    return;
+  }
 
   /* 目标提示 */
   var n=nearestLever();
   var goalEl=document.getElementById("goal");
-  if(hammerOwned) goalEl.textContent="锤子到手 · 鼠标左键砸墙";
+  if(EXIT){
+    var dCells=Math.round(exitDist()/CELL);
+    var ax=EXIT.x-player.x, az=EXIT.z-player.z;
+    var rel=Math.atan2(ax,az)-player.yaw;
+    var dirs8=["正前","右前","右侧","右后","正后","左后","左侧","左前"];
+    var k=Math.round(((rel+Math.PI*2)%(Math.PI*2))/(Math.PI/4))%8;
+    goalEl.textContent="出口 "+dCells+" 格 · "+dirs8[k]+" · 找绿色光柱";
+  }
+  else if(hammerOwned) goalEl.textContent="锤子到手 · 鼠标左键砸墙";
   else if(n.l) goalEl.textContent="拉杆 "+pulledCount+"/"+LEVER_N+" · 最近 "+Math.round(n.d/CELL)+" 格";
   else goalEl.textContent="拉杆都拉完了";
 }
@@ -1610,7 +1777,7 @@ function pickLights(camPos){
     var d=(l.x-camPos[0])*(l.x-camPos[0])+(l.y-camPos[1])*(l.y-camPos[1])+(l.z-camPos[2])*(l.z-camPos[2]);
     return {i:i,d:d};
   }).sort(function(a,b){ return a.d-b.d; });
-  var n=Math.min(8,near.length);
+  var n=Math.min(7,near.length);
   for(var k=0;k<n;k++){
     var l=lights[near[k].i];
     lightPos[k*4]=l.x; lightPos[k*4+1]=l.y; lightPos[k*4+2]=l.z; lightPos[k*4+3]=l.range;
@@ -1628,8 +1795,8 @@ function drawScene(vp,eye,clipOn,clipY){
   gl.enable(gl.DEPTH_TEST);
   gl.disable(gl.CULL_FACE);
 
-  /* 反射 */
-  if(W_refl){
+  /* 反射：高画质下隔帧更新，省掉一半的全场景绘制 */
+  if(W_refl && (!QUALITY || (frameN&1)===0)){
     gl.bindFramebuffer(gl.FRAMEBUFFER,W_refl.fbo);
     gl.viewport(0,0,W_refl.w,W_refl.h);
     gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
@@ -1693,13 +1860,19 @@ function setMainUniforms(vp,eye,clipOn,clipY,isRefl){
   gl.uniform4fv(p.u.uLP,lightPos);
   gl.uniform3fv(p.u.uLC,lightCol);
   gl.uniform1i(p.u.uLN,n);
-  /* 最近砸出的洞（最多 16 个） */
-  var hn=Math.min(16,holes.length);
+  /* 洞是永久的，但 shader 一次只吃 16 个：每帧挑离镜头最近的 16 个 */
+  var nearH=[], hd2;
+  for(var hi=0;hi<holes.length;hi++){
+    var ho0=holes[hi];
+    hd2=(ho0.x-eye[0])*(ho0.x-eye[0])+(ho0.z-eye[2])*(ho0.z-eye[2]);
+    if(hd2<90) nearH.push([hd2,ho0]);
+  }
+  nearH.sort(function(a,b){ return a[0]-b[0]; });
+  var hn=Math.min(16,nearH.length);
   for(var hi=0;hi<16;hi++){
-    var ho=holes[holes.length-1-hi];
-    var o4=hi*4;
-    if(hi>=hn||!ho){ holeUni[o4]=0; holeUni[o4+1]=0; holeUni[o4+2]=0; holeUni[o4+3]=0; }
-    else { holeUni[o4]=ho.x; holeUni[o4+1]=ho.y; holeUni[o4+2]=ho.z; holeUni[o4+3]=ho.r; }
+    var o4=hi*4, hh3=(hi<hn)?nearH[hi][1]:null;
+    if(!hh3){ holeUni[o4]=0; holeUni[o4+1]=0; holeUni[o4+2]=0; holeUni[o4+3]=0; }
+    else { holeUni[o4]=hh3.x; holeUni[o4+1]=hh3.y; holeUni[o4+2]=hh3.z; holeUni[o4+3]=hh3.r; }
   }
   gl.uniform4fv(p.u.uHole,holeUni);
   gl.uniform1i(p.u.uHoleN,hn);
@@ -1770,7 +1943,7 @@ function showFail(msg){
 
 function setupWorld(){
   buildLevers();
-  holes=[]; frags=[]; duckW=[]; visitedSet={};
+  holes=[]; frags=[]; duckW=[]; visitedSet={}; EXIT=null;
   resetPlayer();
   regCX=Math.floor(player.x/CELL); regCZ=Math.floor(player.z/CELL);
   buildWorldMesh(regCX,regCZ);
@@ -1831,11 +2004,27 @@ window.addEventListener("resize",function(){
 });
 
 var lastTs=0, frameN=0, tourStage=0, SIMW=0, FT=0, GOTOLEV=0;
+var PERF={rebuilds:0,rebuildMs:0,fps:0,acc:0,frames:0,worst:0};
 function loop(ts){
   requestAnimationFrame(loop);
   if(!lastTs) lastTs=ts||0;
   var dt=Math.min(0.05,((ts||0)-lastTs)/1000);
   lastTs=ts||0;
+  if(dt>0){
+    PERF.frames++; PERF.acc+=dt; PERF.worst=Math.max(PERF.worst,dt);
+    if(PERF.acc>=1){ PERF.fps=Math.round(PERF.frames/PERF.acc); PERF.frames=0; PERF.acc=0;
+      if(started&&PERF.adaptT===undefined) PERF.adaptT=0;
+      if(started){
+        if(PERF.fps>0&&PERF.fps<45){ PERF.lowN=(PERF.lowN||0)+1; } else PERF.lowN=0;
+        if(PERF.lowN>=2&&RES_SCALE>0.62&&(performance.now()-(PERF.lastRes||0))>4000){
+          RES_SCALE=Math.max(0.62,RES_SCALE-0.12);
+          PERF.lastRes=performance.now(); PERF.lowN=0;
+          try{ resize(); buildFBOs(); }catch(e){}
+          toast("画质自动降一档，让画面稳一点");
+        }
+      }
+      if(DBG_FPS){ var pe=document.getElementById("fpsbox"); if(pe) pe.textContent=PERF.fps+" fps · 重建 "+PERF.rebuildMs.toFixed(1)+"ms"; } PERF.worst=0; }
+  }
   if(!started) return;
   if(GOTOLEV>0){
     GOTOLEV=0;
@@ -1926,9 +2115,11 @@ function mkSkin(){
   function r(u,v,w,h,c){ x.fillStyle=c; x.fillRect(u,v,w,h); }
   r(8,8,8,8,SK); r(0,8,8,8,SK); r(16,8,8,8,SK); r(24,8,8,8,SK); r(8,0,8,8,HAIR); r(16,0,8,8,SK);
   r(8,8,8,2,HAIR); r(0,8,8,2,HAIR); r(16,8,8,2,HAIR); r(24,8,8,2,HAIR);
+  r(24,8,8,8,HAIR); r(0,8,8,4,HAIR); r(16,8,8,4,HAIR);
+  r(11,13,2,1,"#B07850");
   r(10,11,2,1,"#F1EEE6"); r(13,11,2,1,"#F1EEE6");
   r(10,12,1,1,"#3F63B4"); r(14,12,1,1,"#3F63B4");
-  r(11,14,3,1,DARK);
+  r(11,14,2,1,DARK);
   r(20,20,8,12,SH); r(32,20,8,12,SH); r(16,20,4,12,SH); r(28,20,4,12,SH);
   r(20,16,8,4,SH); r(28,16,8,4,SH); r(22,20,4,1,SK);
   r(44,20,4,12,SH); r(52,20,4,12,SH); r(40,20,4,12,SH); r(48,20,4,12,SH);
@@ -2014,7 +2205,7 @@ function drawNetAvatars(p,eye){
     var root=new Float32Array([c*PX,0,-sn*PX,0, 0,PX,0,0, sn*PX,0,c*PX,0, pl.x,yy,pl.z,1]);
     var sw=Math.sin((pl.walk||0)*1.9)*0.62;
     var pit=Math.max(-0.5,Math.min(0.5,pl.pitch||0));
-    var list=[["body",0],["head",pit],["armR",-sw],["armL",sw],["legR",sw],["legL",-sw]];
+    var list=[["body",0],["head",-pit],["armR",-sw],["armL",sw],["legR",sw],["legL",-sw]];
     for(var k=0;k<list.length;k++){
       var part=A[list[k][0]];
       gl.uniformMatrix4fv(p.u.uM,false,pcPartMat(root,part.p,list[k][1]));
@@ -2190,7 +2381,6 @@ function netOnMsg(m){
       }
       if(!dup) holes.push({x:e2[0],y:e2[1],z:e2[2],r:e2[3]});
     }
-    while(holes.length>HMAX) holes.shift();
     updateKeyHud();
     if(pulledCount>=LEVER_N) hammerOwned=true;
     toast("已连上房主的池子 · 拉杆 "+pulledCount+"/"+LEVER_N);
@@ -2217,8 +2407,13 @@ function netOnMsg(m){
     return;
   }
   if(m.t==="h"){
-    holes.push({x:m.x,y:m.y,z:m.z,r:m.r||0.4});
-    while(holes.length>HMAX) holes.shift();
+    var hd=null;
+    for(var hi2=0;hi2<holes.length;hi2++){
+      var hh2=holes[hi2];
+      if(Math.abs(hh2.x-m.x)<0.22&&Math.abs(hh2.y-m.y)<0.22&&Math.abs(hh2.z-m.z)<0.22){ hd=hh2; break; }
+    }
+    if(hd) hd.r=Math.max(hd.r,(m.r||0.4));
+    else holes.push({x:m.x,y:m.y,z:m.z,r:m.r||0.4});
     spawnFrags(m.x,m.y,m.z,m.dx||0,m.dz||0);
     sfx("smash");
     return;
@@ -2267,7 +2462,11 @@ window.__P=function(){
     props:regionProps.length,ducks:duckW.length,started:started,
     tris:meshCount,lights:lights.length,walls:collWalls.length,cell:[regCX,regCZ]};
 };
-window.__PULL=function(){ var n=nearestLever(); if(!n.l) return false; n.l.pulled=true; n.l.pullT=(performance.now()-T0)/1000; pulledCount++; if(pulledCount>=LEVER_N) hammerOwned=true; updateKeyHud(); try{ netLever(n.l.id); }catch(e){} return true; };
+window.__PULL=function(){ var n=nearestLever(); if(!n.l) return false; n.l.pulled=true; n.l.pullT=(performance.now()-T0)/1000; pulledCount++; if(pulledCount>=LEVER_N){ hammerOwned=true; if(!EXIT) spawnExit(); } updateKeyHud(); try{ netLever(n.l.id); }catch(e){} return true; };
+window.__EXIT=function(){ return EXIT?{x:EXIT.x,z:EXIT.z,d:Math.round(exitDist()/CELL)}:null; };
+window.__HOLELIST=function(){ return holes.map(function(h){ return {x:+h.x.toFixed(2),y:+h.y.toFixed(2),z:+h.z.toFixed(2),r:+h.r.toFixed(2)}; }); };
+window.__PROPS=function(){ return regionProps.filter(function(o){return o.k==="duck"||o.k==="sign";}).map(function(o){ return {k:o.k,x:+o.x.toFixed(2),z:+o.z.toFixed(2),pk:o.pk,fall:o.fallT?1:0}; }); };
+window.__PERF=function(){ return {fps:PERF.fps,rebuilds:PERF.rebuilds,rebuildMs:+PERF.rebuildMs.toFixed(1),holes:holes.length,frags:frags.length,props:regionProps.length,tris:meshCount}; };
 window.__HAMMER=function(v){ hammerOwned=v!==false; updateKeyHud(); };
 window.__SMASH=function(){ smash(); };
 window.__MAP=function(){
@@ -2291,9 +2490,9 @@ window.__LOOK=function(yaw,pitch){ player.yaw=yaw; player.pitch=pitch; };
 window.__KEYIN=function(name,v){ keysDown[name]=v?1:0; };
 window.__START=function(q){ begin(q===undefined?1:q); };
 window.__STARTCELL=function(){ return {x:CELL*0.5,z:CELL*0.5}; };
-window.__NP=function(sid,x,z,yaw,name){
+window.__NP=function(sid,x,z,yaw,name,pit){
   NETPC.on=true;
-  NETPC.players[sid||"dbg1"]={x:x,z:z,tx:x,tz:z,y:player.y,ty:player.y,yaw:yaw||0,pitch:0,walk:0,last:performance.now()};
+  NETPC.players[sid||"dbg1"]={x:x,z:z,tx:x,tz:z,y:player.y,ty:player.y,yaw:yaw||0,pitch:pit||0,walk:0,last:performance.now()};
   pcPaintChip();
   return true;
 };
@@ -2319,6 +2518,12 @@ window.__NET=function(){
     sid:NETPC.sid,rnd:Math.random(),rs:ws?ws.readyState:-1,tx:NETPC.tx||0,rx:NETPC.rx||0,rxk:NETPC.rxk||0,joined:!!NETPC.joined,
     players:Object.keys(NETPC.players).length};
 };
+if(DBG_FPS){
+  var fb=document.createElement("div");
+  fb.id="fpsbox";
+  fb.style.cssText="position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:120;font:600 12px/1.2 ui-monospace,monospace;color:#8dffd2;background:rgba(0,0,0,.6);padding:5px 10px;border-radius:8px;pointer-events:none";
+  document.body.appendChild(fb);
+}
 try{
   var qs=location.search||"";
   if(/auto=1/.test(qs)){ begin(/q=low/.test(qs)?0:1); }

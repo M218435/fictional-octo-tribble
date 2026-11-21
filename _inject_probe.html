@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>67 注入台 · hhh.l2.ink</title>
+<style>
+  :root{
+    --clay:#D97757; --paper:#F4EDE3; --dim:#9C9287; --dim2:#6E655B;
+    --ink:#161311; --ink2:#1E1A17; --line:rgba(244,237,227,.14);
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;}
+  body{
+    background:radial-gradient(120% 90% at 50% 0%,#241E1A 0%,#100E0C 62%,#0A0908 100%);
+    color:var(--paper);font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+    overflow:hidden;
+  }
+  /* ---------- 顶栏 ---------- */
+  .top{
+    position:fixed;left:0;right:0;top:0;height:46px;display:flex;align-items:center;gap:10px;
+    padding:0 calc(12px + env(safe-area-inset-left)) 0 calc(12px + env(safe-area-inset-left));
+    background:linear-gradient(180deg,rgba(12,10,9,.92),rgba(12,10,9,.6));
+    border-bottom:1px solid var(--line);z-index:5;backdrop-filter:blur(8px);
+  }
+  .brand{font-size:12.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);}
+  .brand b{color:var(--clay);font-weight:600;letter-spacing:.1em;}
+  .target{
+    display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:8px;
+    background:rgba(244,237,227,.06);border:1px solid var(--line);font-size:11.5px;color:var(--paper);
+  }
+  .target s{color:var(--dim2);text-decoration:none;font-size:10px;}
+  .lock{font-size:10px;color:var(--dim2);}
+  .stat{margin-left:auto;display:flex;align-items:center;gap:7px;font-size:11px;color:var(--dim);}
+  .dot{width:7px;height:7px;border-radius:50%;background:#7a4a3c;box-shadow:0 0 0 1px rgba(244,237,227,.18) inset;}
+  .dot.ok{background:#8FCB74;box-shadow:0 0 10px rgba(143,203,116,.7);}
+  .tb{
+    height:26px;padding:0 10px;border-radius:7px;border:1px solid var(--line);
+    background:rgba(244,237,227,.05);color:var(--dim);font:inherit;font-size:11px;cursor:pointer;
+  }
+  .tb:hover{color:var(--paper);border-color:rgba(244,237,227,.24);}
+
+  /* ---------- 游戏区 ---------- */
+  .stage{
+    position:fixed;left:0;right:0;top:46px;bottom:0;
+    background:#0A0908;
+  }
+  .stage iframe{width:100%;height:100%;border:0;display:block;background:#0A0908;}
+
+  /* ---------- 注入面板 ---------- */
+  .dock{
+    position:fixed;left:calc(12px + env(safe-area-inset-left));bottom:calc(150px + env(safe-area-inset-bottom));
+    z-index:6;font:inherit;display:flex;flex-direction:column-reverse;align-items:flex-start;gap:8px;
+  }
+  .dock-btn{
+    display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 13px;border-radius:10px;
+    background:rgba(26,22,19,.9);border:1px solid var(--line);color:var(--paper);
+    font:inherit;font-size:12px;letter-spacing:.04em;cursor:pointer;backdrop-filter:blur(8px);
+    box-shadow:0 16px 34px -22px #000;
+  }
+  .dock-btn b{color:var(--clay);font-weight:600;}
+  .panel{
+    display:none;width:min(262px,80vw);max-height:min(56vh,470px);overflow:auto;
+    background:rgba(20,17,15,.95);border:1px solid var(--line);border-radius:13px;
+    box-shadow:0 30px 70px -40px #000;backdrop-filter:blur(10px);
+    scrollbar-width:thin;scrollbar-color:#4A3F36 transparent;
+  }
+  .panel::-webkit-scrollbar{width:6px;}
+  .panel::-webkit-scrollbar-thumb{background:#4A3F36;border-radius:3px;}
+  .panel.open{display:block;animation:pfade .18s ease both;}
+  @keyframes pfade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+  .grp{border-bottom:1px solid rgba(244,237,227,.08);}
+  .grp:last-child{border-bottom:0;}
+  .grp-head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:9px 12px;cursor:pointer;user-select:none;-webkit-user-select:none;
+    font-size:12px;letter-spacing:.05em;
+  }
+  .grp-head:hover{background:rgba(244,237,227,.05);}
+  .ar{
+    width:8px;height:8px;font-size:0;background:var(--dim);margin-right:2px;
+    clip-path:polygon(0 0,100% 50%,0 100%);-webkit-clip-path:polygon(0 0,100% 50%,0 100%);
+    transition:background .16s ease,clip-path .16s ease;
+  }
+  .grp.open .ar{background:var(--clay);clip-path:polygon(0 0,100% 0,50% 100%);-webkit-clip-path:polygon(0 0,100% 0,50% 100%);}
+  .grp-body{display:none;padding:2px 12px 11px;}
+  .grp.open .grp-body{display:block;}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 0;}
+  .row em{font-style:normal;color:#C9BFB2;font-size:11.5px;}
+  .row .v{color:var(--clay);font-size:11px;min-width:32px;text-align:right;font-variant-numeric:tabular-nums;}
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;width:92px;height:2px;background:rgba(244,237,227,.22);
+    border-radius:2px;outline:0;
+  }
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--clay);border:0;}
+  input[type=range]::-moz-range-thumb{width:12px;height:12px;border:0;border-radius:50%;background:var(--clay);}
+  .sw{width:34px;height:18px;border-radius:9px;background:rgba(244,237,227,.2);position:relative;cursor:pointer;flex:0 0 auto;transition:background .16s ease;}
+  .sw.on{background:var(--clay);}
+  .sw i{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--paper);transition:transform .16s ease;}
+  .sw.on i{transform:translateX(16px);}
+  .btn{
+    width:100%;height:29px;margin-top:6px;border:1px solid var(--line);border-radius:8px;
+    background:rgba(244,237,227,.06);color:#E8DFD2;font:inherit;font-size:11.5px;cursor:pointer;
+  }
+  .btn:active{background:rgba(217,119,87,.3);}
+  .foot{
+    padding:9px 12px;font-size:10.5px;line-height:1.6;color:var(--dim2);
+    border-top:1px solid rgba(244,237,227,.08);
+  }
+  .foot b{color:var(--dim);font-weight:500;}
+  .toast{
+    position:fixed;left:50%;top:64px;transform:translateX(-50%);
+    padding:7px 14px;border-radius:8px;background:rgba(217,119,87,.94);color:#fff;
+    font-size:11.5px;opacity:0;transition:opacity .2s ease;pointer-events:none;z-index:9;
+  }
+  .toast.show{opacity:1;}
+  @media (max-width:520px){
+    .brand{display:none;}
+    .target s{display:none;}
+    .stat{font-size:10px;gap:5px;}
+    .tb{display:none;}
+    #statText{max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .lock{display:none;}
+    .panel{width:min(240px,74vw);max-height:min(46vh,380px);}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">RTSX · <b>67 注入台</b></div>
+  <div class="target"><span class="lock">目标已锁定</span> hhh.l2.ink <s>· 不可更改</s></div>
+  <div class="stat">
+    <span class="dot" id="dot"></span><span id="statText">等待接口回应</span>
+    <button class="tb" id="reload" type="button">重载</button>
+  </div>
+</header>
+
+<div class="stage"><iframe id="frame" title="67 迷宫追逐战" allow="fullscreen; pointer-lock; autoplay; gamepad"></iframe></div>
+
+<div class="dock" id="dock">
+  <button class="dock-btn" id="dockBtn" type="button">注入 <b>&#9662;</b></button>
+  <div class="panel" id="panel">
+
+    <div class="grp open" id="gView">
+      <div class="grp-head">视角 <span class="ar"></span></div>
+      <div class="grp-body">
+        <div class="row"><em>视野 FOV</em><input id="fov" type="range" min="55" max="115" step="1" value="78"><span class="v" id="fovV">78</span></div>
+        <div class="row"><em>眼高</em><input id="eye" type="range" min="0.4" max="1.9" step="0.05" value="0.98"><span class="v" id="eyeV">0.98</span></div>
+        <div class="row"><em>俯仰角度</em><input id="pit" type="range" min="0.6" max="1.55" step="0.05" value="1.15"><span class="v" id="pitV">1.15</span></div>
+        <div class="row"><em>亮度</em><input id="br" type="range" min="0.6" max="2.2" step="0.05" value="1"><span class="v" id="brV">1.00</span></div>
+      </div>
+    </div>
+
+    <div class="grp" id="gWorld">
+      <div class="grp-head">世界 <span class="ar"></span></div>
+      <div class="grp-body">
+        <div class="row"><em>小地图</em><div class="sw" id="swMap"><i></i></div></div>
+        <button class="btn" id="tpExit" type="button">传送到出口门</button>
+        <button class="btn" id="tpCube" type="button">传送到最近的 67</button>
+        <button class="btn" id="regen" type="button">重新生成迷宫</button>
+      </div>
+    </div>
+
+    <div class="grp" id="gFight">
+      <div class="grp-head">战斗 <span class="ar"></span></div>
+      <div class="grp-body">
+        <div class="row"><em>无敌</em><div class="sw" id="swInv"><i></i></div></div>
+        <div class="row"><em>定住追兵</em><div class="sw" id="swFrz"><i></i></div></div>
+        <div class="row"><em>无限锤</em><div class="sw" id="swHin"><i></i></div></div>
+        <div class="row"><em>追兵速度倍率</em><input id="hsp" type="range" min="0" max="3" step="0.05" value="1"><span class="v" id="hspV">1.00</span></div>
+        <button class="btn" id="clear" type="button">清空追兵</button>
+        <button class="btn" id="collect" type="button">一键收齐所有 67</button>
+      </div>
+    </div>
+
+    <div class="foot">通道 <b>postMessage</b> · 目标 <b>hhh.l2.ink</b> · 状态 <b id="footStat">未连接</b></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* 目标只有这一个，写死，界面上不可修改 */
+  var TARGET = "http://127.0.0.1:8817";
+  var PAGE = TARGET + "/games/67/maze-inject.html?dbg=1";
+  var KEY = "rtsx-67-inject-2026";      // 与站点 maze.html 注入接口里的 KEY 必须一致
+
+  var frame = document.getElementById("frame");
+  var dot = document.getElementById("dot");
+  var statText = document.getElementById("statText");
+  var footStat = document.getElementById("footStat");
+  var panel = document.getElementById("panel");
+  var dockBtn = document.getElementById("dockBtn");
+  var seq = 0, ready = false;
+
+  function toast(msg){
+    var el = document.getElementById("toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(el._t);
+    el._t = setTimeout(function(){ el.classList.remove("show"); }, 1500);
+  }
+
+  function setConn(ok, label){
+    ready = ok;
+    dot.classList.toggle("ok", ok);
+    statText.textContent = label;
+    footStat.textContent = ok ? "接口已回应" : "未连接";
+  }
+
+  function send(cmd, val){
+    if (!frame.contentWindow) { toast("还没有载入页面"); return; }
+    if (!ready) { toast("站点端接口未回应，先确认已部署接收接口"); }
+    seq++;
+    var msg = { t: "mz-cmd", key: KEY, id: seq, cmd: cmd, val: val };
+    try { frame.contentWindow.postMessage(msg, TARGET); }
+    catch (e) { toast("发送失败：" + e.message); }
+  }
+
+  /* 握手：页面载入后主动问一次 */
+  function hello(){
+    setConn(false, "等待接口回应");
+    if (!frame.contentWindow) return;
+    try { frame.contentWindow.postMessage({ t: "mz-hello", key: KEY }, TARGET); } catch (e) {}
+  }
+
+  frame.addEventListener("load", function(){
+    setTimeout(hello, 900);      // 等游戏脚本初始化
+    setTimeout(function(){ if (!ready) setConn(false, "站点端还没有接收接口"); }, 2600);
+  });
+  frame.src = PAGE;
+
+  var SWMAP = { map: "swMap", inv: "swInv", frz: "swFrz", hin: "swHin" };
+
+  window.addEventListener("message", function(ev){
+    var d = ev.data;
+    if (!d || d.t !== "mz-ack" || d.key !== KEY) return;
+    if (ev.origin !== TARGET && ev.origin !== "null") return;
+    setConn(true, "已连接");
+    /* 用站点回传的真实状态校正开关，避免两边显示打架 */
+    if (SWMAP[d.cmd] && typeof d.res === "boolean") {
+      var el = document.getElementById(SWMAP[d.cmd]);
+      if (el) el.classList.toggle("on", d.res);
+    }
+  });
+
+  /* 面板开合 */
+  dockBtn.addEventListener("click", function(){
+    var open = panel.classList.toggle("open");
+    dockBtn.innerHTML = open ? "注入 <b>&#9652;</b>" : "注入 <b>&#9662;</b>";
+  });
+  Array.prototype.forEach.call(panel.querySelectorAll(".grp-head"), function(h){
+    h.addEventListener("click", function(){ this.parentNode.classList.toggle("open"); });
+  });
+
+  document.getElementById("reload").addEventListener("click", function(){
+    hello();
+    frame.src = PAGE;
+    toast("已重载游戏页");
+  });
+
+  /* 滑块 */
+  function bindRange(id, vid, cmd, digits){
+    var el = document.getElementById(id), out = document.getElementById(vid);
+    el.addEventListener("input", function(){
+      var v = parseFloat(el.value);
+      out.textContent = digits ? v.toFixed(digits) : String(v);
+      send(cmd, v);
+    });
+  }
+  bindRange("fov", "fovV", "fov");
+  bindRange("eye", "eyeV", "eye", 2);
+  bindRange("pit", "pitV", "pitch", 2);
+  bindRange("br", "brV", "bright", 2);
+  bindRange("hsp", "hspV", "hsp", 2);
+
+  /* 开关 */
+  function bindSwitch(id, cmd){
+    var el = document.getElementById(id);
+    el.addEventListener("click", function(){
+      var on = !el.classList.contains("on");
+      el.classList.toggle("on", on);
+      send(cmd, on);
+    });
+  }
+  bindSwitch("swMap", "map");
+  bindSwitch("swInv", "inv");
+  bindSwitch("swFrz", "frz");
+  bindSwitch("swHin", "hin");
+
+  /* 按钮 */
+  document.getElementById("tpExit").addEventListener("click", function(){ send("tp_exit"); });
+  document.getElementById("tpCube").addEventListener("click", function(){ send("tp_cube"); });
+  document.getElementById("regen").addEventListener("click", function(){ send("regen"); toast("已下发重新生成"); });
+  document.getElementById("clear").addEventListener("click", function(){ send("clear"); });
+  document.getElementById("collect").addEventListener("click", function(){ send("collect"); });
+
+  /* 暴露给控制台调试 */
+  window.__inject = { send: send, target: TARGET, page: PAGE, key: KEY, connected: function(){ return ready; } };
+})();
+</script>
+</body>
+</html>
