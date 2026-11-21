@@ -238,10 +238,11 @@ var VS_MAIN=`#version 300 es
 layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNor; layout(location=2) in vec2 aUV;
 layout(location=3) in vec3 aCol; layout(location=4) in float aMat;
 uniform mat4 uVP; uniform mat4 uM;
+uniform vec3 uColOv; uniform float uColOn;
 out vec3 vPos; out vec3 vNor; out vec2 vUV; out vec3 vCol; out float vMat;
 void main(){
   vec4 wp=uM*vec4(aPos,1.0);
-  vPos=wp.xyz; vNor=mat3(uM)*aNor; vUV=aUV; vCol=aCol; vMat=aMat;
+  vPos=wp.xyz; vNor=mat3(uM)*aNor; vUV=aUV; vCol=(uColOn>0.5)?uColOv:aCol; vMat=aMat;
   gl_Position=uVP*wp;
 }`;
 
@@ -648,12 +649,15 @@ function drawObjects(vp,eye,clipOn,clipY,isRefl){
   for(i=0;i<regionProps.length;i++){
     o=regionProps[i]; mc=modelCache[o.k]; if(!mc) continue;
     sc=o.scale||1;
+    if(o.hitN) sc*=1-0.07*o.hitN;             /* 被砸凹：整只缩一点 */
     yaw=o.yaw||0;
     if(o.big) yaw=Math.atan2(eye[0]-o.x, eye[2]-o.z);   /* 岸上的鸭子：一直盯着你 */
     c=Math.cos(yaw); sn=Math.sin(yaw);
     bob=(o.big)?Math.sin(t*0.7+(o.ph||0))*0.012:0;
     var oy=o.y-((mc.min?mc.min[1]:0)*sc)+(o.baseFix?o.baseFix*sc:0)+bob;
+    if(o.hitN) oy-=0.10*o.hitN;
     base=new Float32Array([c*sc,0,-sn*sc,0, 0,sc,0,0, sn*sc,0,c*sc,0, o.x,oy,o.z,1]);
+    if(o.hitN) base=m4mul(base,m4Rx(0.10*o.hitN));
     if(o.fallT){
       var fk=Math.min(1,(t-o.fallT)/0.55);
       base=m4mul(base,m4Rx(fk*fk*(o.fallDir||1)*1.5));
@@ -771,6 +775,7 @@ function drawFrags(vp,eye,clipOn,clipY,isRefl){
     var M=m4mul(m4mul(m4mul(m4T(f.x,f.y,f.z),m4Rz(f.rz)),m4mul(m4Ry(f.ry),m4Rx(f.rx))),
                m4S(f.sx*fade,f.sy*fade,f.sz*fade));
     gl.uniformMatrix4fv(p.u.uM,false,M);
+    if(f.col){ gl.uniform3f(p.u.uColOv,f.col[0],f.col[1],f.col[2]); gl.uniform1f(p.u.uColOn,1.0); }
     gl.drawArrays(gl.TRIANGLES,0,36);
   }
   gl.bindVertexArray(null);
@@ -1143,9 +1148,9 @@ function resolveCollision(pos,r){
 function m4T(x,y,z){ return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1]); }
 function m4Rx(a){ var c=Math.cos(a),s=Math.sin(a);
   return new Float32Array([1,0,0,0, 0,c,s,0, 0,-s,c,0, 0,0,0,1]); }
-function spawnFrags(x,y,z,dx,dz,col){
+function spawnFrags(x,y,z,dx,dz,col,cn){
   if(dx===undefined){ dx=0; dz=1; }
-  var n=7+Math.floor(Math.random()*4);
+  var n=cn||(7+Math.floor(Math.random()*4));
   var tx=dz, tz=-dx;                     /* 墙面切向 */
   for(var i=0;i<n;i++){
     var sgn=Math.random()*2-1;
@@ -1209,6 +1214,16 @@ function makeHole(x,y,z,dx,dz,fromNet){
 function propKill(o, py){
   var pm=propMod[o.pk]||(propMod[o.pk]={});
   if(o.k==="duck"){
+    var hp=(pm.duckHp||0)+1;
+    pm.duckHp=hp; o.hitN=hp; o.hitT=(performance.now()-T0)/1000;
+    if(hp<3){
+      /* 实心橡胶鸭：砸凹下去，掉一点皮，掉不了整只 */
+      spawnFrags(o.x+(Math.random()-0.5)*0.2, Math.max(0.6,py), o.z+(Math.random()-0.5)*0.2,
+                 0, 1, [0.92,0.70,0.12], 3);
+      sfx("smash"); sfx("debris");
+      toast("实心的，砸凹了一块（"+hp+"/3）· 再砸两下才散");
+      return true;
+    }
     pm.duckGone=1;
     spawnFrags(o.x, py, o.z, 0, 1, [0.92,0.70,0.12]);
     spawnFrags(o.x, 0.7, o.z, 0, 1, [0.86,0.62,0.10]);
@@ -1867,6 +1882,8 @@ function drawScene(vp,eye,clipOn,clipY){
 function setMainUniforms(vp,eye,clipOn,clipY,isRefl){
   var p=progMain;
   gl.useProgram(p.p);
+  gl.uniform1f(p.u.uColOn,0.0);
+  gl.uniform3f(p.u.uColOv,1.0,1.0,1.0);
   gl.uniformMatrix4fv(p.u.uVP,false,vp);
   gl.uniform1i(p.u.uTex,0);
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,texTile);
@@ -2511,6 +2528,7 @@ window.__P=function(){
 };
 window.__PULL=function(){ var n=nearestLever(); if(!n.l) return false; n.l.pulled=true; n.l.pullT=(performance.now()-T0)/1000; pulledCount++; if(pulledCount>=LEVER_N){ hammerOwned=true; if(!EXIT) spawnExit(); } updateKeyHud(); try{ netLever(n.l.id); }catch(e){} return true; };
 window.__EXIT=function(){ return EXIT?{x:EXIT.x,z:EXIT.z,d:Math.round(exitDist()/CELL)}:null; };
+window.__PROPMOD=function(){ return propMod; };
 window.__HOLELIST=function(){ return holes.map(function(h){ return {x:+h.x.toFixed(2),y:+h.y.toFixed(2),z:+h.z.toFixed(2),r:+h.r.toFixed(2)}; }); };
 window.__PROPS=function(){ return regionProps.filter(function(o){return o.k==="duck"||o.k==="sign";}).map(function(o){ return {k:o.k,x:+o.x.toFixed(2),z:+o.z.toFixed(2),pk:o.pk,fall:o.fallT?1:0}; }); };
 window.__PERF=function(){ return {fps:PERF.fps,rebuilds:PERF.rebuilds,rebuildMs:+PERF.rebuildMs.toFixed(1),holes:holes.length,frags:frags.length,props:regionProps.length,tris:meshCount}; };
