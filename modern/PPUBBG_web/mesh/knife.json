@@ -1,0 +1,1 @@
+{"v": 2460, "i": 8208, "mats": [{"name": "fish_knife", "base": "textures/fish_knife_diff_4k.jpg", "nor": "textures/fish_knife_nor_gl_4k.jpg", "arm": "textures/fish_knife_arm_4k.jpg", "metal": 1.0, "rough": 1.0}], "prims": [{"s": 0, "c": 7332, "m": 0}, {"s": 7332, "c": 876, "m": 0}], "bbox": [-0.01452, -0.11026, -0.00811, 0.01452, 0.10544, 0.00811]}
