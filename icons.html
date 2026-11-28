@@ -55,9 +55,9 @@
 
   <div class="lede">
     <h1>图标库</h1>
-    <span class="tagline">570+ icons · v1.0.3</span>
+    <span class="tagline">site icons · 58</span>
   </div>
-  <p class="sub">站点菜单、设置、工具栏用的就是这一套。全部为 10×10 网格的单色 SVG，原始文件是白色描边，所以给了「深底 / 浅底」两种预览，按实际放置的底色挑。点任意一个复制它的路径。</p>
+  <p class="sub">这是站点自己用的那一套，共 58 个。全部为 10×10 网格的单色 SVG，原始文件是白色描边，所以给了「深底 / 浅底」两种预览，按实际放置的底色挑。点任意一个复制它的路径。完整图标包只在本地保留，不随站点发布。</p>
 
   <div class="ihead">
     <div class="ifilter" id="filters"></div>
@@ -74,7 +74,7 @@
   <div class="board"><div class="igrid" id="grid"></div></div>
 
   <div class="pfoot" style="margin-top:20px;font-size:11.5px;color:var(--ui-dim-2);line-height:1.8;">
-    许可：允许个人与商业使用、无需署名；禁止直接转售或转售修改后的图标包。每个图标另带 64/128/256px PNG。
+    许可：图标包允许个人与商业使用、无需署名，禁止转售图标包本身。因此线上只发布站点自用的 58 个，原始包不入库、不出现在任何公开路径。
   </div>
 </div>
 
@@ -82,9 +82,10 @@
 <script>
 (function(){
   "use strict";
-  var PACK = "570+图标-v1.0.3/";
+  var PACK = "assets/icons/";
   var board = "dark";
-  var cat = -1, q = "";
+  var cat = "";
+  var q = "";
   var all = [], cats = [];
   var grid = document.getElementById("grid");
   var filters = document.getElementById("filters");
@@ -94,23 +95,21 @@
 
   function paint(){
     var list = all.filter(function(it){
-      if (cat >= 0 && it.c !== cat) return false;
+      if (cat && it.c !== cat) return false;
       if (!q) return true;
-      return it.n.toLowerCase().indexOf(q) !== -1;
+      return (it.n + " " + it.f).toLowerCase().indexOf(q) !== -1;
     });
     countEl.textContent = list.length + " / " + all.length + " 个";
     grid.innerHTML = "";
     var frag = document.createDocumentFragment();
-    list.forEach(function(it, i){
+    list.forEach(function(it){
       var cell = el("button", "icell" + (board === "dark" ? " on-dark" : " on-light"));
       cell.type = "button";
       cell.title = it.n;
       cell.setAttribute("aria-label", it.n);
-      var src = PACK + it.p.split("/").map(encodeURIComponent).join("/");
-      cell.innerHTML = '<img loading="lazy" src="' + src + '" alt="" width="26" height="26"><span>' + it.n + "</span>";
+      cell.innerHTML = '<img loading="lazy" src="' + PACK + it.f + '" alt="" width="26" height="26"><span>' + it.n + "</span>";
       cell.addEventListener("click", function(){
-        var path = PACK + it.p;
-        copy(path, it.n);
+        copy(PACK + it.f, it.n);
       });
       frag.appendChild(cell);
     });
@@ -140,19 +139,19 @@
     filters.innerHTML = "";
     var b0 = el("button","fbtn", "全部");
     b0.type = "button";
-    b0.setAttribute("aria-pressed", cat === -1 ? "true" : "false");
-    b0.addEventListener("click", function(){ cat = -1; buildFilters(); paint(); });
+    b0.setAttribute("aria-pressed", cat === "" ? "true" : "false");
+    b0.addEventListener("click", function(){ cat = ""; buildFilters(); paint(); });
     filters.appendChild(b0);
-    cats.forEach(function(name, i){
-      var b = el("button","fbtn", name.replace(/^\d\./,""));
+    cats.forEach(function(name){
+      var b = el("button","fbtn", name);
       b.type = "button";
-      b.setAttribute("aria-pressed", cat === i ? "true" : "false");
-      b.addEventListener("click", function(){ cat = i; buildFilters(); paint(); });
+      b.setAttribute("aria-pressed", cat === name ? "true" : "false");
+      b.addEventListener("click", function(){ cat = name; buildFilters(); paint(); });
       filters.appendChild(b);
     });
     var inp = el("input");
     inp.type = "search";
-    inp.placeholder = "搜索名称，例如 设置 / 音量 / 剑";
+    inp.placeholder = "搜索名称，例如 设置 / 音量 / 菜单";
     inp.value = q;
     inp.addEventListener("input", function(){ q = inp.value.trim().toLowerCase(); paint(); });
     filters.appendChild(inp);
@@ -170,15 +169,15 @@
     });
   });
   document.getElementById("copy-base").addEventListener("click", function(){
-    copy(PACK, "图标包目录");
+    copy("assets/icons/", "站点图标目录");
   });
 
-  fetch("assets/icons/manifest.json").then(function(r){ return r.json(); }).then(function(m){
+  fetch("assets/icons/site-icons.json").then(function(r){ return r.json(); }).then(function(m){
     all = m.icons || []; cats = m.cats || [];
     buildFilters();
     paint();
   }).catch(function(){
-    grid.innerHTML = '<div class="rempty" style="padding:30px;text-align:center;color:var(--ui-dim-2)">图标清单读取失败，请确认 assets/icons/manifest.json 存在。</div>';
+    grid.innerHTML = '<div class="rempty" style="padding:30px;text-align:center;color:var(--ui-dim-2)">图标清单读取失败，请确认 assets/icons/site-icons.json 存在。</div>';
   });
 })();
 </script>

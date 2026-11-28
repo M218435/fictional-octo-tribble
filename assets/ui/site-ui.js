@@ -131,7 +131,7 @@
     { id: "2040k",  g: "entry", i: "monitor",  h: "games/2040k/index.html",     zh: "2040K 画质",    en: "2040K Visuals", dz: "池核 / PPUBBG / 漫游",   de: "Poolcore, FPS, walkthrough", tag: "3D" },
     { id: "text",   g: "entry", i: "games",    h: "TextGame/index.html",        zh: "67-3A大作",     en: "67 Blockbuster", dz: "第一人称 3D 大作",       de: "First-person 3D" },
     { id: "mc",     g: "entry", i: "grid",     h: "games/Minecaraft/index.html",zh: "我的世界 网页版", en: "Minecraft Web", dz: "PE 触屏 / 1.21.11 锁鼠标", de: "PE touch and 1.21.11", tag: "MC" },
-    { id: "icons",  g: "res",   i: "palette",  h: "icons.html",                 zh: "图标库",        en: "Icon library", dz: "570+ 图标 v1.0.3 · 574 个", de: "574 icons, offline", tag: "NEW" },
+    { id: "icons",  g: "res",   i: "palette",  h: "icons.html",                 zh: "图标库",        en: "Icon library", dz: "58 个站点图标 · 本地精简集", de: "58 site icons", tag: "NEW" },
     { id: "sfx",    g: "res",   i: "wave",     h: "assets/sfx/index.html",      zh: "音效实验室",    en: "Sound lab",    dz: "离线音效试听与选择",      de: "Preview offline SFX" },
     { id: "flow",   g: "res",   i: "wand",     h: "assets/fourier-flow.html",   zh: "傅里叶曲线",    en: "Fourier flow", dz: "进度条组件参考",         de: "Progress component" },
     { id: "setting",g: "site",  i: "settings", h: "settings.html",              zh: "设置中心",      en: "Settings",     dz: "外观 / 声音 / 语言 / 数据", de: "Appearance, sound, data" },
@@ -339,7 +339,7 @@
 
     var foot = h("div", "rfoot");
     foot.innerHTML = '<img src="' + ico("shield") + '" width="13" height="13" alt="" style="filter:invert(1) opacity(.5)">' +
-      "<span>" + T("图标 ", "Icons ") + "<b>570+ v1.0.3</b> · " + T("仅个人站内使用", "internal use only") + "</span>";
+      "<span>" + T("图标 ", "Icons ") + "<b>58</b> · " + T("站点自用", "site set") + "</span>";
     el.appendChild(foot);
 
     head.querySelector(".rclose").addEventListener("click", function () { close("menu"); });
@@ -543,7 +543,7 @@
   PANE.about = function () {
     return '<div class="kv">' +
       "<b>" + T("版本", "Version") + "</b><span>RTSX Site UI 1.0 · " + T("外壳组件", "chrome kit") + "</span>" +
-      "<b>" + T("图标", "Icons") + "</b><span>570+图标-v1.0.3 · 574 个 SVG</span>" +
+      "<b>" + T("图标", "Icons") + "</b><span>assets/icons · 58 个 SVG</span>" +
       "<b>" + T("许可", "License") + "</b><span>" + T("允许个人与商业使用、无需署名；禁止转售图标包本身", "Free for personal and commercial use; resale of the pack is not allowed") + "</span>" +
       "<b>" + T("范围", "Scope") + "</b><span>" + T("只在页面外壳生效，游戏画面内不注入任何站点 UI", "Chrome only; no site UI inside games") + "</span>" +
       "</div>" +

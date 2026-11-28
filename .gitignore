@@ -20,6 +20,16 @@ __pycache__/
 
 # 原始素材大包（只保留网页用的导出件）
 modern/PPUBBG/
+/modern/textures/
+/modern/*.zip
+/modern/*.gltf
+/modern/*.bin
+
+# 私有：只在本地保留，不上线
+570+图标-v1.0.3/
+_inject_probe.html
+67-外挂版.html
+67-注入台.html
 
 # IDE
 .idea/
