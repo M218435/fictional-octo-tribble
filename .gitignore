@@ -17,3 +17,9 @@ _mz.html
 _work/
 __pycache__/
 *.pyc
+
+# 原始素材大包（只保留网页用的导出件）
+modern/PPUBBG/
+
+# IDE
+.idea/

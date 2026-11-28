@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#F4F1EA">
+<title>设置中心 · RTSX</title>
+<link rel="icon" type="image/png" href="icon.png">
+<link rel="stylesheet" href="assets/ui/site-ui.css">
+<script>
+/* 尽早决定明暗，避免首屏闪白 */
+(function(){
+  try{
+    var p = JSON.parse(localStorage.getItem("rtsx.ui.v1")||"{}");
+    var t = p.theme || "auto";
+    var dark = t === "dark" || (t === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.setAttribute("data-rtsx-theme", dark ? "dark" : "light");
+    if (p.radius) document.documentElement.setAttribute("data-rtsx-radius", p.radius);
+    if (p.fs) document.documentElement.setAttribute("data-rtsx-fs", p.fs);
+    if (p.density) document.documentElement.setAttribute("data-rtsx-density", p.density);
+    if (p.motion) document.documentElement.setAttribute("data-rtsx-motion", p.motion);
+  }catch(e){}
+})();
+</script>
+<style>
+  .rpage .wrap{ max-width:760px; }
+  .rpage .lede{ display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:18px; }
+  .rpage .lede h1{ margin:0; }
+  .rpage .lede .tagline{
+    font-family:Georgia,"Times New Roman",serif;
+    font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--ui-dim-2);padding-bottom:5px;
+  }
+  .rpage .quick{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px;margin:0 0 22px;
+  }
+  .quick .q{
+    display:flex;align-items:center;gap:10px;
+    padding:11px 13px;
+    background:var(--ui-surface);border:1px solid var(--ui-line);
+    border-radius:calc(var(--ui-r) - 2px);
+    text-decoration:none;color:inherit;
+    transition:transform .18s, box-shadow .18s, border-color .18s;
+  }
+  .quick .q:hover{ transform:translateY(-2px); box-shadow:0 12px 26px -18px rgba(40,30,20,.45); border-color:var(--ui-line); }
+  .quick .q .itile{ width:30px;height:30px; }
+  .quick .q .itile img{ width:16px;height:16px; }
+  .quick .q b{ display:block;font-size:12.5px;font-weight:600; }
+  .quick .q span{ display:block;font-size:11px;color:var(--ui-dim-2);margin-top:1px; }
+  .rpage .pfoot{
+    margin-top:20px;font-size:11.5px;color:var(--ui-dim-2);line-height:1.8;
+  }
+  @media (max-width:620px){
+    .rpage h1{ font-size:22px; }
+    .rpage .quick{ grid-template-columns:1fr 1fr; }
+  }
+</style>
+</head>
+<body class="rpage">
+<div class="wrap">
+  <div class="pbar">
+    <span class="mark">R</span>
+    <div class="wm"><b>RTSX</b><span>Settings center</span></div>
+    <a class="back" href="index.html"><img src="assets/icons/left.svg" alt="">返回大厅</a>
+  </div>
+
+  <div class="lede">
+    <h1>设置中心</h1>
+    <span class="tagline">Site chrome · not in game</span>
+  </div>
+  <p class="sub">这里管的是站点外壳：菜单长什么样、面板多圆、界面声音多大、用中文还是英文。作品本身的光影、HUD、灵敏度完全不在这里改动，游戏画面内也不会出现这些控件。</p>
+
+  <div class="quick">
+    <a class="q" href="icons.html"><span class="itile"><img src="assets/icons/palette.svg" alt=""></span><span><b>图标库</b><span>574 个 SVG，可直接检索</span></span></a>
+    <a class="q" href="assets/sfx/index.html"><span class="itile"><img src="assets/icons/wave.svg" alt=""></span><span><b>音效实验室</b><span>试听并固定喜欢的音效</span></span></a>
+    <a class="q" href="games/2040k/index.html"><span class="itile"><img src="assets/icons/monitor.svg" alt=""></span><span><b>2040K 画质</b><span>池核 / PPUBBG / 漫游</span></span></a>
+  </div>
+
+  <div id="settings-host"></div>
+
+  <div class="pfoot">
+    设置保存在本机 localStorage，不会上传到任何服务器；换设备时可用「数据 → 导出配置」带走。<br>
+    图标来自 <b>570+图标-v1.0.3</b>：允许个人与商业使用、无需署名，禁止转售图标包本身。
+  </div>
+</div>
+
+<script src="assets/ui/site-ui.js" data-surface="light"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    if (!window.RTSXUI) return;
+    RTSXUI.mountInline(document.getElementById("settings-host"));
+  });
+</script>
+</body>
+</html>

@@ -4,6 +4,21 @@
 <meta charset="utf-8">
 <link rel="icon" type="image/png" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
+<link rel="stylesheet" href="assets/ui/site-ui.css">
+<script>
+/* 站点外壳：明暗偏好尽早落地，避免首屏闪 */
+(function(){
+  try{
+    var p = JSON.parse(localStorage.getItem("rtsx.ui.v1")||"{}");
+    var t = p.theme || "auto";
+    var dark = t === "dark" || (t === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.setAttribute("data-rtsx-theme", dark ? "dark" : "light");
+    if (p.radius) document.documentElement.setAttribute("data-rtsx-radius", p.radius);
+    if (p.fs) document.documentElement.setAttribute("data-rtsx-fs", p.fs);
+    if (p.motion) document.documentElement.setAttribute("data-rtsx-motion", p.motion);
+  }catch(e){}
+})();
+</script>
 
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
@@ -663,6 +678,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="assets/sfx/sfx.js"></script>
+<script src="assets/ui/site-ui.js" data-surface="light"></script>
 <script>
 (function () {
   "use strict";
