@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script src="../../assets/ui/boot-veil.js"></script>
+
+<meta charset="utf-8">
+<link rel="icon" type="image/png" href="../../icon.png">
+<link rel="apple-touch-icon" href="../../icon.png">
+<link rel="stylesheet" href="../../assets/ui/site-ui.css">
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>67-3A大作 · RTSX</title>
+<style>
+  :root{
+    --ink:#F2E9DD; --dim:rgba(242,233,221,.70); --dim2:rgba(242,233,221,.44);
+    --line:#3A2C22; --amber:#E2916F; --amber2:#F4C08A; --gold:#E9C46A; --steel:#8FA3AD;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{
+    margin:0;min-height:100vh;
+    background:
+      linear-gradient(180deg, rgba(12,10,9,.28) 0%, rgba(12,10,9,.90) 60%, rgba(9,8,7,.97) 100%),
+      radial-gradient(120% 82% at 50% -8%, #3A2418 0%, #1A1310 52%, #0C0A09 100%);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding:calc(18px + env(safe-area-inset-top)) 20px calc(32px + env(safe-area-inset-bottom));
+    overflow-x:hidden;
+  }
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background-image:linear-gradient(90deg, rgba(226,145,111,.05) 1px, transparent 1px);
+    background-size:96px 96px;
+    mask-image:radial-gradient(72% 58% at 50% 16%, #000 0%, transparent 80%);
+    -webkit-mask-image:radial-gradient(72% 58% at 50% 16%, #000 0%, transparent 80%);
+  }
+  .wrap{position:relative;z-index:1;}
+
+  .bar{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .bar .right{display:flex;align-items:center;gap:12px;}
+  .back{border:0;background:none;font:inherit;font-size:12px;color:var(--dim2);cursor:pointer;padding:4px 0;letter-spacing:.02em;}
+  .back:hover{color:var(--dim);}
+  .snd{
+    border:1px solid var(--line);background:none;border-radius:8px;
+    padding:3px 7px;font:inherit;font-size:10px;letter-spacing:.12em;
+    color:var(--dim2);cursor:pointer;
+  }
+  .snd.off{opacity:.55;text-decoration:line-through;}
+  .badge{font-family:Georgia,serif;font-size:11px;letter-spacing:.26em;color:var(--dim2);text-transform:uppercase;}
+
+  .hero{display:flex;flex-direction:column;align-items:center;margin:22px 0 30px;}
+  .sun{
+    position:relative;width:150px;height:96px;margin-bottom:22px;overflow:hidden;
+    -webkit-mask-image:linear-gradient(180deg,#000 0 62%,rgba(0,0,0,.35) 84%,transparent 100%);
+    mask-image:linear-gradient(180deg,#000 0 62%,rgba(0,0,0,.35) 84%,transparent 100%);
+  }
+  .sun::before{
+    content:"";position:absolute;left:50%;top:2px;width:96px;height:96px;transform:translateX(-50%);
+    border-radius:50%;
+    background:radial-gradient(circle at 50% 34%, #FFF3D6 0%, #F7C97F 34%, #E2916F 66%, rgba(226,145,111,.35) 86%, transparent 100%);
+    box-shadow:0 0 60px 12px rgba(226,145,111,.30);
+  }
+  .sun::after{
+    content:"";position:absolute;left:0;right:0;top:62%;height:1px;
+    background:linear-gradient(90deg, transparent, rgba(242,233,221,.55), transparent);
+  }
+
+  h1{margin:0 0 10px;font-family:Georgia,"Songti SC","STSong",serif;font-size:34px;font-weight:600;letter-spacing:-.01em;}
+  .sub{margin:0;max-width:480px;text-align:center;font-size:13.5px;line-height:1.75;color:var(--dim);}
+
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:720px;margin:32px auto 0;}
+  .card{
+    display:flex;flex-direction:column;
+    padding:20px 20px 18px;
+    border:1px solid var(--line);border-radius:6px;
+    background:linear-gradient(160deg, rgba(46,33,25,.92) 0%, rgba(22,17,14,.94) 100%);
+    box-shadow:inset 0 0 0 1px rgba(226,145,111,.06);
+    text-decoration:none;color:var(--ink);
+    transition:transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+  }
+  .card:hover{transform:translateY(-3px);border-color:#5A4232;box-shadow:0 18px 40px -28px #000, inset 0 0 0 1px rgba(226,145,111,.14);}
+  .card .tag{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--amber);margin-bottom:10px;}
+  .card h2{margin:0 0 8px;font-family:Georgia,"Songti SC",serif;font-size:21px;font-weight:600;}
+  .card p{margin:0 0 16px;font-size:12.5px;line-height:1.75;color:var(--dim);}
+  .card .go{margin-top:auto;font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);}
+
+  .note{
+    max-width:720px;margin:22px auto 0;padding:12px 16px;
+    border-left:2px solid rgba(226,145,111,.45);border-radius:4px;
+    background:rgba(26,19,16,.5);
+    font-size:11.5px;line-height:1.8;color:var(--dim2);
+  }
+
+  @media (max-width:640px){
+    .cards{grid-template-columns:1fr;}
+    h1{font-size:27px;}
+    .sun{width:126px;height:84px;}
+  }
+</style>
+</head>
+<body>
+<div id="rtsx-boot" aria-hidden="true"><div class="rtsx-spin"></div><b id="rtsx-boot-t">载入中…</b></div>
+<style>
+#rtsx-boot{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;background:#0b0b0c;color:#8C8679;font:12.5px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.08em;opacity:0;animation:rtsxveil .2s .6s ease forwards;pointer-events:none}
+#rtsx-boot b{font-weight:400}
+#rtsx-boot .rtsx-spin{width:22px;height:22px;border-radius:50%;border:2px solid rgba(226,145,111,.22);border-top-color:#E2916F;animation:rtsxspin .9s linear infinite}
+@keyframes rtsxspin{to{transform:rotate(360deg)}}
+@keyframes rtsxveil{to{opacity:1}}
+</style>
+
+<div class="wrap">
+  <div class="bar">
+    <button class="back" id="back" type="button">← 返回大厅</button>
+    <div class="right">
+      <button class="snd" id="snd" type="button">SFX</button>
+      <span class="badge">67 · 3A</span>
+    </div>
+  </div>
+
+  <section class="hero">
+    <div class="sun" aria-hidden="true"></div>
+    <h1>67-3A大作</h1>
+    <p class="sub">两个拿得出手的 3D 作品。一个在港区拆中继，一个在 47 层酒店楼顶打团队死斗——都跑在浏览器里，手机横屏就能开局。</p>
+  </section>
+
+  <div class="cards">
+    <a class="card" href="../../TextGame/index.html">
+      <div class="tag">001 · 单兵战役</div>
+      <h2>几猫</h2>
+      <p>港区防御系统失控。切断三处中继，突破封锁，登船撤离。第一人称，鼠标锁视角；触屏左手移动、右手转视角，屏幕按钮开火换弹。</p>
+      <div class="go">进入港区 →</div>
+    </a>
+
+    <a class="card" href="golden-hour/index.html">
+      <div class="tag">002 · 5V5 死斗</div>
+      <h2>暮色酒店</h2>
+      <p>47 层天空大堂，落日斜进落地窗。六把主武器、三张地图、K9 军犬，人机或本地联机。枪匠改配件、刷迷彩，离线也能打。</p>
+      <div class="go">上楼顶 →</div>
+    </a>
+  </div>
+
+  <div class="note">离线可玩：两个作品的全部资源都已放进本站，不连外部站点也能打开。首次进入暮色酒店要下 2.8MB 主包与 5.6MB 启动包，开对局时再拉当前地图。</div>
+</div>
+
+<script src="../../assets/sfx/sfx.js"></script>
+<script src="../../assets/ui/site-ui.js" data-surface="dark"></script>
+<script>
+(function(){
+  var SFX = (function(){
+    var K = window.RTSXSFX;
+    function isOn(){ return K ? !K.isMuted() : false; }
+    return {
+      click: function(){ if (isOn()) K.play("click"); },
+      hover: function(){ if (isOn()) K.play("hover", { volume: 0.7 }); },
+      back:  function(){ if (isOn()) K.play("back"); },
+      isOn:  isOn,
+      set:   function(v){
+        if (!K) return;
+        K.mute(!v);
+        try { localStorage.setItem("rtsx.sound.v1", v ? "on" : "off"); } catch(e) {}
+      }
+    };
+  })();
+
+  try {
+    if (window.RTSXSFX && localStorage.getItem("rtsx.sound.v1") === "off") RTSXSFX.mute(true);
+  } catch(e) {}
+
+  var sndBtn = document.getElementById("snd");
+  function paintSnd(){ if (sndBtn) sndBtn.classList.toggle("off", !SFX.isOn()); }
+  paintSnd();
+  if (sndBtn) sndBtn.addEventListener("click", function(){
+    SFX.set(!SFX.isOn()); paintSnd(); if (SFX.isOn()) SFX.click();
+  });
+  window.addEventListener("storage", paintSnd);
+
+  function warm(url) {
+    if (!window.fetch || !url) return;
+    try { fetch(url, { credentials: "same-origin", cache: "force-cache" }).catch(function(){}); } catch (e) {}
+  }
+
+  [].forEach.call(document.querySelectorAll("a.card"), function(a){
+    a.addEventListener("pointerdown", function(){ SFX.click(); });
+    a.addEventListener("pointerenter", function(){
+      SFX.hover();
+      warm(a.getAttribute("href"));
+    });
+  });
+
+  document.getElementById("back").addEventListener("click", function(){
+    SFX.back();
+    if (window.parent !== window) window.parent.postMessage("rtsx-close", "*");
+    else location.href = "../../index.html";
+  });
+})();
+</script>
+</body>
+</html>
