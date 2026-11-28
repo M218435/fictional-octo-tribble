@@ -77,6 +77,23 @@ html[data-rtsx-motion="off"] .ritoast{
 html[data-rtsx-fs="l"] body{ font-size:17.5px; }
 html[data-rtsx-fs="s"] body{ font-size:15px; }
 
+/* ============ 1.5 滚动条：统一细条，不用系统默认那条灰槽 ============ */
+/* Chrome/Win 上 scrollbar-width/color 一旦出现，::-webkit-scrollbar 会被整体忽略，
+   所以这里只用 webkit 伪元素，不用标准属性。 */
+*::-webkit-scrollbar{ width:10px;height:10px; }
+*::-webkit-scrollbar-track{ background:transparent; }
+*::-webkit-scrollbar-thumb{
+  background:rgba(25,24,23,.26);
+  background-clip:padding-box;
+  border:3px solid transparent;
+  border-radius:99px;
+  min-height:44px;
+}
+*::-webkit-scrollbar-thumb:hover{ background:rgba(25,24,23,.44);background-clip:padding-box; }
+*::-webkit-scrollbar-corner{ background:transparent; }
+html[data-rtsx-theme="dark"] *::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.18);background-clip:padding-box; }
+html[data-rtsx-theme="dark"] *::-webkit-scrollbar-thumb:hover{ background:rgba(255,255,255,.34);background-clip:padding-box; }
+
 /* ============ 2. 悬浮坞 ============ */
 .rdock{
   position:fixed;
