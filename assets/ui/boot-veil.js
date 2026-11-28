@@ -3,6 +3,8 @@
 (function () {
   var D = document, root = D.documentElement;
   var t0 = Date.now(), el = null, shown = false, killT = null, pollT = null, done = false;
+  // 先把根背景压暗，避免"白闪一下再黑屏"
+  try { if (!root.style.background) root.style.background = "#0b0b0c"; } catch (e) {}
 
   function build() {
     if (el) return;
