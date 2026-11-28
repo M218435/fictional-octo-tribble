@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "defaultMap": "hotel",
+  "defaultMode": "tdm",
+  "maps": [
+    {
+      "id": "hotel",
+      "version": "3"
+    },
+    {
+      "id": "sublevel-07",
+      "version": "4"
+    },
+    {
+      "id": "shipment",
+      "version": "3"
+    }
+  ]
+}

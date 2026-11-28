@@ -1,0 +1,524 @@
+/* Reflow the native home instead of scaling a desktop canvas or scrolling it.
+   Other menus keep their own scrolling regions for genuinely long content. */
+:root {
+  --menu-safe-top: env(safe-area-inset-top, 0px);
+  --menu-safe-right: env(safe-area-inset-right, 0px);
+  --menu-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --menu-safe-left: env(safe-area-inset-left, 0px);
+}
+body.compact-menu {
+  --touch-safe-top: var(--menu-safe-top);
+  --touch-safe-right: var(--menu-safe-right);
+  --touch-safe-bottom: var(--menu-safe-bottom);
+  --touch-safe-left: var(--menu-safe-left);
+  --f0: 11px;
+  --f1: 12px;
+  --f2: 13px;
+  --f3: 14px;
+  --f4: 16px;
+  --home-gap: 8px;
+  --home-pad: 12px;
+  --home-utility: 0px;
+}
+body.compact-menu.touch-device { --home-utility: 48px; }
+body.compact-menu #ui {
+  width: var(--menu-width, 100%);
+  height: var(--menu-height, 100dvh);
+}
+body.compact-menu #ui #pg-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto minmax(0, 1fr);
+  grid-template-areas: "brand" "actions" "profile" "mastery" "loadout";
+  align-content: start;
+  align-items: start;
+  gap: var(--home-gap);
+  padding: calc(var(--touch-safe-top) + var(--home-pad)) calc(var(--touch-safe-right) + var(--home-pad)) calc(var(--touch-safe-bottom) + var(--home-pad)) calc(var(--touch-safe-left) + var(--home-pad));
+  overflow: hidden;
+  touch-action: manipulation;
+  line-height: 1.2;
+}
+body.compact-menu #ui:has(#pg-main.on) #ui-scrim { background: linear-gradient(90deg, rgba(6,4,3,.86), rgba(6,4,3,.45) 65%, rgba(6,4,3,.58)); }
+body.compact-menu #ui #pg-main :is(.lockup, .vnav, #loadcard, #pcard, #mastery, .toy-career) {
+  position: static;
+  inset: auto;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+}
+body.compact-menu #ui #pg-main .toy-career { display: contents; }
+body.compact-menu #ui #pg-main .lockup { grid-area: brand; padding-right: var(--home-utility); }
+body.compact-menu #ui #pg-main h1 {
+  font-size: clamp(28px, 7vw, 42px);
+  line-height: 1;
+  letter-spacing: .02em;
+  margin: 4px 0;
+  white-space: nowrap;
+}
+body.compact-menu #ui #pg-main h1 span { display: inline; margin-left: .16em; }
+body.compact-menu #ui #pg-main .kicker { font-size: 10px; line-height: 1.3; letter-spacing: .08em; }
+body.compact-menu #ui #pg-main .mode { font-size: 10px; line-height: 1.4; letter-spacing: .04em; margin: 4px 0 0; }
+body.compact-menu #ui #pg-main .vnav {
+  grid-area: actions;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: 48px;
+  gap: 6px;
+}
+body.compact-menu #ui #pg-main .vnav .nv {
+  grid-column: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 4px 10px;
+  gap: 2px;
+  transform: none;
+}
+body.compact-menu #ui #pg-main .nv b { font-size: 16px; line-height: 1.2; letter-spacing: .06em; white-space: nowrap; }
+body.compact-menu #ui #pg-main .nv em { font-size: 10px; line-height: 1.2; gap: 4px; letter-spacing: 0; white-space: nowrap; flex-wrap: nowrap; }
+body.compact-menu #ui #pg-main .nv em img { max-width: 52px; max-height: 14px; }
+body.compact-menu #ui #pg-main .nv.primary { flex-direction: row; align-items: center; justify-content: space-between; }
+/* The two 44px arrows flank the label/value instead of squeezing the entire
+   difficulty switch beside its heading in a half-width phone button. */
+body.compact-menu #ui #pg-main .nv[data-act="difficulty"] { position: relative; padding: 0; }
+body.compact-menu #ui #pg-main .nv[data-act="difficulty"] b {
+  position: absolute; top: 4px; left: 44px; right: 44px;
+  font-size: 10px; text-align: center; letter-spacing: 0; pointer-events: none;
+}
+body.compact-menu #ui #pg-main .nv[data-act="difficulty"] em {
+  display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; gap: 0; width: 100%; height: 100%;
+}
+body.compact-menu #ui #pg-main .nv .arr { width: 44px; height: 100%; min-width: 44px; min-height: 44px; border: 0; }
+body.compact-menu #ui #pg-main #diffv { min-width: 0; padding-top: 12px; font-size: 11px; letter-spacing: 0; }
+
+body.compact-menu #ui #pg-main #pcard {
+  grid-area: profile;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(96px, .65fr);
+  gap: 6px 10px;
+  padding: 10px;
+}
+body.compact-menu #ui #pg-main .pc-top { grid-column: 1; min-width: 0; gap: 8px; }
+body.compact-menu #ui #pg-main #pcard .rank-svg { width: 30px; height: 30px; }
+body.compact-menu #ui #pg-main .pc-k { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; letter-spacing: .02em; }
+body.compact-menu #ui #pg-main .pc-lvl { margin: 2px 0 4px; gap: 6px; line-height: 1; }
+body.compact-menu #ui #pg-main .pc-lvl b { font-size: 24px; }
+body.compact-menu #ui #pg-main .pc-lvl span { font-size: 11px; letter-spacing: 0; }
+body.compact-menu #ui #pg-main .xpbar { height: 3px; }
+body.compact-menu #ui #pg-main .pc-xp { margin-top: 3px; gap: 4px; font-size: 9px; line-height: 1.3; letter-spacing: 0; white-space: nowrap; }
+body.compact-menu #ui #pg-main .pc-stats {
+  grid-column: 1; grid-row: 2;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px; margin: 0; padding-top: 5px;
+}
+body.compact-menu #ui #pg-main .pc-stats b { font-size: 18px; }
+body.compact-menu #ui #pg-main .pc-stats span { font-size: 10px; line-height: 1.2; letter-spacing: 0; }
+body.compact-menu #ui #pg-main .toy-profile {
+  grid-column: 2; grid-row: 1 / 3;
+  grid-template-columns: minmax(0, 1fr); align-content: center;
+  gap: 5px; margin: 0; padding-left: 8px; border-left: 1px solid var(--line);
+}
+body.compact-menu #ui #pg-main .toy-profile > span { grid-row: auto; font-size: 10px; line-height: 1.4; letter-spacing: 0; }
+body.compact-menu #ui #pg-main .toy-profile > .btn {
+  grid-row: auto; grid-column: 1; width: 100%; min-height: 44px;
+  padding: 5px; font-size: 11px; line-height: 1.3; letter-spacing: 0;
+}
+
+body.compact-menu #ui #pg-main #mastery {
+  grid-area: mastery;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 12px; padding: 8px 10px;
+  overflow: visible;
+}
+body.compact-menu #ui #pg-main #mastery .sech { grid-column: 1 / -1; margin: 0 0 4px; }
+body.compact-menu #ui #pg-main .sech { font-size: 10px; line-height: 1.2; letter-spacing: .08em; }
+body.compact-menu #ui #pg-main .ms {
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 0; min-height: 44px; gap: 4px; padding: 4px 0; margin: 0;
+}
+body.compact-menu #ui #pg-main .ms.eq { padding-left: 6px; }
+body.compact-menu #ui #pg-main .ms > img { display: none; }
+body.compact-menu #ui #pg-main .ms .mn { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; font-size: 11px; line-height: 1.2; letter-spacing: 0; white-space: nowrap; }
+body.compact-menu #ui #pg-main .ms .mn span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+body.compact-menu #ui #pg-main .ms .mn i { font-size: 10px; letter-spacing: 0; }
+body.compact-menu #ui #pg-main .ms .mbar { height: 2px; margin-top: 3px; }
+body.compact-menu #ui #pg-main .ms .mc { gap: 3px; font-size: 10px; letter-spacing: 0; }
+body.compact-menu #ui #pg-main .ms .mc canvas { width: 14px; height: 14px; }
+
+body.compact-menu #ui #pg-main #loadcard {
+  grid-area: loadout;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 8px; padding: 8px 10px; transform: none;
+}
+body.compact-menu #ui #pg-main #loadcard .sech { grid-column: 1 / -1; margin: 0; }
+body.compact-menu #ui #pg-main .lc-main { grid-column: 1; grid-row: 2; min-width: 0; gap: 8px; }
+body.compact-menu #ui #pg-main #lc-img { width: 62px; height: 38px; }
+body.compact-menu #ui #pg-main .lc-t b { font-size: 14px; letter-spacing: .02em; white-space: nowrap; }
+body.compact-menu #ui #pg-main .lc-t :is(span, i) { font-size: 9px; line-height: 1.3; letter-spacing: 0; }
+body.compact-menu #ui #pg-main .lc-t i { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 2px 0 0; max-width: 100%; }
+body.compact-menu #ui #pg-main .lc-sub { grid-column: 2; grid-row: 2; flex-direction: column; justify-content: center; gap: 4px; margin: 0; padding: 0; border: 0; font-size: 10px; letter-spacing: 0; }
+body.compact-menu #ui #pg-main .lc-sub div { gap: 4px; }
+body.compact-menu #ui #pg-main .lc-sub img { width: 24px; height: 14px; object-fit: contain; }
+body.compact-menu #ui #pg-main .lc-fu { grid-column: 1 / -1; grid-template-columns: 20px minmax(0,1fr); padding-top: 4px; margin-top: 0; gap: 6px; }
+body.compact-menu #ui #pg-main .lc-fu .ri { width: 20px; height: 20px; font-size: 18px; }
+body.compact-menu #ui #pg-main .lc-fu b { font-size: 10px; letter-spacing: 0; }
+body.compact-menu #ui #pg-main .lc-fu div > span { font-size: 9px; letter-spacing: 0; margin-top: 2px; }
+body.compact-menu #ui #pg-main :is(.legend, .ver, .lc-fu kbd) { display: none; }
+
+/* Independent columns avoid the old shared grid rows stretching the left
+   menu to the height of the career cards (or stacking cards on each other). */
+body[data-menu-layout="wide"] #ui #pg-main {
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-areas: "brand career" "actions career" "loadout career";
+  column-gap: 16px;
+}
+body[data-menu-layout="wide"] #ui #pg-main .lockup { padding-right: 0; }
+body[data-menu-layout="wide"] #ui #pg-main .toy-career {
+  grid-area: career; display: grid; grid-template-columns: minmax(0, 1fr);
+  gap: var(--home-gap); padding-top: var(--home-utility); align-content: start;
+}
+body[data-menu-layout="wide"] #ui #pg-main :is(#pcard, #mastery) { grid-area: auto; }
+body[data-menu-layout="wide"][data-menu-density="standard"] #ui #pg-main { --home-gap: 16px; --home-pad: 24px; }
+body[data-menu-layout="wide"][data-menu-density="standard"] #ui #pg-main h1 { font-size: clamp(34px, 5vw, 66px); }
+body[data-menu-layout="wide"][data-menu-density="standard"] #ui #pg-main .vnav { grid-template-columns: minmax(0, 1fr); grid-auto-rows: 52px; gap: 8px; }
+body[data-menu-layout="wide"][data-menu-density="standard"] #ui #pg-main .nv { flex-direction: row; align-items: center; justify-content: space-between; }
+body[data-menu-layout="wide"][data-menu-density="standard"] #ui #pg-main #mastery { grid-template-columns: minmax(0, 1fr); }
+body[data-menu-layout="wide"][data-menu-density="standard"] #ui #pg-main .ms { grid-template-columns: 48px minmax(0, 1fr) auto; min-height: 48px; }
+body[data-menu-layout="wide"][data-menu-density="standard"] #ui #pg-main .ms > img { display: block; max-width: 44px; height: 20px; }
+body[data-menu-layout="wide"][data-menu-density="standard"] #ui #pg-main #pcard { grid-template-columns: minmax(0, 1fr); padding: 14px; }
+body[data-menu-layout="wide"][data-menu-density="standard"] #ui #pg-main .toy-profile { grid-column: 1; grid-row: 3; grid-template-columns: minmax(0, 1fr) auto; padding: 6px 0 0; border-left: 0; border-top: 1px solid var(--line); align-items: center; }
+body[data-menu-layout="wide"][data-menu-density="standard"] #ui #pg-main .toy-profile > .btn { grid-column: 2; grid-row: 1; width: auto; padding: 5px 10px; }
+
+/* Short visual viewports include browser bars / notches, not just screen size.
+   Only decorative headings and explanatory copy compact; every action, weapon
+   mastery row, rank, XP, statistic and cloud-save control stays available. */
+body.compact-menu:is([data-menu-density="tight"], [data-menu-density="short"]) { --home-gap: 4px; --home-pad: 8px; }
+body.compact-menu:is([data-menu-density="tight"], [data-menu-density="short"]) #ui #pg-main h1 { font-size: 28px; margin: 0; }
+body.compact-menu:is([data-menu-density="tight"], [data-menu-density="short"]) #ui #pg-main :is(.kicker, .mode) { display: none; }
+body.compact-menu:is([data-menu-density="tight"], [data-menu-density="short"]) #ui #pg-main .lockup { display: flex; align-items: center; height: 44px; }
+body.compact-menu:is([data-menu-density="tight"], [data-menu-density="short"]) #ui #pg-main .vnav { grid-auto-rows: 44px; gap: 4px; }
+body.compact-menu:is([data-menu-density="tight"], [data-menu-density="short"]) #ui #pg-main .nv b { font-size: 15px; }
+body.compact-menu:is([data-menu-density="tight"], [data-menu-density="short"]) #ui #pg-main .nv[data-act="difficulty"] b { font-size: 10px; }
+body.compact-menu:is([data-menu-density="tight"], [data-menu-density="short"]) #ui #pg-main #pcard { padding: 6px 8px; gap: 4px 6px; }
+body.compact-menu:is([data-menu-density="tight"], [data-menu-density="short"]) #ui #pg-main .pc-top { gap: 4px; }
+body.compact-menu:is([data-menu-density="tight"], [data-menu-density="short"]) #ui #pg-main #pcard .rank-svg { width: 24px; height: 24px; }
+body.compact-menu:is([data-menu-density="tight"], [data-menu-density="short"]) #ui #pg-main .pc-lvl b { font-size: 20px; }
+body.compact-menu:is([data-menu-density="tight"], [data-menu-density="short"]) #ui #pg-main .pc-stats { padding-top: 4px; }
+body.compact-menu:is([data-menu-density="tight"], [data-menu-density="short"]) #ui #pg-main .pc-stats b { font-size: 16px; }
+body.compact-menu:is([data-menu-density="tight"], [data-menu-density="short"]) #ui #pg-main #mastery { padding: 5px 8px; gap: 0 8px; }
+body.compact-menu:is([data-menu-density="tight"], [data-menu-density="short"]) #ui #pg-main #mastery .sech { margin-bottom: 2px; }
+body.compact-menu:is([data-menu-density="tight"], [data-menu-density="short"]) #ui #pg-main #loadcard { padding: 5px 8px; gap: 3px 6px; }
+body.compact-menu:is([data-menu-density="tight"], [data-menu-density="short"]) #ui #pg-main #lc-img { width: 42px; height: 30px; }
+body.compact-menu:is([data-menu-density="tight"], [data-menu-density="short"]) #ui #pg-main .lc-t b { font-size: 12px; }
+body.compact-menu:is([data-menu-density="tight"], [data-menu-density="short"]) #ui #pg-main .lc-t > :is(span, i) { display: none; }
+body.compact-menu:is([data-menu-density="tight"], [data-menu-density="short"]) #ui #pg-main .lc-fu div > span { display: none; }
+body.compact-menu:is([data-menu-density="tight"], [data-menu-density="short"]) #ui #pg-main .lc-fu { grid-template-columns: minmax(0, 1fr); }
+body.compact-menu:is([data-menu-density="tight"], [data-menu-density="short"]) #ui #pg-main .lc-fu .ri { display: none; }
+@media (max-width: 360px) {
+  body.compact-menu #ui #pg-main h1 { font-size: 28px; }
+  body.compact-menu #ui #pg-main #lc-img { display: none; }
+  body.compact-menu #ui #pg-main .pc-xp { flex-wrap: wrap; gap: 0 4px; }
+}
+
+/* Legacy phones / very short embedded portrait windows: four directly usable
+   mastery tiles keep all four weapons available without an inner scroller. */
+body[data-menu-layout="portrait"][data-menu-density="short"] #ui #pg-main #mastery { grid-template-columns: repeat(4, minmax(0,1fr)); gap: 0 6px; }
+body[data-menu-layout="portrait"][data-menu-density="short"] #ui #pg-main .ms { display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 2px; }
+body[data-menu-layout="portrait"][data-menu-density="short"] #ui #pg-main .ms .mn { display: block; }
+body[data-menu-layout="portrait"][data-menu-density="short"] #ui #pg-main .ms .mn > span { display: block; }
+body[data-menu-layout="portrait"][data-menu-density="short"] #ui #pg-main .ms .mn i { display: none; }
+body[data-menu-layout="portrait"][data-menu-density="short"] #ui #pg-main .ms .mc canvas { width: 10px; height: 10px; }
+@keyframes home-fade { from { opacity: 0; } to { opacity: 1; } }
+body.compact-menu #ui #pg-main :is(.nv, .lockup, #pcard, #mastery, #loadcard) { animation-name: home-fade; }
+
+/* Native menu shells: one viewport, fixed primary actions, one deliberate
+   scroller per long panel. Combat input never selects the menu layout. */
+#ui [hidden] { display: none !important; }
+.report-tabs { display: none; }
+#pg-gunsmith > .gs-actions { position: absolute; right: 4.8rem; bottom: 9.6rem; width: 35rem; }
+@media (min-width: 1100px) and (min-height: 620px) {
+  #pg-gunsmith .gs-right { bottom: 23rem; }
+}
+body.compact-menu { --menu-gap: 12px; --menu-pad: 16px; }
+body.compact-menu #ui { z-index: 30; }
+body.compact-menu #ui :where(.page:not(#pg-main)) {
+  display: flex; flex-direction: column; align-items: stretch;
+  padding: calc(var(--menu-safe-top) + var(--menu-pad)) calc(var(--menu-safe-right) + var(--menu-pad)) calc(var(--menu-safe-bottom) + var(--menu-pad)) calc(var(--menu-safe-left) + var(--menu-pad));
+  gap: var(--menu-gap); overflow: hidden; min-width: 0; min-height: 0;
+  overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch;
+}
+body.compact-menu #ui .page > :is(.topbar, .lockup, .legend) { flex: none; }
+body.compact-menu #ui :is(.topbar, .lockup, .vnav, #p-board, .st-body, .gs-left, .gs-right, .gs-stage, .online-layout, .training-layout) {
+  position: static; inset: auto; width: auto; min-width: 0; min-height: 0; max-width: 100%; margin: 0;
+}
+body.compact-menu #ui .legend { display: none; }
+body.compact-menu #ui :is(button, #loadcard, .ms) { touch-action: manipulation; }
+body.compact-menu #ui :is(button, select, input[type="range"]) { min-height: 44px; }
+body.compact-menu #ui :is(.tb-keys, .slot kbd, .backb kbd) { display: none; }
+body.compact-menu #ui :is(.btn, .tab, .opt, .slot) { overflow-wrap: anywhere; }
+body.compact-menu #ui .btn { height: auto; padding: 8px 12px; letter-spacing: .06em; white-space: normal; }
+body.compact-menu #ui :is(.nv, .nv.primary, #pg-pause .nv:not(.primary)) {
+  width: 100%; height: auto; min-height: 44px; padding: 8px 10px; gap: 8px; margin: 0;
+}
+body.compact-menu #ui :is(.nv b, .nv.primary b) { font-size: 17px; letter-spacing: .04em; }
+body.compact-menu #ui .nv em { font-size: 11px; letter-spacing: .02em; text-align: right; flex-wrap: wrap; justify-content: flex-end; }
+body.compact-menu #ui .nv:is(:focus, .focus, :active) { transform: none; }
+body.compact-menu #ui .nv .arr { min-width: 44px; min-height: 44px; }
+body.compact-menu #ui .sech { gap: 8px; white-space: normal; font-size: 11px; letter-spacing: .08em; line-height: 1.4; }
+body.compact-menu #ui .topbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; height: auto;
+  min-height: 44px; padding: 0; border: 0; background: rgba(12,9,8,.9); z-index: 3;
+}
+body.compact-menu.touch-device #ui .topbar { padding-right: 50px; }
+body.compact-menu #ui .topbar h2 { font-size: clamp(20px, 3vw, 28px); letter-spacing: .04em; }
+body.compact-menu #ui .backb { height: 44px; padding: 0 10px; flex: none; }
+body.compact-menu #ui .tabs { margin: 0; display: flex; min-width: 0; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; touch-action: pan-x; }
+body.compact-menu #ui .tab { height: auto; flex: none; padding: 8px 12px; letter-spacing: .04em; }
+body.compact-menu #ui .online-mode { margin: 0; min-width: 0; font-size: 11px; line-height: 1.4; letter-spacing: .02em; }
+
+/* Settings: the header stays put; the active panel owns scrolling. */
+body.compact-menu #ui .st-body { flex: 1; overflow: hidden; }
+body.compact-menu #ui .st-panel { display: none; position: static; inset: auto; gap: 20px; min-width: 0; }
+body.compact-menu #ui .st-panel.on { display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, .4fr); align-content: start; height: 100%; max-height: none; overflow-y: auto; padding: 0 4px 12px 0; overscroll-behavior: contain; }
+body.compact-menu #ui .st-panel[data-tab="controls"] { grid-template-columns: minmax(0,1fr); }
+body.compact-menu #ui .st-rows { min-width: 0; gap: 8px; }
+body.compact-menu #ui .row:not(.online-field) { display: grid; grid-template-columns: minmax(90px, .6fr) minmax(70px, 1fr) 44px; height: auto; min-height: 52px; padding: 6px 8px; gap: 8px; }
+body.compact-menu #ui .row :is(label, output) { letter-spacing: .02em; }
+body.compact-menu #ui .row:has(.seg) { grid-template-columns: minmax(0,1fr); }
+body.compact-menu #ui .seg { display: flex; flex-wrap: wrap; gap: 4px; }
+body.compact-menu #ui .seg .pill { display: none; }
+body.compact-menu #ui .seg button { height: auto; min-width: 52px; padding: 8px 10px; letter-spacing: .02em; }
+body.compact-menu #ui .seg button.on { background: var(--or2); color: #160b02; }
+body.compact-menu #ui input[type="range"] { min-width: 0; touch-action: pan-y; }
+body.compact-menu #ui input[type="range"]::-webkit-slider-thumb { width: 24px; height: 28px; margin-top: -12px; }
+body.compact-menu #ui .st-side { min-width: 0; }
+body.compact-menu #ui .st-side p { max-width: none; }
+body.compact-menu #ui .st-side .ql { grid-template-columns: 70px minmax(0,1fr); }
+body.compact-menu #ui .binds { grid-column: 1 / -1; }
+body.compact-menu #ui .touch-setting { min-height: 44px; }
+body.compact-menu #ui .touch-setting select { font-size: 16px; min-width: 0; max-width: 100%; }
+
+/* Public lobby and room share the native commands and roster. */
+body.compact-menu #ui #pg-online .online-layout { flex: 1; display: grid; grid-template-columns: minmax(200px,.85fr) minmax(0,1.3fr); grid-template-rows: minmax(0,1fr); gap: var(--menu-gap); overflow: hidden; }
+body.compact-menu #ui #pg-online .online-layout:has(#online-maps:not([hidden])) { grid-template-rows: auto minmax(0,1fr); }
+body.compact-menu #ui .map-briefing { grid-column: 1 / -1; }
+body.compact-menu #ui .map-card { height: clamp(66px, 12vh, 130px); min-height: 60px; }
+body.compact-menu #ui .online-commands { overflow-y: auto; min-height: 0; padding-right: 3px; }
+body.compact-menu #ui .online-commands > .nv { margin-top: 6px; }
+body.compact-menu #ui :is(.online-commands, .online-squad) p { font-size: 11px; letter-spacing: .02em; line-height: 1.5; margin: 6px 0; }
+body.compact-menu #ui .online-field { display: grid; grid-template-columns: 64px minmax(0,1fr); gap: 6px; min-height: 44px; padding: 4px 6px; margin: 6px 0; }
+body.compact-menu #ui .online-field :is(select, input) { font-size: 16px; letter-spacing: 0; min-height: 44px; min-width: 0; }
+body.compact-menu #ui .online-field :is(span,strong) { font-size: 12px; overflow-wrap: anywhere; }
+body.compact-menu #ui .online-squad { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
+body.compact-menu #ui #online-hall { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+body.compact-menu #ui .online-hall-heading { flex: none; margin: 4px 0; }
+body.compact-menu #ui .online-room-list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 3px 4px 0; }
+body.compact-menu #ui .online-room-entry { gap: 8px; padding: 8px; flex-wrap: wrap; }
+body.compact-menu #ui .online-room-entry > div { flex: 1 1 130px; }
+body.compact-menu #ui #online-roster { display: flex; flex-direction: column; gap: 8px; min-height: 0; height: 100%; }
+body.compact-menu #ui #online-teams { flex: 1; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-content: start; margin: 0; gap: 10px; min-height: 0; overflow-y: auto; }
+body.compact-menu #ui #online-teams > section { min-width: 0; }
+body.compact-menu #ui .online-member { grid-template-columns: 18px minmax(0,1fr) auto; min-height: 44px; height: auto; padding: 5px 3px; font-size: 12px; }
+body.compact-menu #ui .online-member small { font-size: 10px; letter-spacing: 0; }
+body.compact-menu #ui .online-member span:last-child { font-size: 10px; }
+body.compact-menu #ui .online-team-actions { flex: none; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin: 0; }
+body.compact-menu #ui #online-result { font-size: 24px; margin: 0; }
+body.compact-menu #ui #pg-online:has(#online-roster:not([hidden])) .online-commands > .sech { margin-bottom: 6px; }
+
+/* Training: all maps and the launch action remain in the viewport. */
+body.compact-menu #ui .training-layout { flex: 1; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+body.compact-menu #ui #pg-training .map-grid { flex: none; }
+body.compact-menu #ui #pg-training .map-card { height: clamp(100px, 26vh, 260px); }
+body.compact-menu #ui .training-actions { margin: auto 0 0; padding-top: 10px; }
+body.compact-menu #ui .training-actions .nv { width: min(100%, 280px); }
+
+/* Gunsmith uses explicit grid areas; automatic placement used to overlap the
+   options, preview and statistics. Original action nodes move into a footer. */
+body.compact-menu #ui #pg-gunsmith { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); grid-template-rows: auto auto minmax(0,1fr) auto auto; grid-template-areas: 'header header' 'preview preview' 'options stats' 'actions actions' 'upgrade upgrade'; align-items: stretch; align-content: stretch; }
+body.compact-menu #ui #pg-gunsmith .topbar { grid-area: header; }
+body.compact-menu #ui #pg-gunsmith .gs-left { grid-area: options; overflow-y: auto; max-height: none; padding: 0 4px 4px 0; }
+body.compact-menu #ui #pg-gunsmith .gs-right { grid-area: stats; display: block; overflow-y: auto; max-height: none; padding: 0 4px 4px 0; }
+body.compact-menu #ui #pg-gunsmith .gs-stage { grid-area: preview; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); grid-template-rows: auto auto auto auto; gap: 6px; padding: 0; min-height: 0; }
+body.compact-menu #ui #pg-gunsmith #gs-view { position: relative; inset: auto; grid-column: 1 / -1; grid-row: 1; height: clamp(80px, 16vh, 180px); min-height: 0; overflow: hidden; }
+body.compact-menu #ui #gs-lines { display: none; }
+body.compact-menu #ui #pg-gunsmith .slot { position: static; inset: auto; width: auto; min-width: 0; margin: 0; padding: 6px; min-height: 44px; transform: none; }
+body.compact-menu #ui .slot .sk { font-size: 10px; letter-spacing: 0; gap: 4px; }
+body.compact-menu #ui .slot .sv { font-size: 12px; letter-spacing: 0; }
+body.compact-menu #ui #pg-gunsmith .gs-stage.camo .slot { display: none; }
+body.compact-menu #ui #pg-gunsmith .gs-name { position: static; grid-column: 1 / -1; text-align: center; }
+body.compact-menu #ui .gs-name b { font-size: 20px; letter-spacing: .04em; }
+body.compact-menu #ui .gs-name :is(span,i) { font-size: 10px; letter-spacing: .04em; }
+body.compact-menu #ui #pg-gunsmith > .gs-actions { grid-area: actions; display: flex; flex-direction: row; flex-wrap: wrap; position: static; width: auto; gap: 8px; margin: 0; padding: 6px 0 0; background: #120f0de6; }
+body.compact-menu #ui .gs-actions .btn { flex: 1 1 120px; width: auto; min-width: 0; }
+body.compact-menu #ui #gs-fu { grid-area: upgrade; position: static; width: auto; text-align: center; margin: 0; font-size: 10px; }
+body.compact-menu #ui #gs-mode { flex-wrap: nowrap; }
+body.compact-menu #ui #gs-mode button { min-width: 0; padding: 6px; flex: 1; font-size: 12px; }
+body.compact-menu #ui #gs-tags { gap: 4px; margin-bottom: 8px; min-height: 0; }
+body.compact-menu #ui .tag { height: auto; padding: 4px 6px; font-size: 10px; letter-spacing: 0; white-space: normal; }
+body.compact-menu #ui .opt { min-height: 52px; padding: 8px; }
+body.compact-menu #ui .opt .on-n { flex-wrap: wrap; }
+body.compact-menu #ui #gs-nums { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 6px; }
+body.compact-menu #ui #gs-nums span { white-space: normal; letter-spacing: 0; }
+body.compact-menu #ui .sb .sl { font-size: 11px; letter-spacing: 0; }
+body.compact-menu #ui .sb { margin-bottom: 8px; }
+body.compact-menu #ui .camogrid { grid-template-columns: repeat(auto-fit,minmax(44px,1fr)); gap: 6px; }
+body.compact-menu #ui .cm { min-width: 44px; min-height: 44px; }
+body.compact-menu #ui #gs-conf { position: fixed; bottom: calc(var(--menu-safe-bottom) + 64px); height: auto; max-width: calc(100% - 24px); white-space: normal; }
+
+/* Pause keeps resume/leave above the live table, even on short screens. */
+body.compact-menu #ui #pg-pause { display: grid; grid-template-columns: minmax(0,.85fr) minmax(0,1.2fr); grid-template-rows: auto minmax(0,1fr); grid-template-areas: 'title board' 'actions board'; align-content: stretch; }
+body.compact-menu #ui #pg-pause .lockup { grid-area: title; padding-right: 48px; }
+body.compact-menu #ui #pg-pause h1 { font-size: clamp(28px,5vw,48px); line-height: 1; margin: 4px 0; }
+body.compact-menu #ui #pg-pause .kicker { font-size: 11px; letter-spacing: .06em; }
+body.compact-menu #ui #pg-pause .vnav { grid-area: actions; display: flex; gap: 6px; overflow-y: auto; padding-right: 4px; }
+body.compact-menu #ui #p-board { grid-area: board; overflow-y: auto; padding: 12px; clip-path: none; }
+body.compact-menu #ui .p-score { font-size: 22px; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+body.compact-menu #ui .p-score span { margin: 0; font-size: 10px; letter-spacing: .02em; }
+
+/* Results show readable sections behind tabs on phones / short landscapes.
+   Wide tablets retain the complete report; action buttons never scroll away. */
+body.compact-menu #ui #pg-end { align-items: stretch; gap: 8px; }
+body.compact-menu #ui .e-k { margin: 0; text-align: center; font-size: 11px; letter-spacing: .08em; }
+body.compact-menu #ui .e-t { flex: none; text-align: center; font-size: clamp(30px,5vw,56px); margin: 0; letter-spacing: .06em; }
+body.compact-menu #ui .e-rule { width: min(80%,500px); align-self: center; flex: none; margin: 0; }
+body.compact-menu #ui .e-s { flex: none; justify-content: center; gap: 10px; font-size: 28px; }
+body.compact-menu #ui .e-s .emblem { width: 26px; height: 26px; }
+body.compact-menu #ui .e-s span { font-size: 12px; letter-spacing: .04em; }
+body.compact-menu #ui .e-s b { min-width: 30px; }
+body.compact-menu #ui .e-cols { display: grid; flex: 1; min-height: 0; width: 100%; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin: 0; overflow-y: auto; align-content: start; }
+body.compact-menu #ui .e-col { min-width: 0; min-height: 0; padding: 12px; clip-path: none; }
+body.compact-menu #ui #pg-end .e-col:last-child { grid-column: 1 / -1; }
+body.compact-menu #ui .e-stats { grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px 6px; }
+body.compact-menu #ui .e-stats b { font-size: 26px; }
+body.compact-menu #ui .e-stats div > span { font-size: 10px; letter-spacing: 0; }
+body.compact-menu #ui .e-camo .cn { flex-wrap: wrap; white-space: normal; letter-spacing: 0; }
+body.compact-menu #ui .e-mvp { flex-wrap: wrap; gap: 8px; }
+body.compact-menu #ui .e-mvp b { overflow-wrap: anywhere; }
+body.compact-menu #ui .e-btns { flex: none; position: static; display: flex; flex-wrap: wrap; gap: 8px; margin: 0; width: 100%; padding: 6px 0 0; justify-content: center; }
+body.compact-menu #ui .e-btns .btn { flex: 1 1 120px; max-width: 320px; min-width: 0; }
+body.compact-menu #ui .tbl { min-width: 0; }
+body.compact-menu #ui .tbl > div { min-width: 0; }
+body.compact-menu #ui .tbl .rw { grid-template-columns: 18px minmax(48px,1fr) 42px 26px 26px 38px; min-height: 28px; height: auto; padding: 4px; font-size: 12px; }
+body.compact-menu #ui .tbl .rw span:nth-child(2) { min-width: 0; overflow-wrap: anywhere; }
+body.compact-menu #ui .tbl .th { gap: 6px; flex-wrap: wrap; }
+body.compact-menu #ui .tbl .th b { font-size: 18px; letter-spacing: .04em; }
+body.compact-menu #ui #p-board .tbl { grid-template-columns: 1fr; gap: 12px; }
+body.compact-menu #ui .report-tabs { flex: none; gap: 4px; }
+body.compact-menu #ui .report-tabs button { flex: 1; min-width: 0; background: rgba(255,255,255,.05); color: #fff; border: 1px solid var(--line); font: inherit; font-size: 13px; padding: 6px; cursor: pointer; }
+body.compact-menu #ui .report-tabs [aria-selected="true"] { border-color: var(--or2); color: var(--or2); background: rgba(255,138,42,.12); }
+
+/* Account pages retain a stable header and scroll only their real content. */
+body.compact-menu #ui :is(.toy-rank-layout,.toy-unlock-layout) { flex: 1; display: grid; grid-template-columns: minmax(0,.85fr) minmax(0,1.3fr); grid-template-rows: minmax(0,1fr); overflow: hidden; padding: 0; gap: 16px; }
+body.compact-menu #ui :is(.toy-rank-layout,.toy-unlock-layout) > section { overflow-y: auto; display: block; min-width: 0; }
+body.compact-menu #ui .toy-rank-table { table-layout: fixed; }
+body.compact-menu #ui .toy-rank-table :is(th,td) { padding: 10px 6px; font-size: 12px; }
+body.compact-menu #ui .toy-rank-table :is(th,td):first-child { width: 44px; }
+body.compact-menu #ui .toy-rank-table :is(th,td):last-child { width: 64px; }
+body.compact-menu #ui .toy-unlock-layout h3 { font-size: 22px; }
+
+/* Fullscreen 1:1 touch layout editor keeps compact-menu padding disabled so the
+   editable canvas matches real combat safe bounds pixel-for-pixel. */
+body.compact-menu #ui #pg-touch-layout { display: block; padding: 0; }
+
+@media (max-width: 700px) {
+  body.compact-menu #ui .topbar .tabs { flex-basis: 100%; }
+  body.compact-menu #ui .st-panel.on { grid-template-columns: minmax(0,1fr); gap: 14px; }
+  body.compact-menu #ui #pg-online .online-layout { grid-template-columns: minmax(0,1fr); grid-template-rows: auto minmax(0,1fr); }
+  body.compact-menu #ui #pg-online .online-layout:has(#online-maps:not([hidden])) { grid-template-rows: auto auto minmax(0,1fr); }
+  body.compact-menu #ui #online-connect { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 6px; }
+  body.compact-menu #ui #online-connect .online-field { grid-template-columns: minmax(0,1fr); gap: 0; margin: 0; }
+  body.compact-menu #ui #online-connect .online-field > span { display: none; }
+  body.compact-menu #ui .online-connect-hint { display: none; }
+  body.compact-menu #ui #online-connect .nv { padding: 6px; }
+  body.compact-menu #ui #online-connect .nv b { font-size: 15px; }
+  body.compact-menu #ui #online-connect .nv em { display: none; }
+  body.compact-menu #ui .online-commands > .sech { margin-bottom: 6px; }
+  body.compact-menu #ui #online-hall > .kicker { display: none; }
+  body.compact-menu #ui #pg-online:has(#online-roster:not([hidden])) .online-commands { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 6px; }
+  body.compact-menu #ui #pg-online:has(#online-roster:not([hidden])) .online-commands > :is(.sech,p) { grid-column: 1 / -1; margin: 0; }
+  body.compact-menu #ui #online-room { display: contents; }
+  body.compact-menu #ui #pg-online:has(#online-roster:not([hidden])) .online-commands > .nv { margin: 0; }
+  body.compact-menu #ui .map-card { height: 76px; }
+  body.compact-menu #ui .map-notice { margin-top: 4px; font-size: 11px; }
+  body.compact-menu #ui #pg-pause { grid-template-columns: minmax(0,1fr); grid-template-rows: auto auto minmax(0,1fr); grid-template-areas: 'title' 'actions' 'board'; }
+  body.compact-menu #ui #pg-pause .vnav { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
+  body.compact-menu #ui #pg-pause .vnav .nv em { display: none; }
+  body.compact-menu #ui #pg-end .report-tabs { display: flex; }
+  body.compact-menu #ui #pg-end .e-cols { display: block; overflow: hidden; }
+  body.compact-menu #ui #pg-end .e-col { height: 100%; overflow-y: auto; }
+  body.compact-menu #ui #pg-end .e-col:not([data-report-active]) { display: none; }
+  body.compact-menu #ui #pg-end .e-col .tbl { grid-template-columns: minmax(0,1fr); gap: 14px; }
+  body.compact-menu #ui :is(.toy-rank-layout,.toy-unlock-layout) { grid-template-columns: minmax(0,1fr); grid-template-rows: auto minmax(0,1fr); }
+  body.compact-menu #ui .toy-rank-layout > .online-commands { max-height: 34vh; }
+  body.compact-menu #ui .toy-unlock-layout { display: block; overflow-y: auto; }
+}
+@media (min-width: 1100px) and (min-height: 620px) {
+  body.compact-menu #ui #pg-gunsmith { grid-template-columns: minmax(200px,.8fr) minmax(0,1.6fr) minmax(200px,.8fr); grid-template-rows: auto minmax(0,1fr) auto; grid-template-areas: 'header header header' 'options preview stats' 'upgrade actions actions'; }
+  body.compact-menu #ui #pg-gunsmith #gs-view { height: clamp(180px,35vh,350px); }
+}
+body.compact-menu[data-menu-density="short"] { --menu-gap: 6px; --menu-pad: 8px; }
+body.compact-menu[data-menu-density="short"] #ui .e-k { font-size: 10px; }
+body.compact-menu[data-menu-density="short"] #ui .e-t { font-size: 30px; }
+body.compact-menu[data-menu-density="short"] #ui .e-s { font-size: 22px; }
+body.compact-menu[data-menu-density="short"] #ui .e-s .emblem { width: 20px; height: 20px; }
+body.compact-menu[data-menu-density="short"] #ui .e-rule { display: none; }
+body.compact-menu[data-menu-density="short"] #ui #pg-end .report-tabs { display: flex; }
+body.compact-menu[data-menu-density="short"] #ui #pg-end .e-cols { display: block; overflow: hidden; }
+body.compact-menu[data-menu-density="short"] #ui #pg-end .e-col { height: 100%; overflow-y: auto; }
+body.compact-menu[data-menu-density="short"] #ui #pg-end .e-col:not([data-report-active]) { display: none; }
+body.compact-menu[data-menu-density="short"] #ui .e-stats { grid-template-columns: repeat(4,minmax(0,1fr)); }
+@media (max-height: 520px) and (orientation: landscape) {
+  body.compact-menu #ui #pg-gunsmith { grid-template-columns: minmax(0,.9fr) minmax(0,1.1fr) minmax(0,.8fr); grid-template-rows: auto minmax(0,1fr) auto; grid-template-areas: 'header header header' 'options preview stats' 'upgrade actions actions'; }
+  body.compact-menu #ui #pg-gunsmith .topbar .tabs { flex: 1 1 250px; }
+  body.compact-menu #ui #pg-gunsmith #gs-view { height: 70px; }
+  body.compact-menu #ui #pg-gunsmith .gs-stage { overflow-y: auto; align-content: start; grid-template-columns: repeat(2,minmax(0,1fr)); }
+  body.compact-menu #ui #pg-gunsmith .gs-name i { display: none; }
+  body.compact-menu #ui #pg-gunsmith .gs-name b { font-size: 16px; }
+  body.compact-menu #ui #pg-online .online-layout { grid-template-columns: minmax(0,.85fr) minmax(0,1.3fr); grid-template-rows: minmax(0,1fr); }
+  body.compact-menu #ui #pg-online .online-layout:has(#online-maps:not([hidden])) { grid-template-rows: auto minmax(0,1fr); }
+  body.compact-menu #ui .map-card { height: 60px; }
+  body.compact-menu #ui #online-connect { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 4px; }
+  body.compact-menu #ui #online-connect .online-field { grid-template-columns: minmax(0,1fr); margin: 0; padding: 0; }
+  body.compact-menu #ui #online-connect .online-field > span { display: none; }
+  body.compact-menu #ui #online-connect .nv b { font-size: 14px; }
+  body.compact-menu #ui #online-connect .nv em { display: none; }
+  body.compact-menu #ui #online-connect .online-connect-hint { display: none; }
+  body.compact-menu #ui .training-layout { display: grid; grid-template-columns: minmax(0,1fr) auto; grid-template-rows: auto minmax(0,1fr); }
+  body.compact-menu #ui #training-map { grid-column: 1 / -1; }
+  body.compact-menu #ui #pg-training .map-card { height: clamp(80px,34vh,150px); }
+  body.compact-menu #ui .training-actions { grid-row: 1; grid-column: 2; padding: 0; margin: 0; }
+  body.compact-menu #ui #training-status { display: none; }
+}
+@media (min-width: 740px) and (max-height: 520px) {
+  body.compact-menu #ui #pg-online .online-layout:has(#online-maps:not([hidden])) { grid-template-columns: minmax(150px,.8fr) minmax(180px,1fr) minmax(0,1.2fr); grid-template-rows: minmax(0,1fr); }
+  body.compact-menu #ui #pg-online .map-briefing { grid-column: auto; overflow-y: auto; }
+  body.compact-menu #ui #online-map { grid-template-columns: minmax(0,1fr); gap: 5px; }
+  body.compact-menu #ui #online-map .map-card { height: 52px; min-height: 48px; }
+  body.compact-menu #ui #online-map .map-card small { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.compact-menu #ui .page { transition: none; }
+}
+/* Roster rows have three fields; the shared six-column combat table must not
+   consume their name/status space. */
+body.compact-menu #ui .tbl .rw.online-member { grid-template-columns: 18px minmax(0,1fr) 48px; }
+body.compact-menu #ui .online-member span:nth-child(2) { display: block; }
+body.compact-menu #ui .online-member small { display: block; margin-top: 3px; }
+body.compact-menu #ui .online-member span:last-child { text-align: right; }
+body.touch-device #board .tbl .rw { grid-template-columns: 18px minmax(40px,1fr) 40px 24px 24px 36px; }
+body.compact-menu #ui .st-panel :is(.touch-settings, .input-device-settings) { overflow: visible; }
+body.compact-menu #ui #pg-touch-layout .touch-layout-screen { max-height: 100%; }
+body.compact-menu #ui #pg-gunsmith .gs-actions .gs-note { flex-basis: 100%; }
+@media (max-width: 700px) {
+  body.compact-menu #ui #pg-online .online-commands .nv { flex-direction: column; align-items: flex-start; justify-content: center; }
+  body.compact-menu #ui #pg-online .online-commands .nv em { font-size: 10px; justify-content: flex-start; text-align: left; }
+}

@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "id": "hotel",
+  "name": "暮色酒店",
+  "version": "3",
+  "clientScene": "hotel",
+  "sceneAsset": "assets/maps/hotel/3/scene.glb",
+  "sceneSHA256": "c21d826a4d02d24d348e4fdac73bf7f5f433451f5e6aeae99572fceaf61c7ef0",
+  "sceneBytes": 14941636,
+  "worldAsset": "world.json",
+  "gameplayAsset": "gameplay.json",
+  "environment": {
+    "background": "4d3326",
+    "fogColor": "4d3326",
+    "fogDensity": 0.0048
+  }
+}

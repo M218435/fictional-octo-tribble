@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "id": "sublevel-07",
+  "name": "地下变电站",
+  "version": "4",
+  "clientScene": "gltf",
+  "sceneAsset": "assets/maps/sublevel-07/4/scene.glb",
+  "worldAsset": "world.json",
+  "gameplayAsset": "gameplay.json",
+  "environment": {
+    "background": "05080b",
+    "fogColor": "0a1016",
+    "fogDensity": 0.017
+  },
+  "sceneBytes": 19623912,
+  "sceneSHA256": "0720ca184b4a12009186a8b9e643218ff08a90c370d54bb4e6a03dd6976f14cb"
+}

@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "id": "shipment",
+  "name": "装卸货场",
+  "version": "3",
+  "clientScene": "gltf",
+  "sceneAsset": "assets/maps/shipment/3/scene.glb",
+  "sceneBytes": 16349380,
+  "sceneSHA256": "13b15cc09396b6d0eb5c59caef8a2d3cac018e8675e644172c5cafc24814c55b",
+  "worldAsset": "world.json",
+  "gameplayAsset": "gameplay.json",
+  "environment": {
+    "background": "b8b3a7",
+    "fogColor": "b8b3a7",
+    "fogDensity": 0.0048
+  }
+}
