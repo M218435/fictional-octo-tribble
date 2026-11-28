@@ -834,7 +834,8 @@
     "games/breakout.html",
     "games/memory.html",
     "games/minesweeper.html",
-    "games/Minecaraft/index.html"
+    "games/Minecaraft/index.html",
+    "TextGame/index.html"
   ];
 
   var bootReady = false, ipReady = false, pendingEnter = null;
@@ -850,22 +851,14 @@
     if (!pendingEnter || !bootReady || !ipReady) return;
     var fn = pendingEnter;
     pendingEnter = null;
+    setProgress(1);                                  // 真正开门才补满，条不会提前停在 100%
+    if (loadMeta) loadMeta.textContent = "进入大厅";
     fn();
   }
   function gate(fn) { pendingEnter = fn; checkEnter(); }
 
-  /* 3A 大作有 1.4MB，不塞进大厅进度条，等大厅出来再在后台悄悄预热 */
-  var WARM = ["TextGame/index.html"];
-  function warmHeavy() {
-    if (!window.fetch) return;
-    var go = function () {
-      WARM.forEach(function (u) {
-        fetch(u, { credentials: "same-origin" }).catch(function () {});
-      });
-    };
-    if (window.requestIdleCallback) requestIdleCallback(go, { timeout: 4000 });
-    else setTimeout(go, 1500);
-  }
+  /* 所有要预载的东西都在这里算进度：游戏页整页预取，重的那页也不再往后拖 */
+  var loadMeta = document.querySelector(".load-meta span");
   /* 预取记录：页面缓存有效期是 10 分钟，9 分钟内不用重取，过了就补一次 */
   var PREFETCH_KEY = "rtsx.prefetch.v1";
   function readPrefetch() {
@@ -879,51 +872,119 @@
   }
 
   function preload() {
-    // 大厅不等资源：先把门打开，游戏页在后台预热好，后面点开就不用再下。
-    // 以前是 9 个页面全下完才放行（最多卡 8 秒），慢网络下点什么都像"打不开"。
-    bootReady = true;
-    checkEnter();
-    setTimeout(function () { prefetchGames(); }, 500);
+    // 这次不抢跑：先把作品页和素材真正取完，进度条走到头才开门
+    bootReady = false;
+    var last = readPrefetch();
+    if (last && Date.now() - last.at < 9 * 60 * 1000) {
+      setProgress(0.97);                     // 本机已经有缓存，只差开门
+      if (loadMeta) loadMeta.textContent = "缓存已就绪 · 正在确认所在地区…";
+      bootReady = true;
+      checkEnter();
+      return;
+    }
+    prefetchGames();
   }
 
-  function prefetchGames(force) {
-    if (!window.fetch) return;
-    var last = readPrefetch();
-    if (!force && last && Date.now() - last.at < 9 * 60 * 1000) {
-      setProgress(1);                 // 本机已经有缓存，不用重复取
-      warmHeavy();
+  function prefetchGames() {
+    if (!window.fetch) {
+      setProgress(0.97);
+      bootReady = true; checkEnter();
       return;
     }
 
     var queue = ASSETS.slice();
-    var total = queue.length, done = 0, running = 0;
-    var canFit = 2;                   // 两路并发：既快一点，又不会把带宽吃满
+    var total = queue.length;
+    var sizes = new Array(total).fill(0);
+    var totalBytes = 0, bytesDone = 0;
+    var i = 0, lastP = 0;
 
-    var finish = function () {
-      if (running || queue.length) return;
-      setProgress(1);
-      writePrefetch(done);
-      warmHeavy();
-    };
+    // 兜底一：连续 6 秒一个新字节都没有，判定网络卡住，先放行
+    // 兜底二：总时长 22 秒到点也放行，绝不把访客永远锁在加载页
+    var watch = null, hard = null;
+    function arm() {
+      if (watch) clearTimeout(watch);
+      watch = setTimeout(function () {
+        if (bootReady) return;
+        setProgress(0.97);
+        if (loadMeta) loadMeta.textContent = "网络不稳，先放行";
+        bootReady = true; checkEnter();
+      }, 6000);
+    }
+    function release() {
+      if (bootReady) return;
+      setProgress(0.97);
+      if (loadMeta) loadMeta.textContent = "加载时间过长，先放行";
+      bootReady = true; checkEnter();
+    }
 
-    var next = function () {
-      if (!queue.length) { finish(); return; }
-      if (running >= canFit) return;
-      var u = queue.shift();
-      running++;
-      try {
-        fetch(u, { credentials: "same-origin", cache: "force-cache", priority: "low" })
-          .then(function (r) { return r.text(); })
-          .then(after, after);
-      } catch (e) { after(); }
+    function paint() {
+      var v;
+      if (totalBytes) v = Math.min(0.98, (bytesDone / totalBytes) * 0.98);
+      else v = Math.min(0.98, (i / total) * 0.98);
+      v = Math.max(lastP, v);
+      lastP = v;
+      setProgress(v);
+      if (!loadMeta) return;
+      loadMeta.textContent = "预载 " + i + " / " + total + " 页";
+    }
 
-      function after() {
-        running--; done++;
-        setProgress(done / total);
-        next();
+    function finish() {
+      if (watch) clearTimeout(watch);
+      if (hard) clearTimeout(hard);
+      lastP = 0.98;
+      setProgress(0.98);                       // 素材齐了但还没开门，先停在 98%
+      writePrefetch(total);
+      if (loadMeta) loadMeta.textContent = ipReady ? "素材就绪" : "素材就绪 · 正在确认所在地区…";
+      bootReady = true;
+      checkEnter();
+    }
+
+    function step() {
+      if (i >= total) { finish(); return; }
+      var idx = i;
+      var url = queue[idx];
+
+      function pop() {
+        i = idx + 1;
+        paint();
+        step();
       }
-    };
-    next(); next();
+
+      try {
+        fetch(url, { credentials: "same-origin", cache: "force-cache" })
+          .then(function (r) {
+            if (!r.ok || !r.body || !r.body.getReader) return r.text().then(pop, pop);
+            var reader = r.body.getReader();
+            var pump = function () {
+              return reader.read().then(function (res) {
+                if (res.done) { pop(); return; }
+                bytesDone += res.value ? res.value.byteLength : 0;
+                paint();
+                arm();
+                return pump();
+              });
+            };
+            return pump();
+          })
+          .catch(pop);
+      } catch (e) { pop(); }
+    }
+
+    arm();
+    hard = setTimeout(release, 22000);
+
+    // 先量一下每个文件多大，进度才按真实字节走，不会被大文件拖成"停在 94%"
+    var heads = queue.map(function (u) {
+      return fetch(u, { method: "HEAD", credentials: "same-origin", cache: "force-cache" })
+        .then(function (r) { return parseInt(r.headers.get("content-length") || "0", 10) || 0; })
+        .catch(function () { return 0; });
+    });
+    Promise.all(heads).then(function (sz) {
+      sizes = sz;
+      totalBytes = 0;
+      for (var k = 0; k < sz.length; k++) totalBytes += sz[k];
+      step();
+    }, step);
   }
 
   // 鼠标/手指压到某个游戏块时，先把那一页取回来，点开就不用等
