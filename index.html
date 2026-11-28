@@ -974,10 +974,17 @@
     hard = setTimeout(release, 22000);
 
     // 先量一下每个文件多大，进度才按真实字节走，不会被大文件拖成"停在 94%"
+    var headsDone = 0;
     var heads = queue.map(function (u) {
       return fetch(u, { method: "HEAD", credentials: "same-origin", cache: "force-cache" })
-        .then(function (r) { return parseInt(r.headers.get("content-length") || "0", 10) || 0; })
-        .catch(function () { return 0; });
+        .then(function (r) {
+          headsDone++;
+          // 量体积的阶段也给一点前进量，别让条一动不动地等
+          lastP = Math.max(lastP, 0.02 + (headsDone / total) * 0.06);
+          setProgress(lastP);
+          return parseInt(r.headers.get("content-length") || "0", 10) || 0;
+        })
+        .catch(function () { headsDone++; return 0; });
     });
     Promise.all(heads).then(function (sz) {
       sizes = sz;
