@@ -6,9 +6,95 @@
     <meta name="theme-color" content="#17302b" />
     <meta name="description" content="选择 MC 生物，自动战斗，升级技能并击败三位守卫。" />
     <title>MCBONK v2.2</title>
-    <script type="module" crossorigin src="./assets/index-Bgc3q_ns.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-CaAcBdnm.css">
+    <link rel="stylesheet" href="./assets/index-CaAcBdnm.css">
     <link rel="stylesheet" href="./local.css">
+    <script>
+    /* 开场遮罩：主包 1.36MB 单文件，先下完再启动，进度条是真的 */
+    (function () {
+      var SRC = "./assets/index-Bgc3q_ns.js";
+      var TOTAL = 1360000;      /* 解压后的字符量，用来算百分比 */
+      var box, bar, num, tip, shown = 0, started = false, ready = false;
+
+      function mount() {
+        if (box || !document.body) return;
+        var st = document.createElement("style");
+        st.textContent =
+          "#mc-load{position:fixed;inset:0;z-index:9;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:13px;background:#0d1512;color:#cfd8c8;font:12.5px/1.7 system-ui,-apple-system,'Segoe UI',sans-serif;letter-spacing:.08em;transition:opacity .3s ease}" +
+          "#mc-load.hide{opacity:0;pointer-events:none}" +
+          "#mc-load .t{font:600 15px/1 Georgia,'Songti SC',serif;letter-spacing:.24em;color:#a9d78b}" +
+          "#mc-load .bar{width:min(56vw,250px);height:3px;background:rgba(169,215,139,.16);overflow:hidden}" +
+          "#mc-load .bar i{display:block;height:100%;width:0;background:#a9d78b;transition:width .18s linear}" +
+          "#mc-load .s{opacity:.62}";
+        document.head.appendChild(st);
+        box = document.createElement("div");
+        box.id = "mc-load";
+        box.innerHTML = '<span class="t">MCBONK</span><div class="bar"><i></i></div><span class="s">正在载入战场 <b>0%</b></span>';
+        document.body.appendChild(box);
+        bar = box.querySelector(".bar i");
+        num = box.querySelector("b");
+        tip = box.querySelector(".s");
+      }
+      function setP(v) {
+        if (!box) return;
+        if (v < shown) v = shown;
+        shown = v;
+        if (bar) bar.style.width = v + "%";
+        if (num) num.textContent = v + "%";
+      }
+      function hide() {
+        if (ready || !box) return;
+        ready = true;
+        setP(100);
+        box.classList.add("hide");
+        setTimeout(function () { if (box && box.parentNode) box.parentNode.removeChild(box); }, 380);
+      }
+      function boot(src) {
+        if (started) return;
+        started = true;
+        setP(100);
+        if (tip) tip.innerHTML = '正在初始化画面 <b>100%</b>';
+        var sc = document.createElement("script");
+        sc.type = "module";
+        sc.src = src;
+        document.head.appendChild(sc);
+      }
+      function watch() {
+        var n = 0;
+        var tick = setInterval(function () {
+          n++;
+          var app = document.getElementById("app");
+          if (app && app.childElementCount > 0) { clearInterval(tick); setTimeout(hide, 320); }
+          else if (n > 600) { clearInterval(tick); hide(); }
+        }, 100);
+      }
+      function load() {
+        mount();
+        if (!window.fetch || !window.TextDecoder || !window.URL || !URL.createObjectURL) { boot(SRC); watch(); return; }
+        fetch(SRC, { cache: "force-cache" }).then(function (r) {
+          if (!r.ok || !r.body || !r.body.getReader) { boot(SRC); watch(); return; }
+          var rd = r.body.getReader(), chunks = [], got = 0;
+          (function pump() {
+            rd.read().then(function (x) {
+              if (x.done) {
+                setP(99);
+                var blob = new Blob(chunks, { type: "text/javascript" });
+                chunks = null;
+                boot(URL.createObjectURL(blob));
+                watch();
+                return;
+              }
+              chunks.push(x.value);
+              got += x.value.length;
+              setP(Math.min(99, Math.round(got / TOTAL * 100)));
+              pump();
+            }).catch(function () { boot(SRC); watch(); });
+          })();
+        }).catch(function () { boot(SRC); watch(); });
+      }
+      if (document.body) load();
+      else document.addEventListener("DOMContentLoaded", load);
+    })();
+    </script>
   </head>
   <body>
     <div id="world" aria-label="三维山谷战场"></div>
