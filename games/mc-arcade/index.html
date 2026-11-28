@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<link rel="icon" type="image/png" href="../../icon.png">
+<link rel="apple-touch-icon" href="../../icon.png">
+<link rel="stylesheet" href="../../assets/ui/site-ui.css">
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我的世界小游戏 · RTSX</title>
+<style>
+  :root{
+    --ink:#EEF3E4; --dim:rgba(238,243,228,.68); --dim2:rgba(238,243,228,.46);
+    --line:#2A3626; --grass:#8CD06A; --grass-deep:#4E8C3A; --gold:#E9C46A; --dirt:#6B4A34;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{
+    margin:0;min-height:100vh;
+    background:
+      linear-gradient(180deg, rgba(10,18,12,.3) 0%, rgba(10,18,12,.86) 62%, rgba(10,18,12,.96) 100%),
+      radial-gradient(120% 80% at 50% -10%, #1C2A1C 0%, #101710 52%, #0B110C 100%);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding:calc(18px + env(safe-area-inset-top)) 20px calc(32px + env(safe-area-inset-bottom));
+    overflow-x:hidden;
+  }
+  /* 淡淡的方块网格，像素砖感 */
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background-image:
+      linear-gradient(rgba(140,208,106,.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(140,208,106,.045) 1px, transparent 1px);
+    background-size:32px 32px;
+    mask-image:radial-gradient(70% 55% at 50% 18%, #000 0%, transparent 78%);
+    -webkit-mask-image:radial-gradient(70% 55% at 50% 18%, #000 0%, transparent 78%);
+  }
+  .wrap{position:relative;z-index:1;}
+  .bar{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .bar .right{display:flex;align-items:center;gap:12px;}
+  .back{border:0;background:none;font:inherit;font-size:12px;color:var(--dim2);cursor:pointer;padding:4px 0;letter-spacing:.02em;}
+  .back:hover{color:var(--dim);}
+  .snd{
+    border:1px solid var(--line);background:none;border-radius:8px;
+    padding:3px 7px;font:inherit;font-size:10px;letter-spacing:.12em;
+    color:var(--dim2);cursor:pointer;
+  }
+  .snd.off{opacity:.55;text-decoration:line-through;}
+  .badge{
+    font-family:Georgia,serif;font-size:11px;letter-spacing:.26em;
+    color:var(--dim2);text-transform:uppercase;
+  }
+
+  .hero{display:flex;flex-direction:column;align-items:center;margin:24px 0 30px;}
+  .scene{position:relative;width:118px;height:118px;perspective:900px;margin-bottom:24px;}
+  .cube{
+    position:relative;width:118px;height:118px;
+    transform-style:preserve-3d;
+    animation:spin 22s linear infinite;
+  }
+  @keyframes spin{
+    from{transform:rotateX(-18deg) rotateY(0deg);}
+    to{transform:rotateX(-18deg) rotateY(360deg);}
+  }
+  .face{
+    position:absolute;width:118px;height:118px;
+    display:flex;align-items:center;justify-content:center;
+    font-family:"Courier New",Consolas,monospace;font-size:26px;font-weight:700;
+    letter-spacing:.06em;
+    border:2px solid rgba(0,0,0,.25);
+    box-shadow:inset 0 0 0 3px rgba(255,255,255,.08), inset 0 0 46px rgba(0,0,0,.35);
+    image-rendering:pixelated;
+  }
+  /* 草皮顶面 + 泥土地侧面，靠像素渐变块拼出来 */
+  .face.top{
+    background:
+      radial-gradient(circle at 22% 30%, rgba(255,255,255,.10) 0 12%, transparent 13%),
+      repeating-linear-gradient(0deg, rgba(0,0,0,.10) 0 10px, transparent 10px 20px),
+      linear-gradient(160deg,#A6DE7C 0%,#7FC457 55%,#5FA43F 100%);
+    color:#1E3A14;text-shadow:0 1px 0 rgba(255,255,255,.35);
+  }
+  .face.side{
+    background:
+      repeating-linear-gradient(90deg, rgba(0,0,0,.10) 0 12px, transparent 12px 24px),
+      repeating-linear-gradient(0deg, rgba(255,255,255,.05) 0 12px, transparent 12px 24px),
+      linear-gradient(180deg,#8DD06C 0%,#74B951 25%,#5E3F2D 26%,#6B4A34 62%,#553827 100%);
+    color:#EAD9C4;
+  }
+  .face.side span{display:none;}
+  .f1{transform:translateZ(59px);}
+  .f2{transform:rotateY(180deg) translateZ(59px);}
+  .f3{transform:rotateY(90deg) translateZ(59px);}
+  .f4{transform:rotateY(-90deg) translateZ(59px);}
+  .f5{transform:rotateX(90deg) translateZ(59px);}
+  .f6{transform:rotateX(-90deg) translateZ(59px);}
+  .shadow{
+    position:absolute;left:50%;bottom:-18px;width:96px;height:14px;transform:translateX(-50%);
+    background:radial-gradient(ellipse at center, rgba(0,0,0,.55) 0%, transparent 72%);
+    filter:blur(2px);
+  }
+
+  h1{
+    margin:0 0 10px;font-family:Georgia,"Songti SC","STSong",serif;
+    font-size:34px;font-weight:600;letter-spacing:-.01em;
+  }
+  .sub{margin:0;max-width:480px;text-align:center;font-size:13.5px;line-height:1.75;color:var(--dim);}
+
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:720px;margin:34px auto 0;}
+  .card{
+    display:flex;flex-direction:column;
+    padding:20px 20px 18px;
+    border:1px solid var(--line);border-radius:6px;
+    background:
+      linear-gradient(160deg, rgba(38,52,34,.92) 0%, rgba(22,30,22,.94) 100%);
+    box-shadow:inset 0 0 0 1px rgba(140,208,106,.06);
+    text-decoration:none;color:var(--ink);
+    transition:transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+  }
+  .card:hover{transform:translateY(-3px);border-color:#3F5A34;box-shadow:0 18px 40px -28px #000, inset 0 0 0 1px rgba(140,208,106,.14);}
+  .card .tag{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--grass);margin-bottom:10px;}
+  .card h2{
+    margin:0 0 8px;font-family:Georgia,"Songti SC",serif;
+    font-size:21px;font-weight:600;
+  }
+  .card p{margin:0 0 16px;font-size:12.5px;line-height:1.75;color:var(--dim);}
+  .card .go{margin-top:auto;font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);}
+  .card .credit{
+    margin-top:10px;padding-top:9px;border-top:1px dashed rgba(238,243,228,.12);
+    font-size:10.5px;line-height:1.6;color:var(--dim2);letter-spacing:.01em;
+  }
+  .card.soon{opacity:.5;pointer-events:none;}
+  .card.soon .tag{color:var(--dim2);}
+  .card.soon .go{color:var(--dim2);}
+
+  .note{
+    max-width:720px;margin:22px auto 0;padding:12px 16px;
+    border-left:2px solid rgba(140,208,106,.45);border-radius:4px;
+    background:rgba(20,28,20,.5);
+    font-size:11.5px;line-height:1.8;color:var(--dim2);
+  }
+
+  @media (max-width:640px){
+    .cards{grid-template-columns:1fr;}
+    h1{font-size:27px;}
+    .scene{width:96px;height:96px;}
+    .cube,.face{width:96px;height:96px;}
+    .face{font-size:22px;}
+    .f1{transform:translateZ(48px);}
+    .f2{transform:rotateY(180deg) translateZ(48px);}
+    .f3{transform:rotateY(90deg) translateZ(48px);}
+    .f4{transform:rotateY(-90deg) translateZ(48px);}
+    .f5{transform:rotateX(90deg) translateZ(48px);}
+    .f6{transform:rotateX(-90deg) translateZ(48px);}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar">
+    <button class="back" id="back" type="button">← 返回大厅</button>
+    <div class="right">
+      <button class="snd" id="snd" type="button">SFX</button>
+      <span class="badge">MC Arcade</span>
+    </div>
+  </div>
+
+  <section class="hero">
+    <div class="scene">
+      <div class="cube">
+        <div class="face side f1"></div>
+        <div class="face side f2"></div>
+        <div class="face side f3"></div>
+        <div class="face side f4"></div>
+        <div class="face top f5"></div>
+        <div class="face top f6"></div>
+      </div>
+      <div class="shadow"></div>
+    </div>
+    <h1>我的世界小游戏</h1>
+    <p class="sub">一个方块一个玩法。专辑做成一条长线，先从铸剑台开始——对着铁砧一锤一锤，把一块铁胚敲成你自己的武器。</p>
+  </section>
+
+  <div class="cards">
+    <a class="card" href="forge-more/index.html">
+      <div class="tag">001 · 锻造</div>
+      <h2>铸剑大师</h2>
+      <p>加热、锤打、淬火、开刃，按节奏对准锤点，温度掉了要回炉。刀身一点点成形，锤歪了就只能重来。就再敲一锤。</p>
+      <div class="go">进入铁匠铺 →</div>
+      <div class="credit">原作 Forge More · 公益授权版本 · 本站本地化托管</div>
+    </a>
+
+    <a class="card soon" href="#" aria-disabled="true">
+      <div class="tag">002 · 筹备中</div>
+      <h2>下一块方块</h2>
+      <p>专辑会继续往里放：矿洞、红石、生存。等下一款打磨完再开门。</p>
+      <div class="go">敬请期待</div>
+    </a>
+  </div>
+
+  <div class="note">离线可玩：这一页和里面的游戏文件都已经放进本站，不用连 B 站也能打开。手机横屏体验更好。</div>
+</div>
+
+<script src="../../assets/sfx/sfx.js"></script>
+<script src="../../assets/ui/site-ui.js" data-surface="dark"></script>
+<script>
+(function(){
+  var SFX = (function(){
+    var K = window.RTSXSFX;
+    function isOn(){ return K ? !K.isMuted() : false; }
+    return {
+      click: function(){ if (isOn()) K.play("click"); },
+      hover: function(){ if (isOn()) K.play("hover", { volume: 0.7 }); },
+      back:  function(){ if (isOn()) K.play("back"); },
+      isOn:  isOn,
+      set:   function(v){
+        if (!K) return;
+        K.mute(!v);
+        try { localStorage.setItem("rtsx.sound.v1", v ? "on" : "off"); } catch(e) {}
+      }
+    };
+  })();
+
+  try {
+    if (window.RTSXSFX && localStorage.getItem("rtsx.sound.v1") === "off") RTSXSFX.mute(true);
+  } catch(e) {}
+
+  var sndBtn = document.getElementById("snd");
+  function paintSnd(){ if (sndBtn) sndBtn.classList.toggle("off", !SFX.isOn()); }
+  paintSnd();
+  if (sndBtn) sndBtn.addEventListener("click", function(){
+    SFX.set(!SFX.isOn()); paintSnd(); if (SFX.isOn()) SFX.click();
+  });
+  window.addEventListener("storage", paintSnd);
+
+  function warm(url) {
+    if (!window.fetch || !url) return;
+    try { fetch(url, { credentials: "same-origin", cache: "force-cache" }).catch(function(){}); } catch (e) {}
+  }
+
+  [].forEach.call(document.querySelectorAll("a.card"), function(a){
+    a.addEventListener("pointerdown", function(){ SFX.click(); });
+    a.addEventListener("pointerenter", function(){ SFX.hover(); warm(a.getAttribute("href")); });
+  });
+
+  document.getElementById("back").addEventListener("click", function(){
+    SFX.back();
+    if (window.parent !== window) window.parent.postMessage("rtsx-close", "*");
+    else location.href = "../index.html";
+  });
+})();
+</script>
+</body>
+</html>
