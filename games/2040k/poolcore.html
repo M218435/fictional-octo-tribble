@@ -95,9 +95,9 @@
     <p class="en">P0OLC0RE · 2040K</p>
     <div class="sub">白色的池水、无尽的瓷砖、走廊尽头的光。<br>在这张没有尽头的迷宫图上，找到 10 个火警拉杆。<br>全部拉下之后，你会拿到一把锤子。</div>
     <div class="row">
-      <button id="qHigh" class="primary" type="button">高画质</button>
-      <button id="qLow" type="button">流畅</button>
-      <button id="qNet" type="button">联机（公共池）</button>
+      <button id="qHigh" class="primary" type="button" disabled>高画质</button>
+      <button id="qLow" type="button" disabled>流畅</button>
+      <button id="qNet" type="button" disabled>联机（公共池）</button>
     </div>
     <div class="engline" id="engLine"><i id="engBar"></i></div>
     <div class="engmsg" id="engMsg">正在载入引擎 0%</div>
@@ -132,7 +132,8 @@
   function done(){
     btns.forEach(function(b){ if(b) b.disabled=false; });
     if(msg) msg.textContent="";
-    if(line) line.style.opacity="0";
+    if(line){ line.style.opacity="0"; setTimeout(function(){ line.style.display="none"; },600); }
+    if(msg) msg.style.minHeight="0";
   }
   function inject(blobUrl){
     if(msg) msg.textContent="正在初始化画面…";

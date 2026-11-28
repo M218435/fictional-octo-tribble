@@ -240,6 +240,29 @@
     else location.href = "../../index.html";
   });
 })();
-</script>
+</script>
+<script>
+/* 压到卡片上就先把它那一份取回来，点进去不用等 */
+(function(){
+  var warm=function(u){ return fetch(u,{credentials:"same-origin",cache:"force-cache",priority:"low"}).catch(function(){}); };
+  [[ 'a[href="poolcore.html"]', ["poolcore.html","poolcore.engine.js"] ],
+   [ 'a[href="ppubbg.html"]',   ["ppubbg.html"] ]].forEach(function(pair){
+    var el=document.querySelector(pair[0]);
+    if(!el) return;
+    var hot=false;
+    el.addEventListener("pointerenter",function(){
+      if(hot) return; hot=true;
+      var urls=pair[1].slice();
+      (function next(){
+        var u=urls.shift();
+        if(!u) return;
+        warm(u).then(next);
+      })();
+    });
+    el.addEventListener("touchstart",function(){ if(!hot){ hot=true; } },{passive:true});
+  });
+})();
+</script>
+
 </body>
 </html>
