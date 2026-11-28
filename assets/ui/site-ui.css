@@ -244,6 +244,10 @@ html[data-rtsx-theme="dark"] .itile.plain img{ filter:opacity(.75); }
 .rmenu.on{ transform:none; }
 
 .rmenu .rbody{ padding:6px 12px 22px; }
+/* 抽屉菜单不带滚动条：滚轮 / 触摸照常滚，右缘不留细滑块 */
+.rmenu .rbody{ scrollbar-width:none; -ms-overflow-style:none; }
+.rmenu .rbody::-webkit-scrollbar{ width:0;height:0;display:none; }
+.rmenu .rbody::-webkit-scrollbar-button{ display:none;height:0;width:0; }
 
 .sec{}
 .sec + .sec{ margin-top:14px; }
@@ -326,6 +330,9 @@ html[data-rtsx-theme="dark"] .mrow .mgo img{ filter:none; }
 .rset.on{ transform:none; }
 
 .rset .rbody{ padding:0; }
+/* 设置面板同样不出滚动条，只用滚轮/触摸 */
+.rset .rbody{ scrollbar-width:none; -ms-overflow-style:none; }
+.rset .rbody::-webkit-scrollbar{ width:0;height:0;display:none; }
 
 /* 标签栏：桌面竖排，窄屏横向 */
 .rtabs{
