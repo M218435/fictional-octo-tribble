@@ -96,6 +96,15 @@
 </style>
 </head>
 <body>
+<div id="rtsx-boot" aria-hidden="true"><div class="rtsx-spin"></div><b id="rtsx-boot-t">载入中…</b></div>
+<style>
+#rtsx-boot{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;background:#0b0b0c;color:#8C8679;font:12.5px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.08em;opacity:0;animation:rtsxveil .2s .6s ease forwards;pointer-events:none}
+#rtsx-boot b{font-weight:400}
+#rtsx-boot .rtsx-spin{width:22px;height:22px;border-radius:50%;border:2px solid rgba(226,145,111,.22);border-top-color:#E2916F;animation:rtsxspin .9s linear infinite}
+@keyframes rtsxspin{to{transform:rotate(360deg)}}
+@keyframes rtsxveil{to{opacity:1}}
+</style>
+
 <canvas id="c"></canvas>
 
 <div class="top">
