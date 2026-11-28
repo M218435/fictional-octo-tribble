@@ -8,6 +8,7 @@
     <title>MCBONK v2.2</title>
     <link rel="stylesheet" href="./assets/index-CaAcBdnm.css">
     <link rel="stylesheet" href="./local.css">
+    <link rel="icon" href="../../../icon.png">
     <script>
     /* 开场遮罩：主包 1.36MB 单文件，先下完再启动，进度条是真的 */
     (function () {
@@ -16,7 +17,7 @@
       var box, bar, num, tip, shown = 0, started = false, ready = false;
 
       function mount() {
-        if (box || !document.body) return;
+        if (box || !document.documentElement) return;
         var st = document.createElement("style");
         st.textContent =
           "#mc-load{position:fixed;inset:0;z-index:9;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:13px;background:#0d1512;color:#cfd8c8;font:12.5px/1.7 system-ui,-apple-system,'Segoe UI',sans-serif;letter-spacing:.08em;transition:opacity .3s ease}" +
@@ -29,7 +30,7 @@
         box = document.createElement("div");
         box.id = "mc-load";
         box.innerHTML = '<span class="t">MCBONK</span><div class="bar"><i></i></div><span class="s">正在载入战场 <b>0%</b></span>';
-        document.body.appendChild(box);
+        document.documentElement.appendChild(box);
         bar = box.querySelector(".bar i");
         num = box.querySelector("b");
         tip = box.querySelector(".s");
@@ -91,8 +92,7 @@
           })();
         }).catch(function () { boot(SRC); watch(); });
       }
-      if (document.body) load();
-      else document.addEventListener("DOMContentLoaded", load);
+      load();
     })();
     </script>
   </head>

@@ -200,7 +200,7 @@
       <div class="credit">原作 Forge More · 公益授权版本 · 本站本地化托管</div>
     </a>
 
-    <a class="card" href="mcbonk/index.html">
+    <a class="card" href="mcbonk/index.html" data-warm="./mcbonk/assets/index-Bgc3q_ns.js">
       <div class="tag">002 · 自动战斗</div>
       <h2>MCBONK</h2>
       <p>选一只生物就开打：苦力怕贴身引爆，骷髅拉弓，史莱姆弹跳分裂，末影人瞬移突袭。升级、融合、攒终极技，撑过九分钟，打掉三位守卫。</p>
@@ -257,7 +257,11 @@
 
   [].forEach.call(document.querySelectorAll("a.card"), function(a){
     a.addEventListener("pointerdown", function(){ SFX.click(); });
-    a.addEventListener("pointerenter", function(){ SFX.hover(); warm(a.getAttribute("href")); });
+    a.addEventListener("pointerenter", function(){
+      SFX.hover();
+      warm(a.getAttribute("href"));
+      warm(a.getAttribute("data-warm"));
+    });
   });
 
   document.getElementById("back").addEventListener("click", function(){
