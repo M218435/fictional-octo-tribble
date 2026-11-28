@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8">
+<link rel="icon" type="image/png" href="../../icon.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Phigros · HTML5 音游</title>
+<link rel="preload" as="image" href="assets/menu-bg.webp">
+<link rel="preload" as="image" href="assets/Phigros.png">
+<style>
+  @font-face {
+    font-family: 'Phigros';
+    src: url('assets/Phigros.woff2') format('woff2');
+    font-display: swap;
+  }
+  :root {
+    --ink: #f4f8ff;
+    --dim: #a9b8d0;
+    --cyan: #a2eeff;
+    --gold: #ffeca0;
+    --red: #fe4365;
+    --line: rgba(255,255,255,.2);
+    --panel: rgba(8,14,26,.82);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #05070d; }
+  body {
+    font-family: 'Phigros', "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+    color: var(--ink); -webkit-user-select: none; user-select: none; touch-action: none;
+  }
+
+  /* ---------- 背景曲绘 ---------- */
+  #bgArt {
+    position: fixed; inset: -80px; z-index: 0;
+    background: #070a12 center center / cover no-repeat;
+    filter: blur(19px) brightness(.56) saturate(1.2);
+    transform: scale(1.08);
+    transition: background-image .55s ease, filter .45s ease, opacity .45s ease;
+  }
+  /* 主菜单换成网页版入口那张插画，模糊更重，接近 tapToStart 的观感 */
+  body.at-menu #bgArt { filter: blur(11px) brightness(.78) saturate(1.06); }
+  body.at-menu #bgVeil { opacity: .45; }
+  #bgVeil {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(ellipse at 50% 42%, rgba(12,26,50,.12), rgba(2,4,9,.8) 78%),
+      linear-gradient(180deg, rgba(0,0,0,.3), rgba(0,0,0,.52));
+  }
+
+  /* ---------- 画布 ---------- */
+  #stage { position: fixed; inset: 0; z-index: 1; display: block; width: 100%; height: 100%; opacity: 0; transition: opacity .35s; -webkit-touch-callout: none; touch-action: none; -webkit-user-select: none; user-select: none; }
+  body.playing #stage { opacity: 1; }
+
+  /* ---------- 通用屏幕 ---------- */
+  .screen {
+    position: fixed; inset: 0; z-index: 6;
+    display: flex; flex-direction: column;
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transition: opacity .3s ease, visibility .3s;
+  }
+  .screen.show { opacity: 1; visibility: visible; pointer-events: auto; }
+  .screen .fadeUp { opacity: 0; transition: opacity .55s ease; }
+  .screen.show .fadeUp { opacity: 1; }
+  .screen.show .fadeUp.d1 { transition-delay: .1s; }
+  .screen.show .fadeUp.d2 { transition-delay: .2s; }
+  .screen.show .fadeUp.d3 { transition-delay: .3s; }
+
+  /* ---------- 主菜单 ---------- */
+  #menuScreen {
+    align-items: center; justify-content: center;
+    background: linear-gradient(180deg, rgba(4,6,11,.2) 0%, rgba(3,5,9,.42) 56%, rgba(2,3,7,.66) 100%);
+  }
+  .menuWrap { display: flex; flex-direction: column; align-items: center; padding: 0 20px; }
+  .menuLogo {
+    display: block; height: clamp(54px, 19vh, 168px); width: auto; max-width: 76vw;
+    filter: drop-shadow(0 10px 40px rgba(0,0,0,.75));
+  }
+  .menuEntries { display: flex; align-items: stretch; margin-top: clamp(30px, 5.6vh, 62px); }
+  .mBtn {
+    font: inherit; font-size: clamp(13px, 1.5vw, 17px); letter-spacing: .3em; text-indent: .3em;
+    line-height: 1; padding: 15px 44px; border: 0; border-radius: 0; cursor: pointer;
+    transform: skewX(-11deg); transition: background .16s, color .16s, box-shadow .16s;
+  }
+  .mBtn > span { display: inline-block; transform: skewX(11deg); }
+  .mBtn.play { background: #fff; color: #07080c; box-shadow: 10px 10px 0 rgba(0,0,0,.32); }
+  .mBtn.play:hover { background: #cfe8ff; box-shadow: 7px 7px 0 rgba(0,0,0,.32); }
+  .mBtn.set { background: rgba(4,6,10,.55); color: #fff; margin-left: 28px; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.82); }
+  .mBtn.set:hover { background: #fff; color: #07080c; }
+  .mBtn.how {
+    background: transparent; color: rgba(233,243,255,.72); margin-left: 16px;
+    padding: 13px 26px; font-size: clamp(11px, 1.05vw, 13px); letter-spacing: .26em; text-indent: .26em;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.3);
+  }
+  .mBtn.how:hover { color: #07080c; background: rgba(255,255,255,.86); box-shadow: inset 0 0 0 1px #fff; }
+  .mBtn:active { transform: skewX(-11deg) translate(2px, 2px); }
+
+  /* ---------- 玩法指引 ---------- */
+  #guideScreen {
+    padding: 0;
+    background: linear-gradient(180deg, rgba(3,5,10,.72) 0%, rgba(3,5,10,.62) 60%, rgba(2,4,8,.8) 100%);
+  }
+  .guideTop { display: flex; align-items: center; gap: 16px; padding: 18px 26px 14px; flex: none; }
+  .guideBody {
+    flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+    touch-action: pan-y; -webkit-overflow-scrolling: touch;
+    display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr);
+    gap: 38px; align-content: start; padding: 0 26px 26px;
+    scrollbar-width: thin;
+  }
+  .guideBody::-webkit-scrollbar { width: 4px; }
+  .guideBody::-webkit-scrollbar-thumb { background: rgba(255,255,255,.2); }
+  .gTitle {
+    display: flex; align-items: baseline; gap: 10px;
+    font-size: 11px; letter-spacing: .34em; color: rgba(255,255,255,.66);
+    padding-bottom: 9px; margin: 0 0 4px; border-bottom: 1px solid rgba(255,255,255,.16);
+  }
+  .gTitle i { font-style: normal; font-size: 9.5px; letter-spacing: .18em; color: rgba(255,255,255,.3); }
+  .gSec + .gSec { margin-top: 20px; }
+  .gCol { min-width: 0; }
+  .guideTag { margin-left: auto; font-size: 9.5px; letter-spacing: .3em; color: rgba(255,255,255,.26); }
+
+  /* 一段纯 CSS 的小演示：音符沿法线落向判定线 */
+  .gDemo {
+    position: relative; height: 120px; margin-top: 12px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,.13);
+    background: linear-gradient(180deg, rgba(10,18,32,.55), rgba(4,8,16,.8));
+  }
+  .gDemoLine {
+    position: absolute; left: 6%; right: 6%; bottom: 30px; height: 2px;
+    background: #f2f9ff; box-shadow: 0 0 10px rgba(150,215,255,.75);
+    animation: gLinePulse .8s linear .13s infinite;
+  }
+  @keyframes gLinePulse {
+    0%   { box-shadow: 0 0 10px rgba(150,215,255,.7); }
+    12%  { box-shadow: 0 0 20px rgba(210,245,255,.95), 0 0 34px rgba(140,220,255,.6); }
+    100% { box-shadow: 0 0 10px rgba(150,215,255,.7); }
+  }
+  .gDemoNote {
+    position: absolute; top: 0; height: 11px; border-radius: 6px; opacity: 0;
+    animation: gFall 2.4s linear infinite; will-change: transform, opacity;
+  }
+  .gDemoNote.n1 { left: 22%; width: 104px; animation-delay: 0s;
+    background: linear-gradient(90deg, rgba(150,220,255,0) 0%, #cfefff 13%, #eefaff 34%, #fff 50%, #eefaff 66%, #cfefff 87%, rgba(150,220,255,0) 100%);
+    box-shadow: 0 0 9px rgba(160,225,255,.55), 0 0 20px rgba(110,195,255,.22); }
+  .gDemoNote.n2 { left: 52%; width: 78px; animation-delay: .8s;
+    background: linear-gradient(90deg, rgba(255,235,140,0) 0%, #ffe08a 13%, #fff0b8 34%, #fffbe0 50%, #fff0b8 66%, #ffe08a 87%, rgba(255,235,140,0) 100%);
+    box-shadow: 0 0 9px rgba(255,232,150,.5), 0 0 20px rgba(255,210,110,.2); }
+  .gDemoNote.n3 { left: 34%; width: 116px; animation-delay: 1.6s;
+    background: linear-gradient(90deg, rgba(255,130,160,0) 0%, #ff8aa8 13%, #ffb3c6 34%, #ffd6e0 50%, #ffb3c6 66%, #ff8aa8 87%, rgba(255,130,160,0) 100%);
+    box-shadow: 0 0 9px rgba(255,140,170,.5), 0 0 20px rgba(255,110,145,.2); }
+  @keyframes gFall {
+    0%   { transform: translateY(-16px); opacity: 0; }
+    12%  { opacity: .95; }
+    72%  { transform: translateY(79px); opacity: .95; }
+    82%  { transform: translateY(79px); opacity: 0; }
+    100% { transform: translateY(79px); opacity: 0; }
+  }
+  .gDemoTag {
+    position: absolute; right: 10px; bottom: 8px; font-size: 9px;
+    letter-spacing: .22em; color: rgba(255,255,255,.28);
+  }
+
+  .gNote { display: flex; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.07); }
+  .gNote:last-child { border-bottom: none; }
+  .gNoteIcon { width: 116px; min-height: 34px; flex: none; display: flex; align-items: center; }
+  .gNoteIcon i { display: block; width: 100%; }
+  .gNoteIcon img { width: 100%; display: block; }
+  .gNoteIcon img.tap, .gNoteIcon i.tap { filter: drop-shadow(0 0 5px rgba(140,225,255,.55)); }
+  .gNoteIcon img.drag, .gNoteIcon i.drag { filter: drop-shadow(0 0 5px rgba(255,238,140,.5)); }
+  .gNoteIcon img.flick, .gNoteIcon i.flick { filter: drop-shadow(0 0 5px rgba(255,120,150,.55)); }
+  .gNoteIcon i.hold { position: relative; height: 46px; }
+  .gNoteIcon i.hold img { position: absolute; left: 0; width: 100%; display: block; }
+  .gNoteIcon i.hold .head { bottom: 0; filter: drop-shadow(0 0 5px rgba(150,225,255,.6)); }
+  .gNoteIcon i.hold .tail { top: 0; opacity: .62; }
+  .gNoteIcon i.hold .body {
+    position: absolute; left: 50%; top: 5px; bottom: 7px; width: 14px;
+    transform: translateX(-50%);
+    background: linear-gradient(180deg, rgba(176,228,255,.3), rgba(198,240,255,.66));
+  }
+  .gNoteText { min-width: 0; }
+  .gNoteText b { display: block; font-size: 12.5px; font-weight: 500; letter-spacing: .18em; }
+  .gNoteText span { display: block; margin-top: 4px; font-size: 12px; line-height: 1.6; color: var(--dim); }
+
+  .gWin {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 6px 0; font-size: 12px; letter-spacing: .1em;
+    border-bottom: 1px solid rgba(255,255,255,.07);
+  }
+  .gWin span:last-child { color: var(--dim); font-size: 11.5px; letter-spacing: .04em; }
+  .gWin.w1 span:first-child { color: #ffeca0; }
+  .gWin.w2 span:first-child { color: #b4e1ff; }
+  .gWin.w3 span:first-child { color: #9aa6b8; }
+  .gWin.w4 span:first-child { color: #fe4365; }
+
+  .gPara { font-size: 12px; line-height: 1.9; color: var(--dim); letter-spacing: .02em; margin: 8px 0 0; }
+  .gPara b { color: #fff; font-weight: 500; }
+  .gPara em { font-style: normal; color: #ffeca0; }
+
+  .gKeys { display: flex; flex-direction: column; gap: 9px; margin-top: 6px; }
+  .gKey { display: flex; gap: 12px; align-items: baseline; font-size: 11.5px; line-height: 1.75; color: var(--dim); }
+  .gKey i {
+    font-style: normal; flex: none; width: 42px; color: rgba(255,255,255,.62);
+    font-size: 10px; letter-spacing: .16em;
+  }
+  .gKey b { color: #fff; font-weight: 500; }
+  .gRanks { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 10px; }
+  .gRank { display: flex; align-items: baseline; gap: 5px; font-size: 12px; letter-spacing: .1em; }
+  .gRank u { text-decoration: none; font-size: 10px; color: rgba(255,255,255,.45); }
+
+  @media (max-width: 780px) {
+    .guideBody { grid-template-columns: 1fr; gap: 24px; padding: 0 16px 20px; }
+    .guideTop { padding: 14px 16px 10px; }
+    .gNoteIcon { width: 96px; }
+    .gSec + .gSec { margin-top: 20px; }
+  }
+
+  /* ---------- 选曲 ---------- */
+  #selectScreen {
+    padding: 0;
+    background: linear-gradient(90deg, rgba(3,5,10,.6) 0%, rgba(3,5,10,.24) 52%, rgba(3,5,10,.42) 100%);
+  }
+  .selTop {
+    display: flex; align-items: center; gap: 16px;
+    padding: 18px 26px 12px; flex: none;
+  }
+  .ghostBtn {
+    font: inherit; font-size: 12px; letter-spacing: .16em; color: #c3d2e2;
+    background: transparent; border: 1px solid rgba(255,255,255,.26);
+    border-radius: 0; padding: 7px 16px; cursor: pointer; transition: .18s;
+  }
+  .ghostBtn:hover { color: #fff; border-color: #fff; background: rgba(255,255,255,.08); }
+  .selTitle { font-size: 12.5px; letter-spacing: .3em; color: rgba(255,255,255,.7); }
+  .selBody { flex: 1; display: flex; min-height: 0; gap: 20px; padding: 0 26px 22px; }
+
+  .songList {
+    width: min(42vw, 430px); flex: none; margin: 0; padding: 4px; list-style: none;
+    overflow-y: auto; overflow-x: hidden; scrollbar-width: thin;
+    border-right: 1px solid rgba(255,255,255,.12);
+  }
+  .songList::-webkit-scrollbar { width: 4px; }
+  .songList::-webkit-scrollbar-thumb { background: rgba(255,255,255,.24); }
+  .songItem {
+    position: relative; padding: 12px 14px 12px 16px; margin-bottom: 2px; cursor: pointer;
+    border-left: 2px solid transparent;
+    transition: background .18s, border-color .18s;
+  }
+  .songItem:hover { background: rgba(255,255,255,.05); }
+  .songItem.active { background: rgba(255,255,255,.1); border-left-color: #fff; }
+  .siName { font-size: clamp(14px, 1.5vw, 19px); letter-spacing: .02em; }
+  .siArtist { font-size: 10.5px; color: var(--dim); letter-spacing: .06em; margin-top: 4px; opacity: .72; }
+  .siRanks { display: flex; gap: 6px; margin-top: 7px; }
+  .siRank {
+    font-size: 9.5px; letter-spacing: .06em; color: #a9bccf;
+    border: 1px solid rgba(255,255,255,.2); padding: 1px 6px;
+  }
+  .siRank.cur { color: #07080c; background: #fff; border-color: #fff; }
+
+  .selRight { flex: 1; display: flex; gap: 26px; min-width: 0; align-items: center; }
+  .coverWrap {
+    position: relative; flex: none; width: min(32vw, 380px); aspect-ratio: 1/1; align-self: center;
+    overflow: hidden; box-shadow: 0 22px 60px rgba(0,0,0,.62);
+    border: 1px solid rgba(255,255,255,.14);
+  }
+  .coverWrap img { width: 100%; height: 100%; object-fit: cover; display: block; transition: opacity .3s; }
+  .coverWrap::after { content: ''; position: absolute; inset: 0; box-shadow: inset 0 0 70px rgba(0,0,0,.5); pointer-events: none; }
+  .selDetail { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 12px; padding-right: 4px; }
+  #selArtist { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #selName { font-size: clamp(22px, 3.2vw, 40px); letter-spacing: .02em; line-height: 1.15; text-shadow: 0 4px 26px rgba(0,0,0,.65); word-break: break-word; }
+  #selArtist { font-size: clamp(11px, 1.15vw, 14px); color: var(--dim); letter-spacing: .1em; }
+  .lvRow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+  .lvChip {
+    font: inherit; font-size: 12px; letter-spacing: .08em; cursor: pointer;
+    background: transparent; color: #b6c8da;
+    border: 1px solid rgba(255,255,255,.24); padding: 7px 15px; transition: .18s;
+  }
+  .lvChip:hover { color: #fff; border-color: rgba(255,255,255,.7); }
+  .lvChip.on { background: #fff; color: #07080c; border-color: #fff; font-weight: 600; }
+  .lvChip .rk { font-size: 10px; opacity: .6; margin-left: 5px; }
+  .selMeta { font-size: 11px; color: var(--dim); letter-spacing: .06em; line-height: 1.85; min-height: 42px; }
+  .selMeta b { color: #fff; font-weight: 500; }
+  .playRow { display: flex; align-items: center; gap: 16px; margin-top: 8px; }
+  .playBtn {
+    font: inherit; font-size: 14px; letter-spacing: .34em; text-indent: .34em; color: #07080c; cursor: pointer;
+    background: #fff; border: none; padding: 13px 38px; box-shadow: 8px 8px 0 rgba(0,0,0,.34);
+    transition: background .16s, box-shadow .16s, transform .1s;
+  }
+  .playBtn:hover { background: #cfe8ff; box-shadow: 6px 6px 0 rgba(0,0,0,.34); }
+  .playBtn:active { transform: translate(2px, 2px); box-shadow: 4px 4px 0 rgba(0,0,0,.34); }
+  .bestBox { font-size: 10.5px; color: var(--dim); letter-spacing: .06em; line-height: 1.7; }
+  .bestBox b { color: #fff; font-weight: 500; }
+
+  /* ---------- 选曲：版式对照原版 songSelect ---------- */
+  body.at-select #bgArt { filter: blur(26px) brightness(.78) saturate(1.12); }
+  body.at-select #bgVeil { opacity: .06; }
+
+  #selectScreen {
+    padding: 0; overflow: hidden;
+    background: rgba(4,6,10,.16);
+    --ss: min(calc(100vw / 1239), calc(100vh / 891));
+    --ss: min(calc(100vw / 1239), calc(100dvh / 891));
+  }
+  /* 贴屏幕左上角、按高度缩放（不再居中留黑边）：窗口比 1239×891 宽时，
+     多出来的宽度由曲绘去「出血」，右边那几块保持原尺寸靠右贴边 —— 跟原版一致。 */
+  .ssStage {
+    position: absolute; left: 0; top: 0;
+    width: calc(1239px + var(--ssex, 0px)); height: 891px;
+    margin-top: calc((100vh - 891px * var(--ss, 1)) / 2);
+    transform: scale(var(--ss, 1)); transform-origin: 0 0;
+    overflow: hidden;
+  }
+  /* 左侧斜切灰板：整块做成「平行四边形」（和原版一样，四条边两条竖两条横），
+     取中心做斜切原点，左下角正好落在屏幕左边，不会被屏幕切出一个梯形缺口 */
+  .ssLeft {
+    position: absolute; left: 119px; top: 0; width: 470px; height: 891px; z-index: 3;
+    background: rgba(0,0,0,.314);
+    transform: skewX(-15deg); transform-origin: 50% 50%;
+  }
+  .ssTopBar {
+    position: absolute; left: 0; top: 15px; width: 470px; height: 35px;
+    background: rgba(0,0,0,.85);
+  }
+  .ssTopIn {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; gap: 22px; padding: 0 14px;
+  }
+  .ssSort { font-size: 13px; letter-spacing: .12em; color: rgba(255,255,255,.55); }
+  .ssSortName {
+    font-size: 13px; letter-spacing: .12em; color: #fff; cursor: pointer;
+    padding: 8px 10px; margin: -8px -10px; user-select: none;
+    transition: color .12s;
+  }
+  .ssSortName:hover { color: #cfe8ff; }
+  .ssSortName:active { color: #8fc4ee; }
+  .ssSortName::after { content: '▾'; margin-left: 7px; font-size: 10px; opacity: .75; }
+  .ssSet {
+    margin-left: auto; font: inherit; font-size: 13px; letter-spacing: .12em; color: #fff;
+    background: none; border: 0; padding: 4px 2px; cursor: pointer;
+  }
+  .ssSet:hover { color: #9fd0ff; }
+  .ssBack {
+    position: absolute; left: -22px; top: 5px; width: 113px; height: 50px;
+    background: rgba(0,0,0,.9); border: 0; padding: 0; cursor: pointer; z-index: 4;
+    transform: skewX(-15deg); transform-origin: 0 0; overflow: hidden;
+  }
+  .ssBack span { position: absolute; left: 30px; top: 12px; font-size: 20px; color: #fff; transform: skewX(15deg); }
+  .ssBack::after { content: ''; position: absolute; left: 14px; bottom: 9px; width: 62px; height: 5px; background: #fff; }
+  .ssBack:hover { background: #fff; }
+  .ssBack:hover span { color: #07080c; }
+  /* 面板下方那截空白：放曲目数与操作提示，不再空一块 */
+  .ssHint {
+    position: absolute; left: 20px; top: 838px; width: 430px;
+    transform: none; font-size: 11px; letter-spacing: .06em; line-height: 1.7;
+    color: rgba(255,255,255,.4);
+  }
+  .ssHint b { font-weight: 400; color: rgba(255,255,255,.62); }
+
+  .ssList {
+    position: absolute; left: 20px; top: 120px; bottom: 185px; width: 430px;
+    margin: 0; padding: 0; list-style: none; overflow-y: auto; overflow-x: hidden;
+  }
+  .ssList::-webkit-scrollbar { width: 0; height: 0; }
+  .ssRow {
+    position: relative; width: 430px; height: 35px; margin: 0 0 40px; cursor: pointer;
+    display: flex; align-items: center;
+  }
+  .ssRow::before {
+    content: ''; position: absolute; inset: 0;
+    background: transparent; transition: background .15s;
+  }
+  .ssRow:hover::before { background: rgba(255,255,255,.09); }
+  .ssRow .n {
+    position: relative; margin-left: 12px; max-width: 232px;
+    font-size: 20px; letter-spacing: .01em; color: rgba(0,0,0,.55);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .ssRow .a {
+    position: absolute; left: 30px; top: 41px; max-width: 262px; font-size: 12px; letter-spacing: .03em;
+    color: rgba(255,255,255,.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: none;
+  }
+  .ssRow .lv {
+    position: absolute; right: 20px; top: 50%; transform: translateY(-50%);
+    min-width: 30px; text-align: right; font-size: 26px; color: rgba(255,255,255,.82);
+    text-shadow: 0 2px 10px rgba(0,0,0,.6), 0 0 2px rgba(0,0,0,.5);
+  }
+  .ssRow .lv b { display: inline-block; font-weight: 400; }
+  .ssRow.sel { width: 448px; height: 65px; margin-left: -30px; }
+  .ssRow.sel::before { background: rgba(0,0,0,.85); }
+  .ssRow.sel .n { margin-left: 30px; max-width: 226px; font-size: 36px; color: #fff; }
+  .ssRow.sel .a { display: block; }
+  .ssRow.sel .lv {
+    right: 14px; min-width: 95px; height: 75px; background: #fff; color: #07080c;
+    display: flex; align-items: center; justify-content: center; font-size: 36px; text-align: center;
+  }
+
+  .ssArt {
+    position: absolute; left: var(--artx, 470px); top: 100px; width: var(--artw, 800px); height: 546px;
+    transform: skewX(-7deg); transform-origin: 100% 0; overflow: hidden;
+    box-shadow: 0 26px 72px rgba(0,0,0,.46);
+  }
+  .ssArt img { display: block; width: 100%; height: 100%; object-fit: cover; transition: opacity .28s; }
+  .ssArtist {
+    position: absolute; z-index: 5; right: 16px; top: 502px; width: 214px; text-align: right;
+    font-size: 22px; line-height: 1.45; letter-spacing: .02em; color: #fff;
+    text-shadow: 0 2px 14px rgba(0,0,0,.6); word-break: break-word;
+  }
+
+  .ssDetail { position: absolute; left: var(--barx, 323px); right: auto; top: 713px; width: var(--barw, 916px); height: 78px; z-index: 6; }
+  .ssDetail::before {
+    content: ''; position: absolute; inset: 0; background: rgba(0,0,0,.34);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 30px 100%);
+  }
+  .ssLevels { position: absolute; left: 0; top: 0; height: 78px; display: flex; }
+  .ssLv {
+    position: relative; width: 99px; height: 78px; background: #fff; color: #07080c; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    transform: skewX(-15deg); transform-origin: 0 0;
+  }
+  .ssLv i { font-style: normal; font-size: 26px; line-height: 1; transform: skewX(15deg); }
+  .ssLv u { text-decoration: none; font-size: 11px; letter-spacing: .1em; opacity: .7; transform: skewX(15deg); }
+  .ssLv.on { width: 103px; height: 94px; margin-top: -8px; background: #51af44; color: #fff; }
+  .ssLv.on i { font-size: 34px; }
+  .ssLv.on u { opacity: .95; }
+  .ssScore { position: absolute; left: 456px; right: 8px; top: 0; height: 78px; display: flex; align-items: center; gap: 9px; padding: 0 4px 0 6px; }
+  .ssScore b {
+    flex: 1; font-weight: 400; font-size: 40px; line-height: 1; letter-spacing: .02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .ssScore em { font-style: normal; font-size: 12px; letter-spacing: .04em; color: rgba(255,255,255,.82); white-space: nowrap; }
+  .ssNew { font-size: 17px; letter-spacing: .14em; color: rgba(255,255,255,.75); opacity: 1; white-space: nowrap; }
+  .ssNew.off { display: none; }
+  .ssPlay {
+    position: absolute; left: auto; right: 0; top: 791px; width: 100px; height: 85px;
+    background: #fff; border: 0; padding: 0; cursor: pointer; z-index: 6;
+    transform: skewX(-15deg); transform-origin: 0 0;
+  }
+  .ssPlay::after {
+    content: ''; position: absolute; left: 34px; top: 50%; margin-top: -17px;
+    border-left: 30px solid #07080c;
+    border-top: 17px solid transparent; border-bottom: 17px solid transparent;
+    transform: skewX(15deg); transform-origin: 0 50%;
+  }
+  .ssPlay:hover { background: #cfe8ff; }
+  .ssPlay:active { background: #fff; }
+
+  /* 竖屏：曲绘在上、列表居中、底栏压底（原版是横屏，这里只是不让手机竖屏挤成一条） */
+  @media (max-aspect-ratio: 1/1) {
+    .ssStage { position: absolute; inset: 0; width: auto; height: auto; margin: 0; transform: none; }
+    .ssArt { left: -5%; right: auto; top: 4%; width: 110%; height: 30%; transform: skewX(-6deg); }
+    .ssArtist { right: 12px; top: calc(4% + 30% - 8px); width: 60%; font-size: 13px; line-height: 1.3; }
+    .ssLeft { left: 0; top: 38%; width: 100%; height: auto; bottom: 104px; transform: none; background: rgba(0,0,0,.38); }
+    .ssTopBar { left: 0; top: 0; width: 100%; height: 32px; transform: none; }
+    .ssTopIn { transform: none; padding: 0 10px; gap: 12px; }
+    .ssList { left: 0; top: 34px; width: 100%; height: calc(100% - 40px); bottom: auto; transform: none; }
+    .ssRow { width: auto; height: 44px; margin-bottom: 0; transform: none; }
+    .ssRow::before { transform: none; }
+    .ssRow .n { margin-left: 12px; max-width: 74%; font-size: 17px; }
+    .ssRow .a { display: none; }
+    .ssRow .lv { right: 12px; font-size: 17px; transform: translateY(-50%); }
+    .ssRow .lv b { transform: none; }
+    .ssRow.sel { width: auto; height: 56px; margin-left: 0; }
+    .ssRow.sel .n { margin-left: 12px; max-width: 66%; font-size: 24px; }
+    .ssRow.sel .lv { right: 8px; width: 54px; min-width: 54px; height: 54px; font-size: 24px; transform: translateY(-50%) skewX(-15deg); }
+    .ssBack { left: 0; top: 5px; width: 74px; height: 34px; }
+    .ssBack span { left: 22px; top: 7px; font-size: 15px; }
+    .ssBack::after { left: 10px; bottom: 5px; width: 44px; height: 3px; }
+    .ssHint { display: none; }
+    .ssDetail { left: 0; top: auto; bottom: 48px; width: 100%; height: 56px; }
+    .ssLevels { height: 56px; }
+    .ssLv, .ssLv.on { width: auto; flex: 1; height: 56px; margin-top: 0; }
+    .ssLv i { font-size: 20px; }
+    .ssLv.on i { font-size: 24px; }
+    .ssLevels { transform: skewX(-15deg); transform-origin: 0 0; width: 62%; }
+    .ssScore { left: auto; right: 0; width: 46%; height: 56px; padding: 0 4px 0 8px; gap: 6px; }
+    .ssScore b { font-size: 21px; }
+    .ssScore em { font-size: 10px; }
+    .ssNew { font-size: 12px; letter-spacing: .1em; }
+    .ssPlay { left: auto; right: 0; top: auto; bottom: 0; width: 76px; height: 48px; transform: none; }
+    .ssPlay::after { left: 28px; margin-top: -13px; border-left-width: 24px; border-top-width: 13px; border-bottom-width: 13px; }
+  }
+
+  /* ---------- 设置 ---------- */
+  #settingsScreen { align-items: center; justify-content: center; }
+  .setPanel {
+    width: min(92vw, 660px); max-height: min(96vh, 700px); overflow-y: auto;
+    padding: 18px 30px 14px;
+    background: rgba(6,9,15,.93);
+    border: 1px solid rgba(255,255,255,.16); box-shadow: 0 30px 90px rgba(0,0,0,.65);
+  }
+  .setHead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .setHead h2 { margin: 0; font-size: 17px; font-weight: 500; letter-spacing: .32em; }
+  /* 视觉类设置的实时预览：拖动滑块就能看到暗度 / 判定线 / 流速的变化 */
+  .setPreview { position: sticky; top: 0; z-index: 2; margin: 0 0 12px; padding-top: 2px; background: rgba(6,9,15,.96); }
+  .spScene {
+    position: relative; height: 56px; overflow: hidden;
+    background: #0a1220;
+    border: 1px solid rgba(255,255,255,.12);
+  }
+  /* 和局内同一个口径：局内曲绘是「原图直接铺 + 按背景不透明度盖黑幕」，
+     预览以前额外压了 brightness(.56)，所以同样档位总比局内暗一截。
+     这里只留一点模糊（预览条只有 56px 高，不模糊会糊成色块），亮度完全交给 spDim。 */
+  .spScene::before {
+    content: ''; position: absolute; inset: -12px;
+    background: var(--sp-bg, url("assets/menu-bg.webp")) center 42% / cover no-repeat;
+    filter: blur(4px) saturate(1.1);
+  }
+  .spDim { position: absolute; inset: 0; background: #04070e; opacity: .42; pointer-events: none; }
+  .spLine {
+    position: absolute; left: 5%; right: 5%; bottom: 13px; height: 2px;
+    background: #ffefb6; box-shadow: 0 0 5px rgba(255,214,94,.85), 0 0 11px rgba(255,196,60,.4);
+  }
+  .spNote {
+    position: absolute; top: -10px; height: 8px; border-radius: 4px;
+    animation: spFall var(--fall, 2.2s) linear infinite;
+  }
+  .spNote.n1 { left: 21%; width: 58px; animation-delay: 0s;
+    background: linear-gradient(90deg, rgba(150,220,255,0) 0%, #cfefff 16%, #fff 50%, #cfefff 84%, rgba(150,220,255,0) 100%); }
+  .spNote.n2 { left: 52%; width: 46px; animation-delay: .73s;
+    background: linear-gradient(90deg, rgba(255,235,140,0) 0%, #ffe08a 16%, #fffbe0 50%, #ffe08a 84%, rgba(255,235,140,0) 100%); }
+  .spNote.n3 { left: 32%; width: 64px; animation-delay: 1.46s;
+    background: linear-gradient(90deg, rgba(255,130,160,0) 0%, #ff8aa8 16%, #ffd6e0 50%, #ff8aa8 84%, rgba(255,130,160,0) 100%); }
+  @keyframes spFall {
+    0% { transform: translateY(0); opacity: 0; }
+    12% { opacity: 1; }
+    82% { opacity: 1; }
+    100% { transform: translateY(43px); opacity: 0; }
+  }
+  .spTag {
+    position: absolute; right: 8px; top: 6px; font-size: 9.5px; letter-spacing: .1em;
+    color: rgba(233,243,255,.78); text-shadow: 0 1px 3px #000;
+  }
+  .setRow {
+    display: flex; align-items: center; gap: 16px; padding: 5px 2px;
+    border-bottom: 1px solid rgba(255,255,255,.07);
+  }
+  .setRow:last-of-type { border-bottom: none; }
+  .setLabel { flex: 1; font-size: 13px; letter-spacing: .06em; color: #d5e3f0; }
+  .setLabel small { display: block; font-size: 10px; color: #7c8fa4; letter-spacing: .04em; margin-top: 2px; }
+  .setCtl { display: flex; align-items: center; gap: 8px; flex: none; }
+  /* 按键映射：一排小方块，点谁谁进入「按键…」状态 */
+  .keySlots { flex-wrap: wrap; justify-content: flex-end; max-width: 64%; row-gap: 6px; }
+  .keySlot {
+    font: inherit; font-size: 10.5px; letter-spacing: .08em; color: #cfdcea;
+    min-width: 46px; height: 30px; padding: 0 6px; cursor: pointer;
+    background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.22);
+    transition: color .15s, border-color .15s, background .15s;
+  }
+  .keySlot:hover { color: #fff; border-color: rgba(255,255,255,.55); }
+  .keySlot.flick { color: #ffc2cd; border-color: rgba(255,140,165,.42); }
+  .keySlot.arm {
+    color: #ffe07a; border-color: #ffd85e; background: rgba(255,216,94,.12);
+    box-shadow: 0 0 0 1px rgba(255,216,94,.25) inset;
+  }
+  .ghostBtn.mini { font-size: 10px; padding: 6px 10px; height: 30px; }
+  .num {
+    font: inherit; font-size: 13px; color: var(--ink); text-align: center;
+    width: 84px; padding: 7px 4px; background: rgba(0,0,0,.55);
+    border: 1px solid rgba(255,255,255,.2); border-radius: 0; outline: none;
+  }
+  .num:focus { border-color: #fff; }
+  .stepBtn {
+    font: inherit; font-size: 14px; line-height: 1; color: #b6c8da; cursor: pointer;
+    width: 30px; height: 30px; background: transparent;
+    border: 1px solid rgba(255,255,255,.2); border-radius: 0; transition: .16s;
+  }
+  .stepBtn:hover { color: #fff; border-color: #fff; background: rgba(255,255,255,.1); }
+  input[type=range] { -webkit-appearance: none; appearance: none; width: 190px; height: 2px; border-radius: 0; background: rgba(255,255,255,.2); outline: none; }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 13px; height: 13px; border-radius: 0;
+    background: #fff; cursor: pointer;
+  }
+  .valTag { font-size: 11.5px; color: var(--dim); width: 46px; text-align: right; font-variant-numeric: tabular-nums; }
+  .switch { position: relative; width: 46px; height: 22px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.22); cursor: pointer; transition: background .18s, border-color .18s; flex: none; }
+  .switch::after { content: ''; position: absolute; left: 3px; top: 3px; width: 14px; height: 14px; background: #8496aa; transition: transform .18s, background .18s; }
+  .switch.on { background: #fff; border-color: #fff; }
+  .switch.on::after { transform: translateX(24px); background: #06090f; }
+  .setFoot { display: flex; gap: 10px; justify-content: flex-end; margin-top: 12px; }
+  .seg { display: flex; border: 1px solid rgba(255,255,255,.22); }
+  .seg button {
+    font: inherit; font-size: 11.5px; letter-spacing: .08em; color: #b6c8da;
+    background: transparent; border: 0; border-radius: 0; padding: 6px 12px; cursor: pointer;
+    transition: background .16s, color .16s;
+  }
+  .seg button + button { border-left: 1px solid rgba(255,255,255,.22); }
+  .seg button:hover { color: #fff; background: rgba(255,255,255,.08); }
+  .seg button.on { background: #fff; color: #07080c; }
+
+  /* ---------- HUD ---------- */
+  #hud { position: fixed; inset: 0; z-index: 3; pointer-events: none; opacity: 0; transition: opacity .3s; }
+  body.playing #hud { opacity: 1; }
+  #scoreBox { position: absolute; top: 2.2vh; right: 2.6vw; text-align: right; text-shadow: 0 2px 16px #000; }
+  #score { font-size: clamp(24px, 3.4vw, 46px); font-weight: 700; letter-spacing: .08em; font-variant-numeric: tabular-nums; }
+  #acc { font-size: clamp(11px, 1.2vw, 15px); color: var(--dim); margin-top: 2px; letter-spacing: .1em; }
+  #songInfo { position: absolute; top: 2.2vh; left: 68px; font-size: clamp(10.5px, 1.05vw, 14px); color: var(--dim); letter-spacing: .08em; line-height: 1.65; text-shadow: 0 2px 10px #000; }
+  #songInfo b { color: var(--ink); font-weight: 500; font-size: 1.18em; }
+  #judgeText {
+    position: absolute; left: 50%; top: 55%; transform: translate(-50%, -50%) scale(1);
+    font-size: clamp(22px, 3vw, 42px); font-weight: 600; letter-spacing: .26em;
+    opacity: 0; text-shadow: 0 0 26px currentColor; white-space: nowrap;
+  }
+  #judgeText.pop { animation: judgePop .34s cubic-bezier(.15,1.4,.4,1) both; }
+  @keyframes judgePop {
+    0%   { opacity: 0; transform: translate(-50%,-50%) scale(1.5); }
+    22%  { opacity: 1; transform: translate(-50%,-50%) scale(.96); }
+    100% { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+  }
+  #comboWrap { position: absolute; left: 50%; top: 27%; transform: translate(-50%,-50%); text-align: center; opacity: 0; transition: opacity .25s; text-shadow: 0 0 26px rgba(255,255,255,.45); }
+  #combo { font-size: clamp(40px, 6.4vw, 92px); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; display: inline-block; }
+  #combo.bump { animation: comboBump .22s ease-out; }
+  @keyframes comboBump { 0% { transform: scale(1); } 38% { transform: scale(1.13); } 100% { transform: scale(1); } }
+  #comboLabel { font-size: clamp(8px, .95vw, 11px); letter-spacing: .55em; opacity: .65; margin-top: 4px; }
+  #syncMonitor { position: absolute; left: 2.4vw; bottom: 1.5vh; font-size: 10px; letter-spacing: .12em; color: rgba(169,184,208,.5); }
+
+  #pauseBtn {
+    position: fixed; left: 14px; top: 12px; z-index: 5; width: 44px; height: 44px;
+    padding: 0; border: none; background: transparent; cursor: pointer;
+    display: none; align-items: center; justify-content: center; opacity: .8; transition: opacity .2s, transform .15s;
+  }
+  body.playing #pauseBtn { display: flex; }
+  #pauseBtn img { height: 24px; filter: drop-shadow(0 0 6px rgba(255,255,255,.35)); }
+  #pauseBtn:hover { opacity: 1; transform: scale(1.06); }
+
+  /* ---------- 覆盖层 ---------- */
+  .overlay { position: fixed; inset: 0; z-index: 12; display: none; align-items: center; justify-content: center; }
+  .overlay.show { display: flex; animation: ovIn .25s ease; }
+  @keyframes ovIn { from { opacity: 0; } to { opacity: 1; } }
+  #pauseOverlay { background: rgba(3,6,12,.7); backdrop-filter: blur(10px); }
+  .pauseInner { display: flex; flex-direction: column; align-items: center; gap: 26px; }
+  .pauseTitle { font-size: clamp(22px, 3vw, 36px); letter-spacing: .5em; color: #fff; text-indent: .5em; }
+  .pauseIcons { display: flex; gap: 34px; align-items: center; }
+  .iconBig { width: 80px; height: 80px; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: background .2s, transform .15s; }
+  .iconBig:hover { background: rgba(255,255,255,.1); transform: translateY(-2px); }
+  .iconBig img { height: 48px; }
+  .iconBig.txt { font: inherit; font-size: 12px; letter-spacing: .16em; color: #c3d2e2; width: auto; padding: 0 18px; height: 38px; border: 1px solid rgba(255,255,255,.26); border-radius: 0; }
+  .iconBig.txt:hover { color: #fff; border-color: #fff; }
+  .offsetRow { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--dim); letter-spacing: .06em; }
+
+  /* ---------- 结算（照原版 LevelOver：倾斜面板 + 曲绘 + 三根深色条） ---------- */
+  #resultOverlay {
+    --rs: 1px;                      /* 1 设计像素 = 多少屏幕像素，由 app.js 按窗口算 */
+    background: rgba(4,6,10,.9);
+    overflow: hidden;
+  }
+  /* 背景是曲绘本身放大 + 高斯模糊，原版就是这样一整屏虚化的曲绘 */
+  #resultOverlay::before {
+    content: ''; position: absolute; inset: -40px; z-index: 0;
+    background-image: var(--resArt, none); background-size: cover; background-position: center;
+    filter: blur(26px) brightness(.44) saturate(1.02); opacity: .96;
+  }
+  #resultOverlay::after {
+    content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background: radial-gradient(120% 90% at 50% 45%, rgba(0,0,0,0) 40%, rgba(0,0,0,.55) 100%);
+  }
+  .resStage {
+    position: relative; z-index: 2; box-sizing: border-box;
+    width: calc(774 * var(--rs)); height: calc(300 * var(--rs));
+    display: flex; align-items: stretch;
+    animation: resIn .5s cubic-bezier(.2,.9,.2,1) both;
+  }
+  @keyframes resIn { from { opacity: 0; transform: translateY(calc(20 * var(--rs))) scale(.985); } to { opacity: 1; transform: none; } }
+
+  /* 左：曲绘平行四边形（父层整体斜切，图再反切回来，边缘就被切出斜角） */
+  .resLeft {
+    position: absolute; left: calc(-40 * var(--rs)); top: 0; box-sizing: border-box;
+    width: calc(481 * var(--rs)); height: 100%;
+    transform: skewX(-15deg); overflow: hidden;
+  }
+  .resJacket {
+    position: absolute; left: calc(-44 * var(--rs)); top: 0;
+    width: calc(569 * var(--rs)); height: 100%; object-fit: cover;
+    transform: skewX(15deg); transform-origin: center;
+    display: block;
+  }
+  .resShade {
+    position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(180deg, rgba(0,0,0,.34) 0%, rgba(0,0,0,0) 46%, rgba(0,0,0,.62) 100%);
+  }
+  .resSongName {
+    position: absolute; left: calc(22 * var(--rs)); bottom: calc(7 * var(--rs));
+    font-size: calc(24 * var(--rs)); line-height: 1.1; color: #fff;
+    white-space: nowrap; max-width: calc(340 * var(--rs)); overflow: hidden; text-overflow: ellipsis;
+    transform: skewX(15deg); transform-origin: left bottom;
+  }
+  .resLevel {
+    position: absolute; right: calc(88 * var(--rs)); bottom: calc(9 * var(--rs));
+    font-size: calc(12.8 * var(--rs)); line-height: 1; color: rgba(255,255,255,.9);
+    letter-spacing: .02em;
+    transform: skewX(15deg); transform-origin: right bottom;
+  }
+
+  /* 右：分数块 + 两条细条，同样是平行四边形 */
+  .resRight {
+    position: absolute; left: calc(400 * var(--rs)); top: 0; box-sizing: border-box;
+    width: calc(433 * var(--rs)); height: 100%;
+    transform: skewX(-15deg);
+  }
+  .resScoreFrame {
+    position: relative; box-sizing: border-box;
+    width: calc(353 * var(--rs)); height: calc(150 * var(--rs));
+    margin-left: calc(41 * var(--rs));
+    background: rgba(0,0,0,.4);
+    padding: 0 calc(96 * var(--rs)) calc(30 * var(--rs)) calc(30 * var(--rs));
+    display: flex; align-items: flex-end; justify-content: flex-start;
+  }
+  .resScoreNum {
+    font-size: calc(44 * var(--rs)); line-height: 1.1; letter-spacing: .02em; color: #fff;
+    font-variant-numeric: tabular-nums;
+    transform: skewX(15deg); transform-origin: left bottom;
+    white-space: nowrap;
+  }
+  .resGrade {
+    position: absolute; right: calc(14 * var(--rs)); top: 50%;
+    margin-top: calc(-40 * var(--rs));
+    font-size: calc(80 * var(--rs)); line-height: 1; color: #fff;
+    transform: skewX(15deg); transform-origin: right center;
+  }
+  .resBar {
+    display: flex; align-items: center; justify-content: space-between;
+    box-sizing: border-box;
+    width: calc(353 * var(--rs)); height: calc(45 * var(--rs));
+    background: rgba(0,0,0,.4); padding: 0 calc(26 * var(--rs));
+  }
+  .resGlance { margin-top: calc(30 * var(--rs)); margin-left: calc(41 * var(--rs)); }
+  .resDetail { margin-top: calc(30 * var(--rs)); margin-left: calc(41 * var(--rs)); justify-content: space-between; gap: 0; padding: 0 calc(14 * var(--rs)); }
+  .resStat { display: flex; flex-direction: column; align-items: flex-start; line-height: 1; }
+  .resStat b {
+    font-weight: 400; font-size: calc(15 * var(--rs)); color: #fff;
+    font-variant-numeric: tabular-nums; letter-spacing: .02em;
+    transform: skewX(15deg); transform-origin: left center;
+  }
+  .resStat span {
+    margin-top: calc(3 * var(--rs)); font-size: calc(7 * var(--rs));
+    letter-spacing: .06em; color: rgba(255,255,255,.56);
+    transform: skewX(15deg); transform-origin: left center;
+    white-space: nowrap;
+  }
+  .resDetail .resStat { min-width: 0; flex: 1; align-items: center; }
+  .resMore { display: flex; gap: calc(12 * var(--rs)); margin-left: auto; }
+  .resMore .resStat { min-width: calc(28 * var(--rs)); align-items: flex-start; }
+
+  /* 底部标记条 + 左上重试 / 右下返回，照原版的斜角黑条 */
+  .resFoot {
+    position: absolute; left: 50%; bottom: 6vh; z-index: 3;
+    transform: translateX(-50%);
+    display: none; align-items: center; gap: calc(10 * var(--rs));
+    padding: calc(9 * var(--rs)) calc(30 * var(--rs));
+    background: rgba(0,0,0,.5);
+    font-size: calc(12.5 * var(--rs)); letter-spacing: .04em; color: #fff;
+    clip-path: polygon(calc(10 * var(--rs)) 0, 100% 0, calc(100% - 10 * var(--rs)) 100%, 0 100%);
+  }
+  .resFoot.show { display: flex; }
+  .resFoot #resultFlag:empty { display: none; }
+  .resFoot .resNew { display: none; }
+  .resFoot .resNew.show { display: inline; }
+  .resFoot .resNew::before { content: '·'; margin-right: calc(10 * var(--rs)); opacity: .5; }
+
+  .resIconBtn {
+    position: absolute; z-index: 3; padding: 0; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,.86); transition: background .16s;
+  }
+  .resIconBtn:hover { background: rgba(28,28,32,.95); }
+  .resIconBtn svg { display: block; }
+  #resultRetryBtn {
+    left: calc(10 * var(--rs)); top: calc(10 * var(--rs));
+    width: calc(62 * var(--rs)); height: calc(44 * var(--rs));
+    clip-path: polygon(0 0, 100% 0, calc(100% - 6 * var(--rs)) 100%, 0 100%);
+  }
+  #resultRetryBtn svg { width: calc(22 * var(--rs)); height: calc(22 * var(--rs)); }
+  #resultBackBtn {
+    right: calc(10 * var(--rs)); bottom: calc(10 * var(--rs));
+    width: calc(88 * var(--rs)); height: calc(50 * var(--rs));
+    clip-path: polygon(calc(8 * var(--rs)) 0, 100% 0, 100% 100%, 0 100%);
+  }
+  #resultBackBtn svg { width: calc(30 * var(--rs)); height: calc(30 * var(--rs)); }
+
+  /* 竖屏：原版那条 774×300 的横条搬到竖屏手机上只剩中间一条细缝（字号也被缩到看不清），
+     所以竖屏改成「上面曲绘、下面分数块」的竖排，字号按屏宽换算 */
+  @media (max-aspect-ratio: 1/1) {
+    #resultOverlay { --rs: calc(100vw / 774); }
+    .resStage {
+      position: absolute; left: 0; top: 0;
+      width: 100%; height: 100%; display: block;
+    }
+    .resLeft { left: -9vw; top: 4vh; width: 118vw; height: 36vh; }
+    .resJacket { left: -6vw; top: 0; width: 132vw; height: 100%; }
+    .resSongName { left: 24vw; bottom: 1.6vh; font-size: 4.4vw; max-width: 44vw; }
+    .resLevel { right: 10vw; bottom: 1.8vh; font-size: 2.6vw; }
+    .resRight { left: 4vw; top: 44vh; width: 92vw; height: auto; }
+    .resScoreFrame { width: 100%; height: 20vh; margin: 0; padding: 2.6vh 0 0 8vw; }
+    .resScoreNum { font-size: 5.4vh; }
+    .resGrade { right: 5vw; top: 0.6vh; font-size: 11vh; }
+    .resBar { width: 100%; height: 7.4vh; padding: 0 6vw; }
+    .resGlance, .resDetail { margin: 1.8vh 0 0 0; }
+    .resStat b { font-size: 2.8vh; }
+    .resStat span { font-size: 1.35vh; }
+    .resDetail .resStat, .resMore .resStat { min-width: 0; }
+    .resMore { gap: 3vw; }
+    #resultRetryBtn { left: 4vw; top: 4vh; width: 16vw; height: 9vh; }
+    #resultRetryBtn svg { width: 5vw; height: 5vw; }
+    #resultBackBtn { right: 0; bottom: 3vh; width: 22vw; height: 8vh; }
+    #resultBackBtn svg { width: 7vw; height: 7vw; }
+  }
+
+  .primary {
+    font: inherit; font-size: 13.5px; letter-spacing: .2em; text-indent: .2em; color: #07080c;
+    background: #fff; border: none; padding: 11px 30px; cursor: pointer; transition: background .16s;
+  }
+  .primary:hover { background: #cfe8ff; }
+
+  /* 加载提示 */
+  #toast {
+    position: fixed; left: 50%; bottom: 8vh; transform: translateX(-50%) translateY(10px);
+    z-index: 30; padding: 10px 22px; font-size: 12px; letter-spacing: .08em;
+    background: rgba(6,9,15,.94); border: 1px solid rgba(255,255,255,.2); color: #d5e3f0;
+    opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ---------- 横屏建议 ---------- */
+  #orientChip {
+    display: none; align-items: center; gap: 7px; margin-top: clamp(24px, 4.4vh, 40px);
+    font-size: 11px; letter-spacing: .2em; text-indent: .2em; color: rgba(226,240,255,.46);
+  }
+  #orientChip svg { width: 15px; height: 15px; flex: none; opacity: .72; }
+  @media (orientation: portrait) { #orientChip { display: inline-flex; } }
+  body.rotate-hint #orientChip { display: none; }
+
+  #rotateHint {
+    z-index: 40; flex-direction: column; text-align: center; padding: 8vh 8vw;
+    background: rgba(3,5,9,.9);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  }
+  .rotInner { display: flex; flex-direction: column; align-items: center; gap: 4px; max-width: 430px; }
+  .rotStage { position: relative; width: 112px; height: 112px; display: grid; place-items: center; margin-bottom: 24px; }
+  .rotRing {
+    position: absolute; inset: 0; border-radius: 50%;
+    border: 1px dashed rgba(255,255,255,.28);
+    animation: rotSpin 9s linear infinite;
+  }
+  @keyframes rotSpin { to { transform: rotate(360deg); } }
+  .rotPhone { width: 54px; height: 54px; animation: phoneRot 4s cubic-bezier(.62,0,.32,1) infinite; }
+  @keyframes phoneRot {
+    0%, 10%   { transform: rotate(0deg); }
+    45%, 70%  { transform: rotate(90deg); }
+    100%      { transform: rotate(0deg); }
+  }
+  #rotateHint h2 {
+    margin: 0 0 12px; font-size: clamp(18px, 2.2vw, 24px); font-weight: 500; letter-spacing: .24em;
+    color: #f2f7ff; text-indent: .24em;
+  }
+  #rotateHint p {
+    margin: 0 0 28px; font-size: 12.5px; line-height: 2.05; letter-spacing: .06em; color: #93a6bd;
+  }
+  #rotateHint p b { color: #fff; font-weight: 500; }
+  .rotBtns { display: flex; flex-direction: column; gap: 14px; width: 100%; align-items: center; }
+  .rotBtns .primary { letter-spacing: .24em; padding: 12px 34px; }
+  .rotSkip {
+    font: inherit; font-size: 11.5px; letter-spacing: .14em; color: #71829a; cursor: pointer;
+    background: none; border: none; padding: 6px 10px; transition: color .18s;
+  }
+  .rotSkip:hover { color: #d5e3f2; }
+
+  /* 760~1060px：还走两栏，但封面会把右栏挤到只剩一百来像素，
+     BEST / ACC 直接被裁成一列 28px 的碎字，开始按钮也被压扁。 */
+  @media (max-width: 1060px) {
+    .coverWrap { width: min(26vw, 240px); }
+    .playRow { flex-wrap: wrap; }
+    .selRight { gap: 20px; }
+  }
+
+  @media (max-width: 760px) {
+    .mBtn { padding: 12px 22px; font-size: 12px; letter-spacing: .22em; text-indent: .22em; }
+    .mBtn.set { margin-left: 22px; }
+    .mBtn.how { margin-left: 12px; padding: 11px 14px; font-size: 10.5px; letter-spacing: .16em; text-indent: .16em; }
+    .menuLogo { height: clamp(44px, 12vh, 92px); }
+    .selBody { flex-direction: column; padding: 0 14px 14px; }
+    .songList { width: 100%; max-height: 34vh; border-right: none; border-bottom: 1px solid rgba(255,255,255,.12); }
+    .selRight { gap: 14px; }
+    .coverWrap { width: 38vw; }
+    #songInfo, #syncMonitor { display: none; }
+    .setPanel { padding: 18px 16px; }
+    input[type=range] { width: 120px; }
+  }
+</style>
+</head>
+<body>
+  <div id="bgArt"></div>
+  <div id="bgVeil"></div>
+  <canvas id="stage"></canvas>
+
+  <!-- 音乐与打击音都来自预加载的音频元素；全程不创建任何 Web Audio 节点 -->
+  <audio id="bgm" preload="auto"></audio>
+
+  <button id="pauseBtn" type="button" aria-label="暂停"><img src="assets/Pause.png" alt=""></button>
+
+  <div id="hud">
+    <div id="songInfo"></div>
+    <div id="scoreBox"><div id="score">0000000</div><div id="acc">ACC 100.00%</div></div>
+    <div id="comboWrap"><div id="combo">0</div><div id="comboLabel">COMBO</div></div>
+    <div id="judgeText"></div>
+    <div id="syncMonitor"></div>
+  </div>
+
+  <!-- 主菜单 -->
+  <section id="menuScreen" class="screen show">
+    <div class="menuWrap">
+      <img class="menuLogo fadeUp" src="assets/Phigros.png" alt="Phigros">
+      <div class="menuEntries fadeUp d1">
+        <button id="menuStart" class="mBtn play" type="button"><span>开始游戏</span></button>
+        <button id="menuSettings" class="mBtn set" type="button"><span>设置</span></button>
+        <button id="menuGuide" class="mBtn how" type="button"><span>玩法指引</span></button>
+      </div>
+      <div id="orientChip" class="fadeUp d2">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="2.5" y="7" width="19" height="10" rx="1.6"/><path d="M5.4 10.4h.01" stroke-width="2.2" stroke-linecap="round"/></svg>
+        建议横屏游玩
+      </div>
+    </div>
+  </section>
+
+  <!-- 玩法指引 -->
+  <section id="guideScreen" class="screen">
+    <div class="guideTop">
+      <button id="guideBack" class="ghostBtn" type="button">← 返回</button>
+      <div class="selTitle">玩法指引</div>
+      <div class="guideTag">HOW TO PLAY</div>
+    </div>
+
+    <div class="guideBody">
+      <div class="gCol">
+        <section class="gSec">
+          <h3 class="gTitle">判定线<i>JUDGEMENT LINE</i></h3>
+          <div class="gDemo">
+            <div class="gDemoLine"></div>
+            <i class="gDemoNote n1"></i>
+            <i class="gDemoNote n2"></i>
+            <i class="gDemoNote n3"></i>
+            <div class="gDemoTag">音符触线的瞬间就是判定时刻</div>
+          </div>
+          <p class="gPara">音符永远沿着当前判定线的法线方向落下，与线身重合的一刻即判定。谱面里的线会 <b>移动、旋转、变速、淡出</b>，所以别盯屏幕上的固定位置，跟着线走。</p>
+        </section>
+
+        <section class="gSec">
+          <h3 class="gTitle">四种音符<i>NOTE TYPES</i></h3>
+          <div class="gNote">
+            <div class="gNoteIcon"><img class="tap" src="assets/Tap.png" alt=""></div>
+            <div class="gNoteText">
+              <b>Tap · 蓝键</b>
+              <span>触线时点一下。手指只要在这一列上就判，纵向不必精确对上音符；键盘用五个点击键之一。</span>
+            </div>
+          </div>
+          <div class="gNote">
+            <div class="gNoteIcon"><img class="drag" src="assets/Drag.png" alt=""></div>
+            <div class="gNoteText">
+              <b>Drag · 黄键</b>
+              <span>不用点。手指压在这一列，越线自动接住并记 PERFECT；键盘按住五列里对应的那个点击键才算。</span>
+            </div>
+          </div>
+          <div class="gNote">
+            <div class="gNoteIcon"><img class="flick" src="assets/Flick.png" alt=""></div>
+            <div class="gNoteText">
+              <b>Flick · 红键</b>
+              <span>要划。从按下点累计划出 20px 以上才算，单纯点一下不算；不必按在音符上，一次能划过多颗。键盘用划动键。</span>
+            </div>
+          </div>
+          <div class="gNote">
+            <div class="gNoteIcon"><i class="hold"><img class="tail" src="assets/HoldEnd.png" alt=""><span class="body"></span><img class="head" src="assets/HoldHead.png" alt=""></i></div>
+            <div class="gNoteText">
+              <b>Hold · 长条</b>
+              <span>头部与判定线重合时按住，条子走完才算数。它没有尾判——不用掐松手的时间，按住别松就行；尾巴过去之后继续按着也没关系。结束前松手才会 MISS（长条没有 BAD），松手 3 帧内按回去或换根手指接着按都不影响判定。</span>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="gCol">
+        <section class="gSec">
+          <h3 class="gTitle">判定区间<i>WINDOWS</i></h3>
+          <div class="gWin w1"><span>PERFECT</span><span>偏差 ±80 ms 内</span></div>
+          <div class="gWin w2"><span>GOOD</span><span>±80 ~ 160 ms</span></div>
+          <div class="gWin w3"><span>BAD</span><span>±160 ~ 180 ms，断连击</span></div>
+          <div class="gWin w4"><span>MISS</span><span>超过 180 ms 未击中</span></div>
+          <p class="gPara">BAD 仍然算击中，但只拿很少的分并且断连击；连击数过 50 后判定线的光会稍微提亮一档（原版就是暖黄白，不会换成青色）。</p>
+        </section>
+
+        <section class="gSec">
+          <h3 class="gTitle">操作<i>CONTROLS</i></h3>
+          <div class="gKeys">
+            <div class="gKey"><i>触屏</i><span><b>点</b> Tap/ Hold · <b>按住</b> Hold / Drag · <b>快速滑动</b> Flick，支持多指同时按。</span></div>
+            <div class="gKey"><i>键盘</i><span>五个<b>点击键</b>（默认 D F J K 空格）打 Tap / Hold，并按列接住 Drag；一个<b>划动键</b>（默认 ↑）打 Flick。键位可在设置里改。</span></div>
+            <div class="gKey"><i>暂停</i><span><b>Esc</b> 暂停，暂停面板里可以直接改谱面延时。</span></div>
+          </div>
+        </section>
+
+        <section class="gSec">
+          <h3 class="gTitle">结算<i>RESULT</i></h3>
+          <div class="gRanks">
+            <div class="gRank"><b style="color:#ffe9a8">PHI</b><u>一分不扣</u></div>
+            <div class="gRank"><b style="color:#ffd166">V</b><u>≥ 960000</u></div>
+            <div class="gRank"><b style="color:#ffd98a">S</b><u>≥ 920000</u></div>
+            <div class="gRank"><b style="color:#a9dcff">A</b><u>≥ 880000</u></div>
+            <div class="gRank"><b style="color:#9fe0a8">B</b><u>≥ 820000</u></div>
+            <div class="gRank"><b style="color:#c9d3df">C</b><u>≥ 700000</u></div>
+            <div class="gRank"><b style="color:#8e9aab">FALSE</b><u>低于 700000</u></div>
+          </div>
+          <p class="gPara">满分 <b>1000000</b>，评级按官方分数线看<b>分数</b>（不是 ACC）。想拿 PHI 必须一颗都不扣。</p>
+        </section>
+
+        <section class="gSec">
+          <h3 class="gTitle">打不准先调这里<i>CALIBRATION</i></h3>
+          <p class="gPara">总觉得「听到的比看到的早」，就把设置里的 <b>谱面延时</b> 加 10~20ms，反过来就减。<b>音符流速</b> 只改视觉速度，不影响判定；手机上连打掉帧，把 <b>画质</b> 调成「流畅」。</p>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <!-- 选曲 -->
+  <section id="selectScreen" class="screen">
+    <div class="ssStage">
+      <div class="ssLeft">
+        <div class="ssTopBar">
+          <div class="ssTopIn">
+            <span class="ssSort">排序方式</span>
+            <span class="ssSortName" id="ssSortName">名称</span>
+            <button id="ssSettings" class="ssSet" type="button">设置</button>
+          </div>
+        </div>
+        <ul id="songList" class="ssList"></ul>
+        <div class="ssHint" id="ssHint"></div>
+      </div>
+
+      <button id="selectBack" class="ssBack" type="button"><span>←</span></button>
+
+      <div class="ssArt"><img id="selCover" alt=""></div>
+      <div class="ssArtist" id="selArtist"></div>
+
+      <div class="ssDetail">
+        <div class="ssLevels" id="selLevels"></div>
+        <div class="ssScore" id="selBest">
+          <b id="selScore">0000000</b>
+          <em id="selAcc">00.00%</em>
+          <span class="ssNew" id="selNew">NEW</span>
+        </div>
+      </div>
+
+      <button id="playBtn" class="ssPlay" type="button" aria-label="开始"></button>
+    </div>
+  </section>
+
+  <!-- 设置 -->
+  <section id="settingsScreen" class="screen">
+    <div class="setPanel">
+      <div class="setHead">
+        <h2>设 置</h2>
+        <button id="settingsBack" class="ghostBtn" type="button">关闭</button>
+      </div>
+
+      <div class="setPreview">
+        <div class="spScene" id="spScene">
+          <div class="spDim" id="spDim"></div>
+          <div class="spLine" id="spLine"></div>
+          <i class="spNote n1"></i><i class="spNote n2"></i><i class="spNote n3"></i>
+          <span class="spTag" id="spTag">自动 · 1.00×</span>
+        </div>
+      </div>
+
+      <div class="setRow">
+        <div class="setLabel">谱面延时 (ms)<small>听到的声音比看到的滑块早，就调大这个值</small></div>
+        <div class="setCtl">
+          <button class="stepBtn" data-off="-5" type="button">−</button>
+          <input id="setOffset" class="num" type="number" step="1" value="0">
+          <button class="stepBtn" data-off="5" type="button">+</button>
+        </div>
+      </div>
+
+      <div class="setRow">
+        <div class="setLabel">音乐音量</div>
+        <div class="setCtl"><input id="setMusicVol" type="range" min="0" max="100" step="1" value="85"><span class="valTag" id="vMusicVol">85</span></div>
+      </div>
+
+      <div class="setRow">
+        <div class="setLabel">打击音音量</div>
+        <div class="setCtl"><input id="setHitVol" type="range" min="0" max="100" step="1" value="65"><span class="valTag" id="vHitVol">65</span></div>
+      </div>
+
+      <div class="setRow">
+        <div class="setLabel">打击音效<small>命中反馈音与界面点击音</small></div>
+        <div class="setCtl"><div id="setHitSound" class="switch on"></div></div>
+      </div>
+
+      <div class="setRow">
+        <div class="setLabel">音符流速<small>只影响视觉速度，不影响判定</small></div>
+        <div class="setCtl"><input id="setSpeed" type="range" min="60" max="200" step="5" value="100"><span class="valTag" id="vSpeed">1.00×</span></div>
+      </div>
+
+      <div class="setRow keyRow">
+        <div class="setLabel">按键映射<small>点一下格子再按键即可改；五个「点击」键从左到右对应谱面五列，黄键按列接住，红键用划动键</small></div>
+        <div class="setCtl keySlots" id="keySlots">
+          <button class="keySlot" type="button" data-key="tap0">D</button>
+          <button class="keySlot" type="button" data-key="tap1">F</button>
+          <button class="keySlot" type="button" data-key="tap2">SPACE</button>
+          <button class="keySlot" type="button" data-key="tap3">J</button>
+          <button class="keySlot" type="button" data-key="tap4">K</button>
+          <button class="keySlot flick" type="button" data-key="flick">↑</button>
+          <button id="keyReset" class="ghostBtn mini" type="button">默认</button>
+        </div>
+      </div>
+
+      <div class="setRow">
+        <div class="setLabel">画质<small>手机连打掉帧时选「流畅」；觉得发虚就选「高清」</small></div>
+        <div class="setCtl">
+          <div class="seg" id="setQuality">
+            <button type="button" data-q="smooth">流畅</button>
+            <button type="button" data-q="auto">自动</button>
+            <button type="button" data-q="high">高清</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="setRow">
+        <div class="setLabel">背景不透明度</div>
+        <div class="setCtl"><input id="setDim" type="range" min="0" max="100" step="1" value="55"><span class="valTag" id="vDim">55</span></div>
+      </div>
+
+      <div class="setRow">
+        <div class="setLabel">判定线不透明度</div>
+        <div class="setCtl"><input id="setLine" type="range" min="20" max="100" step="1" value="100"><span class="valTag" id="vLine">100</span></div>
+      </div>
+
+      <div class="setRow">
+        <div class="setLabel">显示时钟偏差<small>左下角 AUDIO CLOCK Δ，用于检查音画同步</small></div>
+        <div class="setCtl"><div id="setSync" class="switch on"></div></div>
+      </div>
+
+      <div class="setRow">
+        <div class="setLabel">切出窗口自动暂停</div>
+        <div class="setCtl"><div id="setAutoPause" class="switch"></div></div>
+      </div>
+
+      <div class="setRow">
+        <div class="setLabel">横屏提示<small>竖屏时提醒旋转设备，并在游玩中自动暂停</small></div>
+        <div class="setCtl"><div id="setRotateHint" class="switch on"></div></div>
+      </div>
+
+      <div class="setRow">
+        <div class="setLabel">成绩记录<small>重置所有曲目的最佳成绩</small></div>
+        <div class="setCtl"><button id="clearScores" class="ghostBtn" type="button">清空</button></div>
+      </div>
+
+      <div class="setFoot">
+        <button id="resetSettings" class="ghostBtn" type="button">恢复默认</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 暂停 -->
+  <div id="pauseOverlay" class="overlay">
+    <div class="pauseInner">
+      <div class="pauseTitle">PAUSED</div>
+      <div class="pauseIcons">
+        <button id="resumeBtn" class="iconBig" type="button" aria-label="继续"><img src="assets/Resume.png" alt=""></button>
+        <button id="pauseRestartBtn" class="iconBig" type="button" aria-label="重试"><img src="assets/Retry.png" alt=""></button>
+        <button id="pauseQuitBtn" class="iconBig txt" type="button">返回选曲</button>
+        <button id="pauseSettingsBtn" class="iconBig txt" type="button">设置</button>
+      </div>
+      <div class="offsetRow">
+        <label for="offsetPause">谱面延时(ms)</label>
+        <input id="offsetPause" class="num" type="number" step="1" value="0">
+      </div>
+    </div>
+  </div>
+
+  <!-- 结算：照原版 LevelOver 版式 -->
+  <div id="resultOverlay" class="overlay">
+    <div class="resStage">
+      <div class="resLeft">
+        <img class="resJacket" id="resultJacket" alt="">
+        <div class="resShade"></div>
+        <div class="resSongName" id="resultSongName"></div>
+        <div class="resLevel" id="resultSongMeta"></div>
+      </div>
+      <div class="resRight">
+        <div class="resScoreFrame">
+          <div class="resScoreNum" id="resScore">0000000</div>
+          <div class="resGrade" id="resultRank">C</div>
+        </div>
+        <div class="resBar resGlance">
+          <div class="resStat"><b id="resultCombo">0</b><span>Max Combo</span></div>
+          <div class="resStat"><b id="resultAcc">0.00%</b><span>Accuracy</span></div>
+        </div>
+        <div class="resBar resDetail">
+          <div class="resStat"><b id="resPerfect">0</b><span>Perfect</span></div>
+          <div class="resStat"><b id="resGood">0</b><span>Good</span></div>
+          <div class="resStat"><b id="resBad">0</b><span>Bad</span></div>
+          <div class="resStat"><b id="resMiss">0</b><span>Miss</span></div>
+          <div class="resMore">
+            <div class="resStat"><b id="resEarly">0</b><span>Early</span></div>
+            <div class="resStat"><b id="resLate">0</b><span>Late</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="resFoot" id="resultFoot">
+      <span id="resultFlag"></span><span class="resNew" id="resultNew">NEW RECORD</span>
+    </div>
+    <button id="resultRetryBtn" class="resIconBtn" type="button" aria-label="重试">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round">
+        <path d="M12 5.2a6.8 6.8 0 1 0 6.5 8.4"/><path d="M16.6 2.5v5.1h-5.1"/>
+      </svg>
+    </button>
+    <button id="resultBackBtn" class="resIconBtn" type="button" aria-label="返回选曲">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round">
+        <path d="M3.5 12h16"/><path d="M14 6.5l5.5 5.5-5.5 5.5" stroke-linejoin="round"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- 建议横屏游玩 -->
+  <div id="rotateHint" class="overlay" aria-modal="true" role="dialog">
+    <div class="rotInner">
+      <div class="rotStage">
+        <div class="rotRing"></div>
+        <svg class="rotPhone" viewBox="0 0 64 64" fill="none">
+          <rect x="20" y="6" width="24" height="52" rx="3" stroke="#e9f2fb" stroke-width="2.4"/>
+          <path d="M27 11.5h10" stroke="#e9f2fb" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M27 52.5h10" stroke="#e9f2fb" stroke-width="2.4" stroke-linecap="round" opacity=".4"/>
+        </svg>
+      </div>
+      <h2>建议横屏游玩</h2>
+      <p>横屏时判定线更宽、音符间距更舒展，<br>多指同时操作 <b>Drag / Flick</b> 也更好打。</p>
+      <div class="rotBtns">
+        <button id="rotateHintClose" class="primary" type="button">仍然竖屏游玩</button>
+        <button id="rotateHintNever" class="rotSkip" type="button">以后不再提示</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script src="songs.js"></script>
+  <script src="gunzip.js"></script>
+  <script src="game.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
