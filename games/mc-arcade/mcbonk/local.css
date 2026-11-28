@@ -1,0 +1,8 @@
+/* 本地化补丁：去掉 B 站宿主相关入口（关注 / 三连 / 排行榜） */
+.reward-strip,
+[data-ranks],
+.result-ranks,
+.rank-overlay,
+#rank-submit {
+  display: none !important;
+}
